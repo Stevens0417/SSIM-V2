@@ -1,0 +1,70 @@
+.container {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  padding: 5px 24px 5px 8px;
+  font-size: 12px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 4px;
+  background: var(--color-white);
+  outline: none;
+  text-overflow: ellipsis;
+}
+
+.input:focus {
+  border-color: var(--color-accent-500);
+}
+
+.input:disabled {
+  background: var(--color-gray-50);
+  color: var(--color-gray-400);
+  cursor: not-allowed;
+}
+
+.chevron {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--color-gray-400);
+  pointer-events: none;
+  line-height: 1;
+}
+
+.dropdown {
+  z-index: 9999;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.option {
+  padding: 5px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.option:hover,
+.optionHighlighted {
+  background: var(--color-gray-100);
+}
+
+.optionHighlighted {
+  background: var(--color-gray-100);
+}
+
+.noResults {
+  padding: 8px;
+  font-size: 11px;
+  color: var(--color-gray-400);
+  text-align: center;
+}

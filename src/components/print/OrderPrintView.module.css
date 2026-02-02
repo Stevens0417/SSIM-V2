@@ -1,0 +1,324 @@
+/* ===== Print Order Form — fixed 1-page, letter size ===== */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  width: 7.5in;
+  height: 10in;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9px;
+  color: #000;
+  line-height: 1.35;
+}
+
+/* ---- Multi-page override ---- */
+.pageMulti {
+  height: auto;
+  overflow: visible;
+}
+
+/* ---- Header ---- */
+.header {
+  flex-shrink: 0;
+  position: relative;
+  text-align: center;
+  border-bottom: 2.5px solid #000;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  height: 1.05in;
+  overflow: hidden;
+}
+
+.logo {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 110px;
+  max-height: 70px;
+  height: auto;
+  display: block;
+}
+
+.headerText {
+  display: inline-block;
+  line-height: 1.35;
+  padding-top: 6px;
+}
+
+.headerLine1 {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.headerLine2 {
+  font-size: 10px;
+  font-weight: 400;
+  margin-top: 3px;
+}
+
+.headerLine3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.headerLine4 {
+  font-size: 9px;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+/* ---- Section boxes ---- */
+.section {
+  flex-shrink: 0;
+  border: 1.5px solid #000;
+  margin-bottom: 4px;
+  overflow: hidden;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.sectionGrower {
+  height: 1.3in;
+}
+
+.sectionItems {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.sectionItemsMulti {
+  flex: none;
+  overflow: visible;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.sectionTitle {
+  background: #222;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  line-height: 1.4;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.sectionBody {
+  padding: 6px 8px;
+}
+
+/* ---- Grower info grid ---- */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 16px;
+}
+
+.infoRow {
+  display: flex;
+  gap: 3px;
+  align-items: baseline;
+}
+
+.infoLabel {
+  font-weight: 700;
+  font-size: 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  min-width: 52px;
+}
+
+.infoValue {
+  font-size: 9px;
+  border-bottom: 1px solid #aaa;
+  flex: 1;
+  min-height: 15px;
+  padding-bottom: 1px;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Items table ---- */
+.itemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9px;
+  table-layout: fixed;
+}
+
+.itemsTable thead {
+  display: table-header-group;
+}
+
+.itemsTable thead th {
+  background: #ddd;
+  font-weight: 700;
+  font-size: 7.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 5px 6px;
+  border: 1px solid #000;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* Explicit column widths */
+.colProduct { width: 22%; }
+.colQty { width: 5%; }
+.colSize { width: 8%; }
+.colPkg { width: 9%; }
+.colTreatment { width: 14%; }
+.colRetail { width: 10%; }
+.colNet { width: 19%; }
+.colTotal { width: 13%; }
+
+.itemsTable tbody td {
+  padding: 4px 6px;
+  border: 1px solid #bbb;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+  vertical-align: middle;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemsTable tbody tr:last-child td {
+  border-bottom: 1px solid #000;
+}
+
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRow td {
+  font-weight: 700;
+  border-top: 2px solid #000 !important;
+  border-bottom: 2px solid #000 !important;
+  background: #eee;
+  padding: 5px 6px;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.emptyRow td {
+  height: 18px;
+}
+
+.sectionDiscounts {
+  height: 1.85in;
+}
+
+.sectionComments {
+  height: 1.4in;
+}
+
+.sectionSignatures {
+  height: 0.85in;
+}
+
+/* ---- Discounts section ---- */
+.discountsBody {
+  padding: 8px 10px;
+}
+
+.discountsGrid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 0;
+  font-size: 9px;
+}
+
+.discountLabel {
+  font-weight: 400;
+  line-height: 1.7;
+}
+
+.discountValue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.7;
+  min-width: 100px;
+}
+
+.discountDivider {
+  grid-column: 1 / -1;
+  border-top: 1px solid #999;
+  margin: 3px 0;
+}
+
+.discountBold {
+  font-weight: 700;
+}
+
+.grandTotal {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* ---- Comments ---- */
+.commentsBox {
+  white-space: pre-wrap;
+  font-size: 9px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+
+/* ---- Signatures ---- */
+.sigGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 28px;
+  margin-top: 6px;
+}
+
+.sigLine {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.sigLabel {
+  font-weight: 700;
+  font-size: 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sigBlank {
+  flex: 1;
+  border-bottom: 1px solid #000;
+  min-height: 20px;
+}
+
+/* ---- Footer keep-together ---- */
+.footerBlock {
+  break-before: auto;
+}
+
+/* ---- Print overrides ---- */
+@media print {
+  .page {
+    max-width: none;
+  }
+  .pageMulti {
+    height: auto;
+    overflow: visible;
+  }
+}

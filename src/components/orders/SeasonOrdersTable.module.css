@@ -1,0 +1,87 @@
+.wrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--color-gray-200);
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-gray-100);
+  color: var(--color-primary-800);
+}
+
+.table tbody tr:hover {
+  background: var(--color-gray-50);
+}
+
+.right {
+  text-align: right;
+}
+
+.center {
+  text-align: center;
+}
+
+.mono {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.positive {
+  color: #16a34a;
+}
+
+.negative {
+  color: var(--color-red-600);
+}
+
+.editBtn {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--color-accent-500);
+  border-radius: 3px;
+  background: var(--color-white);
+  color: var(--color-accent-500);
+  cursor: pointer;
+}
+
+.editBtn:hover {
+  background: var(--color-gray-50);
+}
+
+.status {
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--color-gray-500);
+}
+
+.error {
+  padding: 12px 16px;
+  background: #fdecea;
+  color: var(--color-red-600);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .table {
+    font-size: 12px;
+  }
+}

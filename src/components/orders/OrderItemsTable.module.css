@@ -1,0 +1,179 @@
+.wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  background: var(--color-white);
+  margin-bottom: 8px;
+}
+
+.table {
+  width: 100%;
+  min-width: 800px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+}
+
+.table thead th {
+  padding: 4px 5px;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-primary-800);
+  color: var(--color-white);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.table tbody td {
+  padding: 2px 3px;
+  border-bottom: 1px solid var(--color-gray-100);
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+/* Column classes (widths defined by <colgroup> in JSX) */
+.colProduct {}
+.colTreatment {}
+.colPkg {}
+.colSize {}
+.colNum {}
+.colMoney {}
+.colTotal {}
+.colAction {}
+
+/* Align centered headers (body cells handled by their own classes) */
+.table thead .colSize,
+.table thead .colNum {
+  text-align: center;
+}
+
+.table thead .colMoney,
+.table thead .colTotal {
+  text-align: right;
+}
+
+.table thead .colAction {
+  text-align: center;
+}
+
+/* Inputs */
+.input {
+  width: 100%;
+  padding: 3px 5px;
+  font-size: 11px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 3px;
+  background: var(--color-white);
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--color-accent-500);
+}
+
+.numInput {
+  composes: input;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+.pkgSelect {
+  width: 100%;
+  padding: 3px 2px;
+  font-size: 10px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 3px;
+  background: var(--color-white);
+  outline: none;
+  cursor: pointer;
+}
+
+.pkgSelect:focus {
+  border-color: var(--color-accent-500);
+}
+
+.sizeInput {
+  composes: input;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 10px;
+}
+
+.sizeSelect {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 2px;
+  font-size: 10px;
+  text-align: center;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 3px;
+  background: var(--color-white);
+  outline: none;
+  cursor: pointer;
+}
+
+.sizeSelect:focus {
+  border-color: var(--color-accent-500);
+}
+
+.sizeSelect:disabled {
+  background: var(--color-gray-50);
+  cursor: not-allowed;
+  color: var(--color-gray-400);
+}
+
+/* Read-only money cells */
+.moneyCell {
+  display: block;
+  padding: 2px 5px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--color-gray-700);
+  white-space: nowrap;
+}
+
+.positive {
+  color: #16a34a;
+}
+
+.negative {
+  color: var(--color-red-600);
+}
+
+/* Actions */
+.removeBtn {
+  background: none;
+  border: none;
+  color: var(--color-gray-400);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.removeBtn:hover {
+  color: var(--color-red-600);
+  background: var(--color-gray-50);
+}
+
+.addBtn {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px dashed var(--color-gray-200);
+  border-radius: 4px;
+  background: none;
+  color: var(--color-accent-500);
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: var(--color-gray-50);
+}

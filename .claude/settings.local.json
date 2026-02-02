@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npx next lint:*)",
+      "Bash(npm install:*)",
+      "Bash(dir \"c:\\\\Projects\\\\SSIMV2\\\\docs\\\\04_UI_UX\"\")",
+      "Bash(npm i:*)",
+      "Bash(cd:*)"
+    ]
+  }
+}

@@ -1,0 +1,299 @@
+schema_name,object_type,object_name,owner,view_definition,trigger_definition
+public,i,customers_customer_name_uq,postgres,null,null
+public,i,customers_pkey,postgres,null,null
+public,i,deliveries_customer_date_idx,postgres,null,null
+public,i,deliveries_order_item_idx,postgres,null,null
+public,i,deliveries_pkey,postgres,null,null
+public,i,deliveries_product_treatment_idx,postgres,null,null
+public,i,deliveries_season_customer_idx,postgres,null,null
+public,i,order_items_order_id_idx,postgres,null,null
+public,i,order_items_order_idx,postgres,null,null
+public,i,order_items_pkey,postgres,null,null
+public,i,order_items_product_idx,postgres,null,null
+public,i,order_items_treatment_idx,postgres,null,null
+public,i,orders_customer_date_idx,postgres,null,null
+public,i,orders_pkey,postgres,null,null
+public,i,orders_season_year_date_idx,postgres,null,null
+public,i,orders_season_year_idx,postgres,null,null
+public,i,pricing_pkey,postgres,null,null
+public,i,pricing_product_season_idx,postgres,null,null
+public,i,pricing_product_treatment_season_uq,postgres,null,null
+public,i,pricing_product_year_idx,postgres,null,null
+public,i,pricing_season_year_idx,postgres,null,null
+public,i,pricing_treatment_season_idx,postgres,null,null
+public,i,pricing_treatment_year_idx,postgres,null,null
+public,i,products_pkey,postgres,null,null
+public,i,products_product_name_uq,postgres,null,null
+public,i,replants_customer_date_idx,postgres,null,null
+public,i,replants_order_item_idx,postgres,null,null
+public,i,replants_original_delivery_idx,postgres,null,null
+public,i,replants_original_return_idx,postgres,null,null
+public,i,replants_pkey,postgres,null,null
+public,i,replants_product_treatment_idx,postgres,null,null
+public,i,replants_season_customer_idx,postgres,null,null
+public,i,returns_customer_date_idx,postgres,null,null
+public,i,returns_order_item_idx,postgres,null,null
+public,i,returns_pkey,postgres,null,null
+public,i,returns_product_treatment_idx,postgres,null,null
+public,i,returns_season_customer_idx,postgres,null,null
+public,i,treatments_pkey,postgres,null,null
+public,i,treatments_treatment_name_uq,postgres,null,null
+public,r,customers,postgres,null,CREATE TRIGGER trg_customers_updated_at BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+public,r,deliveries,postgres,null,CREATE TRIGGER trg_deliveries_updated_at BEFORE UPDATE ON deliveries FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+public,r,order_items,postgres,null,null
+public,r,orders,postgres,null,CREATE TRIGGER trg_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+public,r,pricing,postgres,null,CREATE TRIGGER trg_pricing_updated_at BEFORE UPDATE ON pricing FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+public,r,products,postgres,null,CREATE TRIGGER trg_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+public,r,replants,postgres,null,CREATE TRIGGER trg_replants_updated_at BEFORE UPDATE ON replants FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+public,r,returns,postgres,null,CREATE TRIGGER trg_returns_updated_at BEFORE UPDATE ON returns FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+public,r,treatments,postgres,null,CREATE TRIGGER trg_treatments_updated_at BEFORE UPDATE ON treatments FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+public,v,v_current_season,postgres," SELECT max(season_year) AS season_year
+   FROM pricing;",null
+public,v,v_order_items_this_season,postgres," WITH cs AS (
+         SELECT v_current_season.season_year
+           FROM v_current_season
+        )
+ SELECT ( SELECT cs_1.season_year
+           FROM cs cs_1) AS season_year,
+    o.id AS order_id,
+    o.order_date,
+    o.customer_id,
+    c.customer_name,
+    c.farm_name,
+    c.phone_number,
+    o.brand_grower_pct,
+    o.early_pay_pct,
+    o.subtotal_before_discounts,
+    o.brand_grower_discount_total,
+    o.tote_bulk_discount_total,
+    o.subtotal_after_discounts_before_early_pay,
+    o.early_pay_discount_total,
+    o.total_after_all_discounts,
+    o.total_profit AS order_total_profit,
+    o.avg_profit_per_unit,
+    o.total_units,
+    o.created_at AS order_created_at,
+    o.updated_at AS order_updated_at,
+    oi.id AS order_item_id,
+    oi.product_id,
+    p.product_name,
+    oi.treatment_id,
+    t.treatment_name,
+    oi.seed_size,
+    oi.package_type,
+    oi.units,
+    oi.retail_price_per_unit,
+    oi.tote_bulk_discount_per_unit,
+    oi.line_subtotal_before_discounts,
+    oi.brand_grower_discount_amount,
+    oi.tote_bulk_discount_amount,
+    oi.line_total_after_discounts_before_early_pay,
+    oi.early_pay_discount_amount,
+    oi.line_total_after_all_discounts,
+    oi.break_even_price_per_unit,
+    oi.profit_per_unit,
+    oi.total_profit AS line_total_profit,
+    oi.created_at AS order_item_created_at
+   FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     JOIN customers c ON c.id = o.customer_id
+     JOIN products p ON p.id = oi.product_id
+     JOIN treatments t ON t.id = oi.treatment_id
+     JOIN cs ON o.season_year = cs.season_year;",null
+public,v,v_orders_this_season,postgres," SELECT o.id,
+    o.order_date,
+    o.customer_id,
+    o.brand_grower_pct,
+    o.early_pay_pct,
+    o.subtotal_before_discounts,
+    o.brand_grower_discount_total,
+    o.tote_bulk_discount_total,
+    o.subtotal_after_discounts_before_early_pay,
+    o.early_pay_discount_total,
+    o.total_after_all_discounts,
+    o.total_profit,
+    o.avg_profit_per_unit,
+    o.total_units,
+    o.created_at,
+    o.updated_at,
+    o.season_year,
+    c.customer_name,
+    c.farm_name,
+    c.phone_number
+   FROM orders o
+     JOIN customers c ON c.id = o.customer_id
+  WHERE o.season_year = (( SELECT max(pricing.season_year) AS max
+           FROM pricing));",null
+public,v,v_pricing_break_even_wide,postgres," SELECT pc.season_year,
+    pr.product_name AS product,
+    pr.crop,
+    pr.chu,
+    pr.seed_trait,
+    max(
+        CASE
+            WHEN tr.treatment_name = 'PONCHO'::text THEN
+            CASE
+                WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+                WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+                ELSE NULL::numeric
+            END
+            ELSE NULL::numeric
+        END) AS ""PONCHO"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'FUNGICIDE'::text THEN
+            CASE
+                WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+                WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+                ELSE NULL::numeric
+            END
+            ELSE NULL::numeric
+        END) AS ""FUNGICIDE"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'FUNGICIDE OPTIMIZE'::text THEN
+            CASE
+                WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+                WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+                ELSE NULL::numeric
+            END
+            ELSE NULL::numeric
+        END) AS ""FUNGICIDE OPTIMIZE"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'Fung/Insect'::text THEN
+            CASE
+                WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+                WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+                ELSE NULL::numeric
+            END
+            ELSE NULL::numeric
+        END) AS ""Fung/Insect"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'DIAMIDE'::text THEN
+            CASE
+                WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+                WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+                ELSE NULL::numeric
+            END
+            ELSE NULL::numeric
+        END) AS ""DIAMIDE"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'Poncho/i-374'::text THEN
+            CASE
+                WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+                WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+                ELSE NULL::numeric
+            END
+            ELSE NULL::numeric
+        END) AS ""Poncho/i-374"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'Fung/Insect/Opt'::text THEN
+            CASE
+                WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+                WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+                ELSE NULL::numeric
+            END
+            ELSE NULL::numeric
+        END) AS ""Fung/Insect/Opt"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'Fung/Insect/Ilevo'::text THEN
+            CASE
+                WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+                WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+                ELSE NULL::numeric
+            END
+            ELSE NULL::numeric
+        END) AS ""Fung/Insect/Ilevo""
+   FROM pricing pc
+     JOIN products pr ON pr.id = pc.product_id
+     JOIN treatments tr ON tr.id = pc.treatment_id
+  GROUP BY pc.season_year, pr.product_name, pr.crop, pr.chu, pr.seed_trait;",null
+public,v,v_pricing_options,postgres," SELECT pr.season_year,
+    p.id AS product_id,
+    p.product_name,
+    p.crop,
+    p.chu,
+    p.seed_trait,
+    t.id AS treatment_id,
+    t.treatment_name,
+    pr.retail_price,
+        CASE
+            WHEN lower(p.crop) = 'corn'::text THEN pr.retail_price - 0.075 * pr.retail_price - 56.65
+            WHEN lower(p.crop) = 'soybean'::text THEN pr.retail_price - 0.075 * pr.retail_price - 10.40
+            ELSE NULL::numeric
+        END AS break_even_price
+   FROM pricing pr
+     JOIN products p ON p.id = pr.product_id
+     JOIN treatments t ON t.id = pr.treatment_id;",null
+public,v,v_pricing_seasons,postgres," SELECT DISTINCT season_year
+   FROM pricing
+  ORDER BY season_year DESC;",null
+public,v,v_pricing_sheet,postgres," SELECT pc.pricing_year,
+    pr.product_name,
+    pr.crop,
+    pr.chu,
+    pr.seed_trait,
+    tr.treatment_name,
+    pc.retail_price,
+        CASE
+            WHEN pr.crop = 'corn'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 56.65, 2)
+            WHEN pr.crop = 'soybean'::text THEN round(pc.retail_price - 0.075 * pc.retail_price - 10.40, 2)
+            ELSE NULL::numeric
+        END AS break_even_price
+   FROM pricing pc
+     JOIN products pr ON pr.id = pc.product_id
+     JOIN treatments tr ON tr.id = pc.treatment_id;",null
+public,v,v_pricing_sheet_wide,postgres," SELECT pc.season_year,
+    pr.product_name AS product,
+    pr.crop,
+    pr.chu,
+    pr.seed_trait,
+    max(
+        CASE
+            WHEN tr.treatment_name = 'PONCHO'::text THEN pc.retail_price
+            ELSE NULL::numeric
+        END) AS ""PONCHO"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'FUNGICIDE'::text THEN pc.retail_price
+            ELSE NULL::numeric
+        END) AS ""FUNGICIDE"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'FUNGICIDE OPTIMIZE'::text THEN pc.retail_price
+            ELSE NULL::numeric
+        END) AS ""FUNGICIDE OPTIMIZE"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'Fung/Insect'::text THEN pc.retail_price
+            ELSE NULL::numeric
+        END) AS ""Fung/Insect"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'DIAMIDE'::text THEN pc.retail_price
+            ELSE NULL::numeric
+        END) AS ""DIAMIDE"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'Poncho/i-374'::text THEN pc.retail_price
+            ELSE NULL::numeric
+        END) AS ""Poncho/i-374"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'Fung/Insect/Opt'::text THEN pc.retail_price
+            ELSE NULL::numeric
+        END) AS ""Fung/Insect/Opt"",
+    max(
+        CASE
+            WHEN tr.treatment_name = 'Fung/Insect/Ilevo'::text THEN pc.retail_price
+            ELSE NULL::numeric
+        END) AS ""Fung/Insect/Ilevo""
+   FROM pricing pc
+     JOIN products pr ON pr.id = pc.product_id
+     JOIN treatments tr ON tr.id = pc.treatment_id
+  GROUP BY pc.season_year, pr.product_name, pr.crop, pr.chu, pr.seed_trait;",null

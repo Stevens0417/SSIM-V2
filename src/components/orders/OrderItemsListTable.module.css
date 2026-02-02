@@ -1,0 +1,217 @@
+/* ---- Filter bar ---- */
+.filterBar {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.clearFiltersBtn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 4px;
+  background: var(--color-white);
+  color: var(--color-gray-700);
+  cursor: pointer;
+}
+
+.clearFiltersBtn:hover {
+  background: var(--color-gray-50);
+}
+
+/* ---- Table ---- */
+.wrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.table thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--color-gray-200);
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--color-gray-100);
+  color: var(--color-primary-800);
+}
+
+.table tbody tr:hover {
+  background: var(--color-gray-50);
+}
+
+/* ---- Filterable header cell ---- */
+.filterableTh {
+  position: relative;
+}
+
+.thContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.filterBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-gray-400);
+  font-size: 9px;
+  cursor: pointer;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.filterBtn:hover {
+  background: var(--color-gray-100);
+  color: var(--color-gray-700);
+}
+
+.filterBtnActive {
+  background: var(--color-accent-500);
+  color: var(--color-white);
+}
+
+.filterBtnActive:hover {
+  background: var(--color-accent-600, var(--color-accent-500));
+}
+
+/* ---- Filter dropdown ---- */
+.filterDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  min-width: 140px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 2px;
+}
+
+.filterOption {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-primary-800);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.filterOption:hover {
+  background: var(--color-gray-50);
+}
+
+.filterOptionActive {
+  background: var(--color-accent-50, #eff6ff);
+  font-weight: 600;
+  color: var(--color-accent-500);
+}
+
+/* ---- Alignment helpers ---- */
+.right {
+  text-align: right;
+}
+
+.center {
+  text-align: center;
+}
+
+.orderId {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--color-gray-500);
+}
+
+.mono {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.positive {
+  color: #16a34a;
+}
+
+.negative {
+  color: var(--color-red-600);
+}
+
+/* ---- Action buttons ---- */
+.actionGroup {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.editBtn {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--color-accent-500);
+  border-radius: 3px;
+  background: var(--color-white);
+  color: var(--color-accent-500);
+  cursor: pointer;
+}
+
+.editBtn:hover {
+  background: var(--color-gray-50);
+}
+
+.deleteBtn {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--color-red-600);
+  border-radius: 3px;
+  background: var(--color-white);
+  color: var(--color-red-600);
+  cursor: pointer;
+}
+
+.deleteBtn:hover {
+  background: #fef2f2;
+}
+
+/* ---- Status / Error ---- */
+.status {
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--color-gray-500);
+}
+
+.error {
+  padding: 12px 16px;
+  background: #fdecea;
+  color: var(--color-red-600);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .table {
+    font-size: 11px;
+  }
+}

@@ -1,0 +1,146 @@
+.panel {
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  background: var(--color-gray-50);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panelTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary-800);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--color-gray-400);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.closeBtn:hover {
+  color: var(--color-gray-900);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fieldFull {
+  composes: field;
+  grid-column: 1 / -1;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.required::after {
+  content: " *";
+  color: var(--color-red-600);
+}
+
+.input {
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 4px;
+  outline: none;
+  background: var(--color-white);
+}
+
+.input:focus {
+  border-color: var(--color-accent-500);
+}
+
+.inputError {
+  border-color: var(--color-red-600);
+}
+
+.errorText {
+  font-size: 11px;
+  color: var(--color-red-600);
+}
+
+.saveError {
+  margin-top: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--color-red-600);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.saveBtn {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  background: var(--color-accent-500);
+  color: var(--color-white);
+  cursor: pointer;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: var(--color-accent-400);
+}
+
+.saveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  padding: 6px 16px;
+  font-size: 12px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 4px;
+  background: var(--color-white);
+  color: var(--color-gray-700);
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  background: var(--color-gray-100);
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fieldFull {
+    grid-column: 1;
+  }
+}
