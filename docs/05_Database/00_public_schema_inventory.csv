@@ -297,3 +297,26 @@ public,v,v_pricing_sheet_wide,postgres," SELECT pc.season_year,
      JOIN products pr ON pr.id = pc.product_id
      JOIN treatments tr ON tr.id = pc.treatment_id
   GROUP BY pc.season_year, pr.product_name, pr.crop, pr.chu, pr.seed_trait;",null
+
+  CREATE OR REPLACE VIEW public.v_deliveries_this_season AS
+SELECT
+  d.id AS delivery_id,
+  d.delivery_date,
+  d.season_year,
+  d.customer_id,
+  c.customer_name,
+  d.product_id,
+  p.product_name,
+  d.treatment_id,
+  t.treatment_name,
+  d.units_delivered,
+  d.order_id,
+  d.order_item_id,
+  d.notes,
+  d.created_at,
+  d.updated_at
+FROM public.deliveries d
+JOIN public.customers c ON c.id = d.customer_id
+JOIN public.products p ON p.id = d.product_id
+JOIN public.treatments t ON t.id = d.treatment_id
+WHERE d.season_year = (SELECT MAX(season_year) FROM public.v_pricing_seasons);

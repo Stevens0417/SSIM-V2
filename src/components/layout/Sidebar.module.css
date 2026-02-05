@@ -1,3 +1,4 @@
+/* ---- Desktop Sidebar ---- */
 .sidebar {
   position: fixed;
   top: 0;
@@ -49,54 +50,170 @@
   padding-left: 17px;
 }
 
-/* Hamburger — hidden on desktop */
-.hamburger {
+/* ---- Mobile Top Bar (hidden on desktop) ---- */
+.mobileTopBar {
   display: none;
+}
+
+/* ---- Mobile Drawer (hidden on desktop) ---- */
+.drawer {
+  display: none;
+}
+
+/* ---- Hamburger button ---- */
+.hamburger {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.hamburger:hover {
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .bar {
   display: block;
   width: 20px;
   height: 2px;
-  background: var(--color-white);
+  background: var(--color-primary-900);
   border-radius: 1px;
 }
 
+/* ---- Overlay ---- */
 .overlay {
   display: none;
 }
 
-/* ---- Mobile ---- */
+/* ---- Mobile Styles (<768px) ---- */
 @media (max-width: 768px) {
+  /* Hide desktop sidebar */
+  .sidebar {
+    display: none;
+  }
+
+  /* Show mobile top bar */
+  .mobileTopBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    padding: 0 12px;
+    background: var(--color-white);
+    border-bottom: 1px solid var(--color-gray-200);
+    z-index: 150;
+  }
+
+  .mobileTopLogo {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-primary-900);
+    letter-spacing: 0.5px;
+  }
+
+  /* Hamburger on right */
   .hamburger {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    z-index: 200;
-    padding: 8px;
-    background: var(--color-primary-900);
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
   }
 
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
-  }
-
-  .open {
-    transform: translateX(0);
-  }
-
+  /* Show overlay when drawer is open */
   .overlay {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 99;
-    background: rgba(0, 0, 0, 0.4);
+    z-index: 199;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  /* Mobile drawer from right */
+  .drawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    background: var(--color-white);
+    z-index: 200;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .drawerOpen {
+    transform: translateX(0);
+  }
+
+  .drawerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--color-gray-200);
+  }
+
+  .drawerTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-primary-900);
+  }
+
+  .drawerClose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: transparent;
+    border: none;
+    font-size: 28px;
+    color: var(--color-gray-500);
+    cursor: pointer;
+    border-radius: 6px;
+    line-height: 1;
+  }
+
+  .drawerClose:hover {
+    background: var(--color-gray-100);
+    color: var(--color-gray-700);
+  }
+
+  .drawerNav {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 0;
+  }
+
+  .drawerLink {
+    display: block;
+    padding: 14px 20px;
+    color: var(--color-gray-700);
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+  }
+
+  .drawerLink:hover {
+    background: var(--color-gray-50);
+  }
+
+  .drawerLinkActive {
+    background: var(--color-accent-50);
+    color: var(--color-accent-600);
+    font-weight: 600;
+    border-left: 3px solid var(--color-accent-500);
   }
 }

@@ -6,7 +6,8 @@
       "Bash(npm install:*)",
       "Bash(dir \"c:\\\\Projects\\\\SSIMV2\\\\docs\\\\04_UI_UX\"\")",
       "Bash(npm i:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

@@ -11,23 +11,11 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/orders/page": [
+    "/replants/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/orders/page.css",
-      "static/chunks/app/orders/page.js"
-    ],
-    "/orders/print/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/orders/print/page.css",
-      "static/chunks/app/orders/print/page.js"
-    ],
-    "/pricing/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/pricing/page.css",
-      "static/chunks/app/pricing/page.js"
+      "static/css/app/replants/page.css",
+      "static/chunks/app/replants/page.js"
     ]
   }
 }

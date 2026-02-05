@@ -1,28 +1,28 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/browserClient";
 
-export interface ReplantEntryInsert {
-  replant_date: string;
+export interface ReplantInsert {
+  return_date: string;
   season_year: number;
   customer_id: string;
   product_id: string;
   treatment_id: string;
-  units_replanted: number;
+  units_returned: number;
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
 }
 
-export interface CreateReplantEntriesResult {
+export interface CreateReplantsResult {
   ids: string[];
 }
 
-export async function createReplantEntries(
-  rows: ReplantEntryInsert[]
-): Promise<CreateReplantEntriesResult> {
+export async function createReplants(
+  rows: ReplantInsert[]
+): Promise<CreateReplantsResult> {
   const supabase = getSupabaseBrowserClient();
 
   const { data, error } = await supabase
-    .from("replants")
+    .from("returns")
     .insert(rows)
     .select("id");
 
@@ -38,8 +38,8 @@ export async function createReplantEntries(
 /* ---- Fetch replants from view ---- */
 
 export interface ReplantViewRow {
-  replant_id: string;
-  replant_date: string;
+  return_id: string;
+  return_date: string;
   season_year: number;
   customer_id: string;
   customer_name: string;
@@ -47,7 +47,7 @@ export interface ReplantViewRow {
   product_name: string;
   treatment_id: string;
   treatment_name: string;
-  units_replanted: number;
+  units_returned: number;
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
@@ -59,18 +59,20 @@ export async function fetchReplantsThisSeason(): Promise<ReplantViewRow[]> {
   const supabase = getSupabaseBrowserClient();
 
   const { data, error } = await supabase
-    .from("v_replants_this_season")
+    .from("v_returns_this_season")
     .select("*");
 
   if (error) {
     throw new Error(error.message || "Failed to load replants");
   }
 
-  // Sort client-side: replant_date DESC, then customer_name ASC
+  // Sort client-side: return_date DESC, then customer_name ASC
   const rows = (data ?? []) as ReplantViewRow[];
   rows.sort((a, b) => {
-    const dateCompare = b.replant_date.localeCompare(a.replant_date);
+    // Date descending
+    const dateCompare = b.return_date.localeCompare(a.return_date);
     if (dateCompare !== 0) return dateCompare;
+    // Customer ascending
     return a.customer_name.localeCompare(b.customer_name);
   });
 
@@ -79,25 +81,25 @@ export async function fetchReplantsThisSeason(): Promise<ReplantViewRow[]> {
 
 /* ---- Update a replant ---- */
 
-export interface ReplantEntryUpdate {
-  replant_date: string;
+export interface ReplantUpdate {
+  return_date: string;
   customer_id: string;
   product_id: string;
   treatment_id: string;
-  units_replanted: number;
+  units_returned: number;
   notes: string | null;
 }
 
-export async function updateReplantEntry(
-  replantId: string,
-  updates: ReplantEntryUpdate
+export async function updateReplant(
+  returnId: string,
+  updates: ReplantUpdate
 ): Promise<void> {
   const supabase = getSupabaseBrowserClient();
 
   const { error } = await supabase
-    .from("replants")
+    .from("returns")
     .update(updates)
-    .eq("id", replantId);
+    .eq("id", returnId);
 
   if (error) {
     throw new Error(error.message || "Failed to update replant");
@@ -106,13 +108,13 @@ export async function updateReplantEntry(
 
 /* ---- Delete a replant ---- */
 
-export async function deleteReplantEntry(replantId: string): Promise<void> {
+export async function deleteReplant(returnId: string): Promise<void> {
   const supabase = getSupabaseBrowserClient();
 
   const { error } = await supabase
-    .from("replants")
+    .from("returns")
     .delete()
-    .eq("id", replantId);
+    .eq("id", returnId);
 
   if (error) {
     throw new Error(error.message || "Failed to delete replant");

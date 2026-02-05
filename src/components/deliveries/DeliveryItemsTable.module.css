@@ -1,0 +1,215 @@
+/* ---- Desktop: table layout ---- */
+.wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  background: var(--color-white);
+  margin-bottom: 8px;
+}
+
+.table {
+  width: 100%;
+  min-width: 500px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+}
+
+.table thead th {
+  padding: 4px 5px;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-primary-800);
+  color: var(--color-white);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.table tbody td {
+  padding: 2px 3px;
+  border-bottom: 1px solid var(--color-gray-100);
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.colTreatment {
+  text-align: center;
+}
+
+.colNum {
+  text-align: right;
+}
+
+.colAction {
+  text-align: center;
+}
+
+.numInput {
+  width: 100%;
+  padding: 3px 5px;
+  font-size: 11px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 3px;
+  background: var(--color-white);
+  outline: none;
+  text-align: right;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+.numInput:focus {
+  border-color: var(--color-accent-500);
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  color: var(--color-gray-400);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.removeBtn:hover {
+  color: var(--color-red-600);
+  background: var(--color-gray-50);
+}
+
+.addBtn {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px dashed var(--color-gray-200);
+  border-radius: 4px;
+  background: none;
+  color: var(--color-accent-500);
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: var(--color-gray-50);
+}
+
+/* ---- Mobile: card layout (hidden on desktop) ---- */
+.cardList {
+  display: none;
+}
+
+.card {
+  border: 1px solid var(--color-gray-200);
+  border-radius: 8px;
+  background: var(--color-white);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cardIndex {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.cardRemoveBtn {
+  background: none;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  color: var(--color-gray-400);
+  cursor: pointer;
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.cardRemoveBtn:hover {
+  color: var(--color-red-600);
+  border-color: var(--color-red-600);
+}
+
+.cardField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.cardNumInput {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 16px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  background: var(--color-white);
+  outline: none;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardNumInput:focus {
+  border-color: var(--color-accent-500);
+}
+
+/* ---- Error states ---- */
+.errorWrap > * {
+  border-color: var(--color-red-600) !important;
+}
+
+.inputError {
+  border-color: var(--color-red-600) !important;
+}
+
+.errorText {
+  font-size: 11px;
+  color: var(--color-red-600);
+  margin-top: 2px;
+}
+
+/* ---- Mobile breakpoint ---- */
+@media (max-width: 768px) {
+  /* Hide desktop table */
+  .wrapper {
+    display: none;
+  }
+
+  /* Show mobile cards */
+  .cardList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  /* Full-width add button */
+  .addBtn {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    min-height: 44px;
+    border-radius: 8px;
+  }
+}

@@ -1,28 +1,28 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/browserClient";
 
-export interface ReplantEntryInsert {
-  replant_date: string;
+export interface DeliveryInsert {
+  delivery_date: string;
   season_year: number;
   customer_id: string;
   product_id: string;
   treatment_id: string;
-  units_replanted: number;
+  units_delivered: number;
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
 }
 
-export interface CreateReplantEntriesResult {
+export interface CreateDeliveriesResult {
   ids: string[];
 }
 
-export async function createReplantEntries(
-  rows: ReplantEntryInsert[]
-): Promise<CreateReplantEntriesResult> {
+export async function createDeliveries(
+  rows: DeliveryInsert[]
+): Promise<CreateDeliveriesResult> {
   const supabase = getSupabaseBrowserClient();
 
   const { data, error } = await supabase
-    .from("replants")
+    .from("deliveries")
     .insert(rows)
     .select("id");
 
@@ -35,11 +35,11 @@ export async function createReplantEntries(
   };
 }
 
-/* ---- Fetch replants from view ---- */
+/* ---- Fetch deliveries from view ---- */
 
-export interface ReplantViewRow {
-  replant_id: string;
-  replant_date: string;
+export interface DeliveryViewRow {
+  delivery_id: string;
+  delivery_date: string;
   season_year: number;
   customer_id: string;
   customer_name: string;
@@ -47,7 +47,7 @@ export interface ReplantViewRow {
   product_name: string;
   treatment_id: string;
   treatment_name: string;
-  units_replanted: number;
+  units_delivered: number;
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
@@ -55,66 +55,68 @@ export interface ReplantViewRow {
   updated_at: string;
 }
 
-export async function fetchReplantsThisSeason(): Promise<ReplantViewRow[]> {
+export async function fetchDeliveriesThisSeason(): Promise<DeliveryViewRow[]> {
   const supabase = getSupabaseBrowserClient();
 
   const { data, error } = await supabase
-    .from("v_replants_this_season")
+    .from("v_deliveries_this_season")
     .select("*");
 
   if (error) {
-    throw new Error(error.message || "Failed to load replants");
+    throw new Error(error.message || "Failed to load deliveries");
   }
 
-  // Sort client-side: replant_date DESC, then customer_name ASC
-  const rows = (data ?? []) as ReplantViewRow[];
+  // Sort client-side: delivery_date DESC, then customer_name ASC
+  const rows = (data ?? []) as DeliveryViewRow[];
   rows.sort((a, b) => {
-    const dateCompare = b.replant_date.localeCompare(a.replant_date);
+    // Date descending
+    const dateCompare = b.delivery_date.localeCompare(a.delivery_date);
     if (dateCompare !== 0) return dateCompare;
+    // Customer ascending
     return a.customer_name.localeCompare(b.customer_name);
   });
 
   return rows;
 }
 
-/* ---- Update a replant ---- */
+/* ---- Update a delivery ---- */
 
-export interface ReplantEntryUpdate {
-  replant_date: string;
+export interface DeliveryUpdate {
+  delivery_date: string;
   customer_id: string;
   product_id: string;
   treatment_id: string;
-  units_replanted: number;
+  units_delivered: number;
   notes: string | null;
 }
 
-export async function updateReplantEntry(
-  replantId: string,
-  updates: ReplantEntryUpdate
+export async function updateDelivery(
+  deliveryId: string,
+  updates: DeliveryUpdate
 ): Promise<void> {
   const supabase = getSupabaseBrowserClient();
 
   const { error } = await supabase
-    .from("replants")
+    .from("deliveries")
     .update(updates)
-    .eq("id", replantId);
+    .eq("id", deliveryId);
 
   if (error) {
-    throw new Error(error.message || "Failed to update replant");
+    throw new Error(error.message || "Failed to update delivery");
   }
 }
 
-/* ---- Delete a replant ---- */
+/* ---- Delete a delivery ---- */
 
-export async function deleteReplantEntry(replantId: string): Promise<void> {
+export async function deleteDelivery(deliveryId: string): Promise<void> {
   const supabase = getSupabaseBrowserClient();
 
   const { error } = await supabase
-    .from("replants")
+    .from("deliveries")
     .delete()
-    .eq("id", replantId);
+    .eq("id", deliveryId);
 
   if (error) {
-    throw new Error(error.message || "Failed to delete replant");
+    throw new Error(error.message || "Failed to delete delivery");
   }
 }

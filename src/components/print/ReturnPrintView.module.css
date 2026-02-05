@@ -1,0 +1,283 @@
+/* ===== Print Return Form — fixed 1-page, letter size ===== */
+/* Fixed section heights in mm for deterministic layout */
+
+@page {
+  margin-top: 4mm;
+  margin-bottom: 6mm;
+  margin-left: 8mm;
+  margin-right: 8mm;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  width: 190mm;
+  height: 254mm;
+  margin: 0;
+  padding: 6mm 8mm;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9px;
+  color: #000;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+/* ---- Header Section — 42mm ---- */
+.header {
+  flex-shrink: 0;
+  position: relative;
+  text-align: center;
+  border-bottom: 2.5px solid #000;
+  height: 42mm;
+  padding: 6mm 8mm;
+  margin-bottom: 2mm;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38mm;
+  max-height: 28mm;
+  height: auto;
+  display: block;
+}
+
+.headerText {
+  display: inline-block;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.headerLine1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.headerLine2 {
+  font-size: 11px;
+  font-weight: 400;
+  margin-top: 3px;
+}
+
+.headerLine3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.headerLine4 {
+  font-size: 9px;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+/* ---- Section boxes ---- */
+.section {
+  flex-shrink: 0;
+  border: 1.5px solid #000;
+  margin-bottom: 2mm;
+  overflow: hidden;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  box-sizing: border-box;
+}
+
+/* Customer Information — 34mm */
+.sectionCustomer {
+  height: 34mm;
+}
+
+/* Return Items — 92mm */
+.sectionItems {
+  height: 92mm;
+}
+
+/* Comments — 40mm */
+.sectionComments {
+  height: 40mm;
+}
+
+/* Signatures — 32mm */
+.sectionSignatures {
+  height: 32mm;
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  background: #222;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  line-height: 1.4;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.sectionBody {
+  padding: 4mm 6mm;
+  box-sizing: border-box;
+}
+
+/* ---- Customer info grid ---- */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 16px;
+}
+
+.infoRow {
+  display: flex;
+  gap: 3px;
+  align-items: baseline;
+}
+
+.infoLabel {
+  font-weight: 700;
+  font-size: 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  min-width: 72px;
+}
+
+.infoValue {
+  font-size: 9px;
+  border-bottom: 1px solid #aaa;
+  flex: 1;
+  min-height: 14px;
+  padding-bottom: 1px;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Items table ---- */
+.itemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+}
+
+.itemsTable thead {
+  display: table-header-group;
+}
+
+.itemsTable thead th {
+  background: #ddd;
+  font-weight: 700;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2mm 3mm;
+  border: 1px solid #000;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* Column widths */
+.colProduct { width: 45%; }
+.colTreatment { width: 35%; }
+.colUnits { width: 20%; text-align: right; }
+
+.itemsTable tbody td {
+  padding: 1.5mm 3mm;
+  border: 1px solid #bbb;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+  vertical-align: middle;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemsTable tbody tr {
+  height: 6mm;
+}
+
+.itemsTable tbody tr:last-child td {
+  border-bottom: 1px solid #000;
+}
+
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRow {
+  height: 8mm !important;
+}
+
+.totalRow td {
+  font-weight: 700;
+  font-size: 12px;
+  border-top: 2px solid #000 !important;
+  border-bottom: 2px solid #000 !important;
+  background: #eee;
+  padding: 2mm 3mm;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.emptyRow td {
+  height: 6mm;
+}
+
+/* ---- Comments ---- */
+.commentsBox {
+  white-space: pre-wrap;
+  font-size: 9px;
+  line-height: 1.5;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* ---- Signatures ---- */
+.sigGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 28px;
+  margin-top: 4mm;
+}
+
+.sigLine {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.sigLabel {
+  font-weight: 700;
+  font-size: 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sigBlank {
+  flex: 1;
+  border-bottom: 1px solid #000;
+  min-height: 18px;
+}
+
+/* ---- Print overrides ---- */
+@media print {
+  .page {
+    max-width: none;
+  }
+}
