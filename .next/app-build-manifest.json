@@ -1,21 +1,70 @@
 {
   "pages": {
-    "/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/page.css",
+      "static/chunks/app/page.js"
+    ],
+    "/pricing/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/pricing/page.css",
+      "static/chunks/app/pricing/page.js"
+    ],
+    "/orders/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/orders/page.css",
+      "static/chunks/app/orders/page.js"
+    ],
+    "/deliveries/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/deliveries/page.css",
+      "static/chunks/app/deliveries/page.js"
+    ],
+    "/returns/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/returns/page.css",
+      "static/chunks/app/returns/page.js"
+    ],
     "/replants/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/replants/page.css",
       "static/chunks/app/replants/page.js"
+    ],
+    "/adjustments/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/adjustments/page.css",
+      "static/chunks/app/adjustments/page.js"
+    ],
+    "/bayer-shipments/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/bayer-shipments/page.css",
+      "static/chunks/app/bayer-shipments/page.js"
+    ],
+    "/on-hand-inventory/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/on-hand-inventory/page.css",
+      "static/chunks/app/on-hand-inventory/page.js"
+    ],
+    "/orders/print/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/orders/print/page.css",
+      "static/chunks/app/orders/print/page.js"
     ]
   }
 }

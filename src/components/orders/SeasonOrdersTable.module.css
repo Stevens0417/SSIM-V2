@@ -82,6 +82,13 @@
 
 @media (max-width: 768px) {
   .table {
+    font-size: 11px;
+    min-width: 700px;
+  }
+
+  .editBtn {
+    padding: 6px 12px;
     font-size: 12px;
+    min-height: 36px;
   }
 }

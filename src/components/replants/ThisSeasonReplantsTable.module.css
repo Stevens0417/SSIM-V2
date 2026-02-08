@@ -311,9 +311,44 @@
 @media (max-width: 768px) {
   .table {
     font-size: 11px;
+    min-width: 700px;
   }
 
   .searchBar {
     max-width: none;
+  }
+
+  .searchInput {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .editBtn,
+  .deleteBtn {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+
+  .modal {
+    max-width: none;
+    margin: 16px;
+  }
+
+  .modalClose {
+    width: 44px;
+    height: 44px;
+  }
+
+  .formInput,
+  .formTextarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .cancelBtn,
+  .saveBtn {
+    min-height: 44px;
+    font-size: 14px;
   }
 }

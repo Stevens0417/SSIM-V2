@@ -33,3 +33,17 @@
 .active:hover {
   background: var(--color-primary-700);
 }
+
+@media (max-width: 768px) {
+  .group {
+    display: flex;
+    width: 100%;
+  }
+
+  .btn {
+    flex: 1;
+    text-align: center;
+    min-height: 44px;
+    padding: 10px 8px;
+  }
+}

@@ -3,19 +3,34 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/components/auth/AuthProvider";
 import styles from "./Sidebar.module.css";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/pricing", label: "Pricing" },
-  { href: "/orders", label: "Orders" },
-  { href: "/deliveries", label: "Deliveries" },
-  { href: "/returns", label: "Returns" },
-  { href: "/replants", label: "Replants" },
+const NAV_SECTIONS = [
+  {
+    label: "Tools",
+    items: [
+      { href: "/", label: "Dashboard" },
+      { href: "/pricing", label: "Pricing" },
+      { href: "/adjustments", label: "Adjustments" },
+      { href: "/on-hand-inventory", label: "On-Hand Inventory" },
+    ],
+  },
+  {
+    label: "Forms",
+    items: [
+      { href: "/orders", label: "Orders" },
+      { href: "/deliveries", label: "Deliveries" },
+      { href: "/returns", label: "Returns" },
+      { href: "/replants", label: "Replants" },
+      { href: "/bayer-shipments", label: "Bayer Shipments" },
+    ],
+  },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { signOut } = useAuth();
   const [open, setOpen] = useState(false);
 
   // Close drawer on ESC key
@@ -45,7 +60,7 @@ export default function Sidebar() {
     <>
       {/* ---- Mobile Top Bar ---- */}
       <div className={styles.mobileTopBar}>
-        <span className={styles.mobileTopLogo}>SSIM</span>
+        <span className={styles.mobileTopLogo}>Stevens Seeds Inventory Management</span>
         <button
           className={styles.hamburger}
           onClick={() => setOpen(true)}
@@ -82,41 +97,61 @@ export default function Sidebar() {
           </button>
         </div>
         <nav className={styles.drawerNav}>
-          {NAV_ITEMS.map(({ href, label }) => {
-            const isActive =
-              href === "/" ? pathname === "/" : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`${styles.drawerLink} ${isActive ? styles.drawerLinkActive : ""}`}
-                onClick={closeDrawer}
-              >
-                {label}
-              </Link>
-            );
-          })}
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label}>
+              <div className={styles.drawerSectionHeader}>{section.label}</div>
+              {section.items.map(({ href, label }) => {
+                const isActive =
+                  href === "/" ? pathname === "/" : pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`${styles.drawerLink} ${isActive ? styles.drawerLinkActive : ""}`}
+                    onClick={closeDrawer}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
+        <div className={styles.drawerFooter}>
+          <button className={styles.drawerSignOut} onClick={signOut}>
+            Sign Out
+          </button>
+        </div>
       </aside>
 
       {/* ---- Desktop Sidebar ---- */}
       <aside className={styles.sidebar}>
-        <div className={styles.logo}>SSIM</div>
+        <div className={styles.logo}>Stevens Seeds Inventory Management</div>
         <nav className={styles.nav}>
-          {NAV_ITEMS.map(({ href, label }) => {
-            const isActive =
-              href === "/" ? pathname === "/" : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`${styles.link} ${isActive ? styles.active : ""}`}
-              >
-                {label}
-              </Link>
-            );
-          })}
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label}>
+              <div className={styles.sectionHeader}>{section.label}</div>
+              {section.items.map(({ href, label }) => {
+                const isActive =
+                  href === "/" ? pathname === "/" : pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`${styles.link} ${isActive ? styles.active : ""}`}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
+        <div className={styles.sidebarFooter}>
+          <button className={styles.signOut} onClick={signOut}>
+            Sign Out
+          </button>
+        </div>
       </aside>
     </>
   );

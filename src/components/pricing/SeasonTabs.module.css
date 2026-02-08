@@ -31,10 +31,12 @@
 @media (max-width: 768px) {
   .tabs {
     flex-wrap: wrap;
+    gap: 2px;
   }
 
   .tab {
-    padding: 6px 14px;
+    padding: 10px 14px;
     font-size: 13px;
+    min-height: 44px;
   }
 }

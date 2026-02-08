@@ -1,0 +1,197 @@
+/* ---- Header Band ---- */
+.headerBand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--color-primary-800);
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+}
+
+.headerTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.headerSub {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+/* ---- Toolbar (toggle + refresh) ---- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+/* ---- View Toggle ---- */
+.viewToggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+/* ---- Refresh button ---- */
+.refreshBtn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 4px;
+  background: var(--color-white);
+  color: var(--color-gray-700);
+  cursor: pointer;
+}
+
+.refreshBtn:hover:not(:disabled) {
+  background: var(--color-gray-50);
+}
+
+.refreshBtn:disabled {
+  color: var(--color-gray-400);
+  cursor: not-allowed;
+}
+
+.toggleBtn {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background: var(--color-white);
+  color: var(--color-gray-700);
+  cursor: pointer;
+  border-right: 1px solid var(--color-gray-200);
+}
+
+.toggleBtn:last-child {
+  border-right: none;
+}
+
+.toggleBtn:hover:not(.toggleActive) {
+  background: var(--color-gray-50);
+}
+
+.toggleActive {
+  background: var(--color-accent-500);
+  color: var(--color-white);
+  font-weight: 600;
+}
+
+/* ---- KPI Cards ---- */
+.kpiRow {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.kpiCard {
+  flex: 1;
+  padding: 12px 16px;
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+}
+
+.kpiValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-primary-800);
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
+.kpiNegative .kpiValue {
+  color: var(--color-red-600);
+}
+
+/* ---- Empty / Status ---- */
+.status {
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--color-gray-500);
+}
+
+.error {
+  padding: 12px 16px;
+  background: #fdecea;
+  color: var(--color-red-600);
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+/* ---- Mobile responsive ---- */
+@media (max-width: 768px) {
+  .headerBand {
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+
+  .headerTitle {
+    font-size: 16px;
+  }
+
+  .headerSub {
+    font-size: 11px;
+  }
+
+  .toolbar {
+    margin-bottom: 14px;
+    gap: 8px;
+  }
+
+  .viewToggle {
+    width: auto;
+    flex: 1;
+  }
+
+  .toggleBtn {
+    flex: 1;
+    text-align: center;
+    padding: 10px 8px;
+    min-height: 44px;
+    font-size: 13px;
+  }
+
+  .refreshBtn {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .kpiRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .kpiValue {
+    font-size: 18px;
+  }
+
+  .kpiCard {
+    padding: 10px 12px;
+  }
+}

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import Sidebar from "@/components/layout/Sidebar";
+import AuthProvider from "@/components/auth/AuthProvider";
+import AppShell from "@/components/layout/AppShell";
 import "./globals.css";
-import styles from "./layout.module.css";
 
 export const metadata: Metadata = {
   title: "SSIM",
@@ -23,12 +23,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <div className={styles.shell}>
-          <div className="no-print">
-            <Sidebar />
-          </div>
-          <main className={styles.main}>{children}</main>
-        </div>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

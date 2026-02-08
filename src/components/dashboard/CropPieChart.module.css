@@ -1,0 +1,119 @@
+/* ---- Toggle ---- */
+.toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+  margin-bottom: 14px;
+}
+
+.toggleBtn {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background: var(--color-white);
+  color: var(--color-gray-700);
+  cursor: pointer;
+  border-right: 1px solid var(--color-gray-200);
+}
+
+.toggleBtn:last-child {
+  border-right: none;
+}
+
+.toggleBtn:hover:not(.toggleActive) {
+  background: var(--color-gray-50);
+}
+
+.toggleActive {
+  background: var(--color-accent-500);
+  color: var(--color-white);
+  font-weight: 600;
+}
+
+/* ---- Pie ---- */
+.pieWrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.pieChart {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: var(--color-gray-100);
+}
+
+/* ---- SVG Border Overlay ---- */
+.borderOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---- Slice Labels ---- */
+.sliceLabel {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  line-height: 1.25;
+  z-index: 2;
+}
+
+.sliceName {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 2.5px #000;
+  paint-order: stroke fill;
+  white-space: nowrap;
+}
+
+.slicePct {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 2.5px #000;
+  paint-order: stroke fill;
+}
+
+/* ---- Mobile ---- */
+@media (max-width: 768px) {
+  .toggle {
+    width: auto;
+  }
+
+  .toggleBtn {
+    flex: 1;
+    text-align: center;
+    padding: 10px 8px;
+    min-height: 44px;
+    font-size: 12px;
+  }
+
+  .pieChart {
+    width: 280px;
+    height: 280px;
+  }
+
+  .sliceName {
+    font-size: 12px;
+    -webkit-text-stroke: 3px #000;
+  }
+
+  .slicePct {
+    font-size: 12px;
+    -webkit-text-stroke: 3px #000;
+  }
+}

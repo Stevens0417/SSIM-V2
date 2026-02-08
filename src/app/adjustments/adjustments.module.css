@@ -1,0 +1,78 @@
+/* ---- Header Band ---- */
+.headerBand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--color-primary-800);
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+}
+
+.headerTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.headerSub {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+/* ---- Season Selector ---- */
+.seasonBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.seasonLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+}
+
+.seasonSelect {
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  background: var(--color-white);
+  outline: none;
+  cursor: pointer;
+}
+
+.seasonSelect:focus {
+  border-color: var(--color-accent-500);
+}
+
+/* ---- Mobile responsive ---- */
+@media (max-width: 768px) {
+  .headerBand {
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+
+  .headerTitle {
+    font-size: 16px;
+  }
+
+  .headerSub {
+    font-size: 11px;
+  }
+
+  .seasonSelect {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 16px;
+  }
+}

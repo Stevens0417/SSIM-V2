@@ -21,3 +21,9 @@ Thumbs.db
 
 # Supabase
 supabase/.temp/
+
+# Claude
+.claude/settings.local.json
+
+# TypeScript
+tsconfig.tsbuildinfo
