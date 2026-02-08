@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import OrderItemsTable, {
   type OrderItem,
   createEmptyItem,
@@ -59,8 +58,6 @@ function fmt(n: number): string {
 type View = "new" | "list";
 
 export default function OrdersPage() {
-  const router = useRouter();
-
   // View toggle
   const [view, setView] = useState<View>("new");
 
@@ -165,8 +162,7 @@ export default function OrdersPage() {
     setItems((prev) => recalcAllItems(prev, pct, earlyPayPct));
   };
 
-  const handleEarlyPayToggle = (enabled: boolean) => {
-    const pct = enabled ? 5 : 0;
+  const handleEarlyPayChange = (pct: number) => {
     setEarlyPayPct(pct);
     setItems((prev) => recalcAllItems(prev, brandGrowerPct, pct));
   };
@@ -401,10 +397,10 @@ export default function OrdersPage() {
       if (editingOrderId) {
         await updateOrder(editingOrderId, orderPayload, itemPayloads);
       } else {
-        await saveOrder(orderPayload, itemPayloads);
+        const newId = await saveOrder(orderPayload, itemPayloads);
+        setEditingOrderId(newId);
       }
       setSaveSuccess(true);
-      clearForm();
     } catch (err) {
       setSaveError(
         err instanceof Error ? err.message : "Failed to save order"
@@ -486,7 +482,7 @@ export default function OrdersPage() {
       },
     };
     sessionStorage.setItem("ssim-print-data", JSON.stringify(printData));
-    router.push("/orders/print");
+    window.open("/orders/print", "_blank");
   };
 
   return (
@@ -625,14 +621,23 @@ export default function OrdersPage() {
                 }
               />
             </div>
-            <label className={styles.earlyPayLabel}>
+            <div className={styles.discountField}>
+              <label className={styles.discountLabel}>Early Pay %</label>
               <input
-                type="checkbox"
-                checked={earlyPayPct > 0}
-                onChange={(e) => handleEarlyPayToggle(e.target.checked)}
+                className={styles.discountInput}
+                type="number"
+                min={0}
+                max={100}
+                step={0.1}
+                value={earlyPayPct || ""}
+                placeholder="0"
+                onChange={(e) =>
+                  handleEarlyPayChange(
+                    Math.min(100, Math.max(0, Number(e.target.value) || 0))
+                  )
+                }
               />
-              Early Pay (5%)
-            </label>
+            </div>
           </div>
 
           {/* ---- Order Summary ---- */}

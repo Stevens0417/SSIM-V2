@@ -270,6 +270,51 @@
   cursor: not-allowed;
 }
 
+/* ---- Verified row ---- */
+.verifiedRow {
+  color: var(--color-gray-400);
+}
+
+.verifyCheckbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-accent-500);
+}
+
+.verifyCheckbox:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+/* ---- Verify error banner ---- */
+.verifyError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: #fdecea;
+  color: var(--color-red-600);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.dismissBtn {
+  padding: 2px 8px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  color: var(--color-red-600);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.dismissBtn:hover {
+  opacity: 0.7;
+}
+
 /* ---- Mobile responsive ---- */
 @media (max-width: 768px) {
   .table {

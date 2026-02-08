@@ -7,7 +7,15 @@
       "Bash(dir \"c:\\\\Projects\\\\SSIMV2\\\\docs\\\\04_UI_UX\"\")",
       "Bash(npm i:*)",
       "Bash(cd:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(npm test:*)",
+      "Bash(node -e:*)",
+      "Bash(node --version:*)",
+      "Bash(npx vitest:*)",
+      "WebFetch(domain:vitest.dev)",
+      "Bash(del c:ProjectsSSIMV2srcsmoke.test.ts)",
+      "Bash(find:*)"
     ]
   }
 }

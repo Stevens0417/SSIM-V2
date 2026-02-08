@@ -13,6 +13,7 @@ interface Props {
   error: string | null;
   onEdit: (shipmentId: string) => void;
   onDelete: (shipmentId: string) => void | Promise<void>;
+  onVerify: (shipmentItemId: string, verified: boolean) => Promise<void>;
 }
 
 export default function ThisSeasonShipmentsTable({
@@ -24,10 +25,37 @@ export default function ThisSeasonShipmentsTable({
   error,
   onEdit,
   onDelete,
+  onVerify,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; label: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [pendingVerify, setPendingVerify] = useState<Set<string>>(new Set());
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const handleVerifyToggle = async (row: ShipmentViewRow) => {
+    const itemId = row.shipment_item_id;
+    const newValue = !row.is_verified;
+
+    // Mark as pending (optimistic — parent patches rows)
+    setPendingVerify((prev) => new Set(prev).add(itemId));
+    setVerifyError(null);
+
+    try {
+      await onVerify(itemId, newValue);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "Unknown error";
+      setVerifyError(
+        `Failed to update verification for ${row.product_name}: ${detail}`
+      );
+    } finally {
+      setPendingVerify((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!searchTerm.trim()) return rows;
@@ -94,9 +122,21 @@ export default function ThisSeasonShipmentsTable({
         </div>
       ) : (
         <div className={styles.wrapper}>
+          {verifyError && (
+            <div className={styles.verifyError}>
+              {verifyError}
+              <button
+                className={styles.dismissBtn}
+                onClick={() => setVerifyError(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
           <table className={styles.table}>
             <thead>
               <tr>
+                <th className={styles.center}>Verified</th>
                 <th>Shipment Date</th>
                 <th>Shipment #</th>
                 <th>Product</th>
@@ -109,9 +149,22 @@ export default function ThisSeasonShipmentsTable({
               {filtered.map((r) => {
                 const isFirstForShipment = !seenShipments.has(r.shipment_id);
                 if (isFirstForShipment) seenShipments.add(r.shipment_id);
+                const isPending = pendingVerify.has(r.shipment_item_id);
 
                 return (
-                  <tr key={r.shipment_item_id}>
+                  <tr
+                    key={r.shipment_item_id}
+                    className={r.is_verified ? styles.verifiedRow : ""}
+                  >
+                    <td className={styles.center}>
+                      <input
+                        type="checkbox"
+                        className={styles.verifyCheckbox}
+                        checked={r.is_verified}
+                        disabled={isPending}
+                        onChange={() => handleVerifyToggle(r)}
+                      />
+                    </td>
                     <td>{r.shipment_date}</td>
                     <td>{r.shipment_number}</td>
                     <td>{r.product_name}</td>

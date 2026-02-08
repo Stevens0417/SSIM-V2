@@ -66,16 +66,24 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+function safePct(v: number): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, n));
+}
+
 export function recalcLine(
   item: OrderItem,
   brandGrowerPct: number,
   earlyPayPct: number
 ): OrderItem {
+  const bgPct = safePct(brandGrowerPct);
+  const epPct = safePct(earlyPayPct);
   const lineSubtotalBeforeDiscounts = round2(
     item.units * item.retailPricePerUnit
   );
   const brandGrowerDiscountAmount = round2(
-    lineSubtotalBeforeDiscounts * (brandGrowerPct / 100)
+    lineSubtotalBeforeDiscounts * (bgPct / 100)
   );
   const toteBulkDiscountAmount = round2(
     item.units * item.toteBulkDiscountPerUnit
@@ -86,7 +94,7 @@ export function recalcLine(
       toteBulkDiscountAmount
   );
   const earlyPayDiscountAmount = round2(
-    lineTotalAfterDiscountsBeforeEarlyPay * (earlyPayPct / 100)
+    lineTotalAfterDiscountsBeforeEarlyPay * (epPct / 100)
   );
   const lineTotalAfterAllDiscounts = round2(
     lineTotalAfterDiscountsBeforeEarlyPay - earlyPayDiscountAmount

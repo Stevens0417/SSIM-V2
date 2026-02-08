@@ -84,6 +84,9 @@ export interface ShipmentViewRow {
   treatment_id: string;
   treatment_name: string;
   units_received: number;
+  is_verified: boolean;
+  verified_at: string | null;
+  verified_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -177,5 +180,36 @@ export async function deleteBayerShipment(
 
   if (error) {
     throw new Error(error.message || "Failed to delete shipment");
+  }
+}
+
+/* ---- Toggle verification on a shipment item ---- */
+
+export async function verifyShipmentItem(
+  shipmentItemId: string,
+  verified: boolean
+): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+
+  // Only send is_verified — the DB trigger
+  // (trg_bayer_shipment_items_verified_meta) auto-sets
+  // verified_at and verified_by (uuid FK to auth.users).
+  const { error } = await supabase
+    .from("bayer_shipment_items")
+    .update({ is_verified: verified })
+    .eq("id", shipmentItemId);
+
+  if (error) {
+    console.error("[verifyShipmentItem] Supabase error:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      shipmentItemId,
+      verified,
+    });
+    throw new Error(
+      error.message || "Failed to update verification status"
+    );
   }
 }

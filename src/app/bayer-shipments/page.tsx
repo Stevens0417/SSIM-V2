@@ -18,6 +18,7 @@ import {
   fetchShipmentSeasons,
   fetchBayerShipments,
   deleteBayerShipment,
+  verifyShipmentItem,
   type ShipmentViewRow,
 } from "@/services/bayer-shipment.service";
 import styles from "./bayer-shipments.module.css";
@@ -343,6 +344,32 @@ export default function BayerShipmentsPage() {
     setView("new");
   };
 
+  // Verify handler — optimistic UI
+  const handleVerify = async (shipmentItemId: string, verified: boolean) => {
+    // Optimistic patch
+    setShipmentRows((prev) =>
+      prev.map((r) =>
+        r.shipment_item_id === shipmentItemId
+          ? { ...r, is_verified: verified }
+          : r
+      )
+    );
+
+    try {
+      await verifyShipmentItem(shipmentItemId, verified);
+    } catch (err) {
+      // Revert on failure
+      setShipmentRows((prev) =>
+        prev.map((r) =>
+          r.shipment_item_id === shipmentItemId
+            ? { ...r, is_verified: !verified }
+            : r
+        )
+      );
+      throw err; // re-throw so the table component shows its error banner
+    }
+  };
+
   // Delete handler
   const handleDelete = async (shipmentId: string) => {
     try {
@@ -383,6 +410,7 @@ export default function BayerShipmentsPage() {
           error={listError}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onVerify={handleVerify}
         />
       ) : (
         <>

@@ -202,16 +202,6 @@
   border-color: var(--color-accent-500);
 }
 
-.earlyPayLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-gray-700);
-  cursor: pointer;
-}
-
 /* ---- Order Summary ---- */
 .orderSummary {
   border: 1px solid var(--color-gray-200);
