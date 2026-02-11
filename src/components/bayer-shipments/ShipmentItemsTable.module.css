@@ -173,6 +173,15 @@
   border-color: var(--color-accent-500);
 }
 
+/* ---- No-treatment indicator ---- */
+.naText {
+  display: inline-block;
+  padding: 3px 5px;
+  font-size: 11px;
+  color: var(--color-gray-400);
+  font-style: italic;
+}
+
 /* ---- Error states ---- */
 .errorWrap > * {
   border-color: var(--color-red-600) !important;

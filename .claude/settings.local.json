@@ -15,7 +15,9 @@
       "Bash(npx vitest:*)",
       "WebFetch(domain:vitest.dev)",
       "Bash(del c:ProjectsSSIMV2srcsmoke.test.ts)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && grep \"\"create table\\\\|create or replace view\\\\|bayer_shipment\"\" {}')"
     ]
   }
 }

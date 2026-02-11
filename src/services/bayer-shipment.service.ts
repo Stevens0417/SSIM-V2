@@ -3,6 +3,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browserClient";
 export interface ShipmentHeaderInsert {
   shipment_date: string;
   shipment_number: string;
+  season_year: number;
 }
 
 export interface ShipmentItemInsert {
@@ -29,6 +30,7 @@ export async function createBayerShipment(
     .insert({
       shipment_date: header.shipment_date,
       shipment_number: header.shipment_number,
+      season_year: header.season_year,
     })
     .select("id")
     .single();
@@ -58,17 +60,21 @@ export async function createBayerShipment(
   return { shipmentId, itemCount: itemRows.length };
 }
 
-/* ---- Fetch seasons from v_all_seasons ---- */
+/* ---- Fetch distinct seasons that have shipments ---- */
 
 export async function fetchShipmentSeasons(): Promise<number[]> {
   const supabase = getSupabaseBrowserClient();
 
   const { data, error } = await supabase
-    .from("v_all_seasons")
+    .from("v_bayer_shipments_headers")
     .select("season_year");
 
   if (error) throw new Error(error.message || "Failed to load seasons");
-  return (data ?? []).map((r) => r.season_year as number);
+
+  // Dedupe + sort descending (view may return one row per shipment)
+  const unique = [...new Set((data ?? []).map((r) => r.season_year as number))];
+  unique.sort((a, b) => b - a);
+  return unique;
 }
 
 /* ---- Fetch shipments from view ---- */
@@ -130,6 +136,7 @@ export async function updateBayerShipment(
     .update({
       shipment_date: header.shipment_date,
       shipment_number: header.shipment_number,
+      season_year: header.season_year,
     })
     .eq("id", shipmentId);
 
@@ -183,6 +190,42 @@ export async function deleteBayerShipment(
   }
 }
 
+/* ---- Fetch packaging products (crop = 'packaging') ---- */
+
+export interface PackagingProduct {
+  id: string;
+  product_name: string;
+}
+
+export async function fetchPackagingProducts(): Promise<PackagingProduct[]> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, product_name")
+    .eq("crop", "packaging")
+    .order("product_name");
+
+  if (error) throw new Error(error.message || "Failed to load packaging products");
+  return (data ?? []) as PackagingProduct[];
+}
+
+/* ---- Fetch NO_TREATMENT id (call once on page init) ---- */
+
+export async function fetchNoTreatmentId(): Promise<string | null> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("treatments")
+    .select("id")
+    .eq("treatment_name", "NO_TREATMENT")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[fetchNoTreatmentId] Supabase error:", error.message);
+    return null;
+  }
+  return data?.id ?? null;
+}
+
 /* ---- Toggle verification on a shipment item ---- */
 
 export async function verifyShipmentItem(
@@ -210,6 +253,81 @@ export async function verifyShipmentItem(
     });
     throw new Error(
       error.message || "Failed to update verification status"
+    );
+  }
+}
+
+/* ---- Year-End Totals ---- */
+
+export interface YearEndTotalRow {
+  season_year: number;
+  product_id: string;
+  product_name: string;
+  treatment_id: string;
+  treatment_name: string;
+  net_units: number;
+  is_verified: boolean;
+  verified_at: string | null;
+  verified_by: string | null;
+}
+
+export async function fetchYearEndTotals(
+  seasonYear: number
+): Promise<YearEndTotalRow[]> {
+  const supabase = getSupabaseBrowserClient();
+
+  const { data, error } = await supabase
+    .from("v_bayer_year_end_totals")
+    .select("*")
+    .eq("season_year", seasonYear)
+    .order("product_name", { ascending: true })
+    .order("treatment_name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message || "Failed to load year-end totals");
+  }
+
+  return (data ?? []) as YearEndTotalRow[];
+}
+
+/* ---- Upsert year-end verification ---- */
+
+export async function upsertYearEndVerification(
+  seasonYear: number,
+  productId: string,
+  treatmentId: string,
+  isVerified: boolean
+): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("bayer_year_end_verifications")
+    .upsert(
+      {
+        user_id: user.id,
+        season_year: seasonYear,
+        product_id: productId,
+        treatment_id: treatmentId,
+        is_verified: isVerified,
+      },
+      { onConflict: "user_id,season_year,product_id,treatment_id" }
+    );
+
+  if (error) {
+    console.error("[upsertYearEndVerification] Supabase error:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(
+      error.message || "Failed to update year-end verification"
     );
   }
 }

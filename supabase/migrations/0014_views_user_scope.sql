@@ -54,7 +54,7 @@ union
     from replants
    where user_id = auth.uid()
 union
-  select distinct extract(year from shipment_date)::integer as season_year
+  select distinct season_year
     from bayer_shipments
    where user_id = auth.uid()
 order by 1 desc;
@@ -67,7 +67,7 @@ create or replace view public.v_bayer_shipments as
 select
   s.id            as shipment_id,
   s.shipment_date,
-  extract(year from s.shipment_date)::integer as season_year,
+  s.season_year,
   s.shipment_number,
   i.id            as shipment_item_id,
   i.product_id,
@@ -81,7 +81,8 @@ from bayer_shipments      s
 join bayer_shipment_items i on i.shipment_id = s.id
 join products             p on p.id = i.product_id
 join treatments           t on t.id = i.treatment_id
-where s.user_id = auth.uid();
+where s.user_id = auth.uid()
+  and i.user_id = auth.uid();
 
 
 -- ---------------------------------------------------------
@@ -91,12 +92,12 @@ create or replace view public.v_bayer_shipments_headers as
 select
   id as shipment_id,
   shipment_date,
-  extract(year from shipment_date)::integer as season_year,
+  season_year,
   shipment_number,
   created_at,
   updated_at
 from bayer_shipments s
-where s.user_id = auth.uid();
+where user_id = auth.uid();
 
 
 -- ---------------------------------------------------------
@@ -426,147 +427,61 @@ group by o.season_year, p.crop, t.treatment_name;
 
 
 -- ---------------------------------------------------------
--- 15) v_dashboard_customer_volume_buckets_by_season
--- ---------------------------------------------------------
-create or replace view public.v_dashboard_customer_volume_buckets_by_season as
-with customer_totals as (
-  select
-    o.season_year,
-    o.customer_id,
-    sum(oi.units)::integer                    as customer_units,
-    sum(oi.line_total_after_all_discounts)    as customer_sales,
-    sum(oi.total_profit)                      as customer_profit
-  from orders      o
-  join order_items oi on oi.order_id = o.id
-  where o.user_id = auth.uid()
-  group by o.season_year, o.customer_id
-),
-season_stats as (
-  select
-    season_year,
-    greatest(1::numeric, ceil(max(customer_units)::numeric / 6.0))::integer as bucket_size,
-    max(customer_units) as max_units
-  from customer_totals
-  group by season_year
-),
-bucketed as (
-  select
-    ct.season_year,
-    ct.customer_id,
-    ct.customer_units,
-    ct.customer_sales,
-    ct.customer_profit,
-    ss.bucket_size,
-    ss.max_units,
-    least(5, floor(((ct.customer_units - 1) / nullif(ss.bucket_size, 0))::double precision)::integer) as bucket_idx
-  from customer_totals ct
-  join season_stats    ss on ss.season_year = ct.season_year
-),
-bucket_ranges as (
-  select
-    x.season_year,
-    x.bucket_size,
-    x.max_units,
-    x.bucket_idx,
-    x.bucket_idx * x.bucket_size + 1                          as bucket_start,
-    least((x.bucket_idx + 1) * x.bucket_size, x.max_units)   as bucket_end
-  from (select distinct season_year, bucket_size, max_units, bucket_idx from bucketed) x
-)
-select
-  b.season_year,
-  b.bucket_idx,
-  br.bucket_start::text || '-' || br.bucket_end::text as bucket_label,
-  count(*)::integer                                    as customer_count,
-  coalesce(sum(b.customer_units),  0)::integer         as total_units,
-  coalesce(sum(b.customer_sales),  0::numeric)         as total_sales,
-  coalesce(sum(b.customer_profit), 0::numeric)         as total_profit,
-  case
-    when coalesce(sum(b.customer_units), 0) = 0 then 0::numeric
-    else round(sum(b.customer_sales)  / nullif(sum(b.customer_units), 0)::numeric, 2)
-  end as avg_price_per_unit,
-  case
-    when coalesce(sum(b.customer_units), 0) = 0 then 0::numeric
-    else round(sum(b.customer_profit) / nullif(sum(b.customer_units), 0)::numeric, 2)
-  end as avg_profit_per_unit
-from bucketed      b
-join bucket_ranges br on br.season_year = b.season_year and br.bucket_idx = b.bucket_idx
-group by b.season_year, b.bucket_idx, br.bucket_start, br.bucket_end
-order by b.season_year desc, b.bucket_idx;
-
-
--- ---------------------------------------------------------
--- 16) v_dashboard_customer_volume_buckets_by_season_crop
+-- 15) v_dashboard_customer_volume_buckets_by_season_crop
+--     Hardcoded bucket ranges matching live DB.
+--     (v_dashboard_customer_volume_buckets_by_season without
+--      _crop was removed — not used by the app.)
 -- ---------------------------------------------------------
 create or replace view public.v_dashboard_customer_volume_buckets_by_season_crop as
-with customer_totals as (
+with customer_crop_totals as (
   select
     o.season_year,
-    p.crop,
     o.customer_id,
-    sum(oi.units)::integer                    as customer_units,
-    sum(oi.line_total_after_all_discounts)    as customer_sales,
-    sum(oi.total_profit)                      as customer_profit
+    p.crop,
+    sum(oi.units)::integer                                     as total_units,
+    coalesce(sum(oi.line_total_after_all_discounts), 0::numeric) as total_sales,
+    coalesce(sum(oi.total_profit), 0::numeric)                 as total_profit
   from orders      o
   join order_items oi on oi.order_id = o.id
   join products    p  on p.id = oi.product_id
   where o.user_id = auth.uid()
-  group by o.season_year, p.crop, o.customer_id
-),
-season_stats as (
-  select
-    season_year,
-    crop,
-    greatest(1::numeric, ceil(max(customer_units)::numeric / 6.0))::integer as bucket_size,
-    max(customer_units) as max_units
-  from customer_totals
-  group by season_year, crop
+    and oi.user_id = auth.uid()
+    and p.crop in ('corn', 'soybean')
+  group by o.season_year, o.customer_id, p.crop
 ),
 bucketed as (
   select
-    ct.season_year,
-    ct.crop,
-    ct.customer_id,
-    ct.customer_units,
-    ct.customer_sales,
-    ct.customer_profit,
-    ss.bucket_size,
-    ss.max_units,
-    least(5, floor(((ct.customer_units - 1) / nullif(ss.bucket_size, 0))::double precision)::integer) as bucket_idx
-  from customer_totals ct
-  join season_stats    ss on ss.season_year = ct.season_year and ss.crop = ct.crop
-),
-bucket_ranges as (
-  select
-    x.season_year,
-    x.crop,
-    x.bucket_size,
-    x.max_units,
-    x.bucket_idx,
-    x.bucket_idx * x.bucket_size + 1                          as bucket_start,
-    least((x.bucket_idx + 1) * x.bucket_size, x.max_units)   as bucket_end
-  from (select distinct season_year, crop, bucket_size, max_units, bucket_idx from bucketed) x
+    season_year,
+    crop,
+    customer_id,
+    total_units,
+    total_sales,
+    total_profit,
+    case
+      when total_units < 50   then '01: <50'
+      when total_units < 100  then '02: 50-99'
+      when total_units < 250  then '03: 100-249'
+      when total_units < 500  then '04: 250-499'
+      when total_units < 1000 then '05: 500-999'
+      else '06: 1000+'
+    end as volume_bucket
+  from customer_crop_totals
 )
 select
-  b.season_year,
-  b.crop,
-  b.bucket_idx,
-  br.bucket_start::text || '-' || br.bucket_end::text as bucket_label,
-  count(*)::integer                                    as customer_count,
-  coalesce(sum(b.customer_units),  0)::integer         as total_units,
-  coalesce(sum(b.customer_sales),  0::numeric)         as total_sales,
-  coalesce(sum(b.customer_profit), 0::numeric)         as total_profit,
+  season_year,
+  crop,
+  volume_bucket,
+  count(distinct customer_id)::integer         as customer_count,
+  sum(total_units)::integer                    as bucket_total_units,
+  coalesce(sum(total_sales), 0::numeric)       as bucket_total_sales,
   case
-    when coalesce(sum(b.customer_units), 0) = 0 then 0::numeric
-    else round(sum(b.customer_sales)  / nullif(sum(b.customer_units), 0)::numeric, 2)
+    when coalesce(sum(total_units), 0) = 0 then 0::numeric
+    else round(sum(total_sales) / nullif(sum(total_units), 0)::numeric, 2)
   end as avg_price_per_unit,
-  case
-    when coalesce(sum(b.customer_units), 0) = 0 then 0::numeric
-    else round(sum(b.customer_profit) / nullif(sum(b.customer_units), 0)::numeric, 2)
-  end as avg_profit_per_unit
-from bucketed      b
-join bucket_ranges br on br.season_year = b.season_year and br.crop = b.crop and br.bucket_idx = b.bucket_idx
-group by b.season_year, b.crop, b.bucket_idx, br.bucket_start, br.bucket_end
-order by b.season_year desc, b.crop, b.bucket_idx;
+  coalesce(sum(total_profit), 0::numeric)      as bucket_total_profit
+from bucketed
+group by season_year, crop, volume_bucket
+order by season_year desc, crop, volume_bucket;
 
 
 -- ---------------------------------------------------------

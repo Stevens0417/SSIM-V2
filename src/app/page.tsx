@@ -253,14 +253,18 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {filteredBuckets.map((r) => (
-                    <tr key={r.bucket_idx}>
-                      <td>{r.bucket_label}</td>
+                    <tr key={r.volume_bucket}>
+                      <td>{r.volume_bucket.replace(/^\d+:\s*/, "")}</td>
                       <td className={styles.mono}>{r.customer_count}</td>
-                      <td className={styles.mono}>{r.total_units.toLocaleString()}</td>
-                      <td className={styles.mono}>{fmtCurrency(r.total_sales)}</td>
-                      <td className={styles.mono}>{fmtCurrency(r.total_profit)}</td>
+                      <td className={styles.mono}>{r.bucket_total_units.toLocaleString()}</td>
+                      <td className={styles.mono}>{fmtCurrency(r.bucket_total_sales)}</td>
+                      <td className={styles.mono}>{fmtCurrency(r.bucket_total_profit)}</td>
                       <td className={styles.mono}>{fmtCurrency(r.avg_price_per_unit)}</td>
-                      <td className={styles.mono}>{fmtCurrency(r.avg_profit_per_unit)}</td>
+                      <td className={styles.mono}>
+                        {r.bucket_total_units > 0
+                          ? fmtCurrency(r.bucket_total_profit / r.bucket_total_units)
+                          : fmtCurrency(0)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -64,29 +64,6 @@ export async function fetchCropKpis(
   return (data ?? []) as CropKpis[];
 }
 
-/* ---- Crop Summary ---- */
-
-export interface CropSummaryRow {
-  season_year: number;
-  crop: string;
-  total_units: number;
-  total_sales: number;
-  total_profit: number;
-}
-
-export async function fetchCropSummary(
-  seasonYear: number
-): Promise<CropSummaryRow[]> {
-  const sb = getSupabaseBrowserClient();
-  const { data, error } = await sb
-    .from("v_dashboard_crop_summary_by_season")
-    .select("*")
-    .eq("season_year", seasonYear);
-
-  if (error) throw new Error(error.message || "Failed to load crop summary");
-  return (data ?? []) as CropSummaryRow[];
-}
-
 /* ---- Treatment Mix by Crop ---- */
 
 export interface TreatmentMixRow {
@@ -116,14 +93,12 @@ export async function fetchTreatmentMix(
 export interface VolumeBucketRow {
   season_year: number;
   crop: string;
-  bucket_idx: number;
-  bucket_label: string;
+  volume_bucket: string;
   customer_count: number;
-  total_units: number;
-  total_sales: number;
-  total_profit: number;
+  bucket_total_units: number;
+  bucket_total_sales: number;
   avg_price_per_unit: number;
-  avg_profit_per_unit: number;
+  bucket_total_profit: number;
 }
 
 export async function fetchVolumeBuckets(
@@ -134,7 +109,7 @@ export async function fetchVolumeBuckets(
     .from("v_dashboard_customer_volume_buckets_by_season_crop")
     .select("*")
     .eq("season_year", seasonYear)
-    .order("bucket_idx", { ascending: true });
+    .order("volume_bucket", { ascending: true });
 
   if (error) throw new Error(error.message || "Failed to load volume buckets");
   return (data ?? []) as VolumeBucketRow[];

@@ -63,13 +63,12 @@ create trigger trg_bayer_shipment_items_verified_meta
 
 -- ---------------------------------------------------------
 -- 3) Update v_bayer_shipments to include verified fields
---    (no WHERE — relies on RLS on underlying tables)
 -- ---------------------------------------------------------
 create or replace view public.v_bayer_shipments as
 select
   s.id            as shipment_id,
   s.shipment_date,
-  extract(year from s.shipment_date)::integer as season_year,
+  s.season_year,
   s.shipment_number,
   i.id            as shipment_item_id,
   i.product_id,
@@ -85,4 +84,6 @@ select
 from bayer_shipments      s
 join bayer_shipment_items i on i.shipment_id = s.id
 join products             p on p.id = i.product_id
-join treatments           t on t.id = i.treatment_id;
+join treatments           t on t.id = i.treatment_id
+where s.user_id = auth.uid()
+  and i.user_id = auth.uid();

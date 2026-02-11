@@ -7,8 +7,9 @@ import ShipmentItemsTable, {
   createEmptyShipmentItem,
 } from "@/components/bayer-shipments/ShipmentItemsTable";
 import ThisSeasonShipmentsTable from "@/components/bayer-shipments/ThisSeasonShipmentsTable";
+import YearEndTable from "@/components/bayer-shipments/YearEndTable";
 import {
-  fetchNewestSeasonYear,
+  fetchSeasons,
   fetchPricingOptions,
   type PricingOption,
 } from "@/services/pricing.service";
@@ -19,7 +20,13 @@ import {
   fetchBayerShipments,
   deleteBayerShipment,
   verifyShipmentItem,
+  fetchNoTreatmentId,
+  fetchPackagingProducts,
+  fetchYearEndTotals,
+  upsertYearEndVerification,
   type ShipmentViewRow,
+  type PackagingProduct,
+  type YearEndTotalRow,
 } from "@/services/bayer-shipment.service";
 import styles from "./bayer-shipments.module.css";
 
@@ -31,7 +38,7 @@ function todayISO(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-type View = "new" | "list";
+type View = "new" | "list" | "yearEnd";
 
 interface FormErrors {
   date?: boolean;
@@ -48,8 +55,11 @@ export default function BayerShipmentsPage() {
   const [view, setView] = useState<View>("new");
 
   // Season + pricing data
+  const [formSeasons, setFormSeasons] = useState<number[]>([]);
   const [seasonYear, setSeasonYear] = useState<number | null>(null);
   const [pricingOptions, setPricingOptions] = useState<PricingOption[]>([]);
+  const [noTreatmentId, setNoTreatmentId] = useState<string | null>(null);
+  const [packagingProducts, setPackagingProducts] = useState<PackagingProduct[]>([]);
   const [dataError, setDataError] = useState<string | null>(null);
 
   // List view state
@@ -59,6 +69,13 @@ export default function BayerShipmentsPage() {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
 
+  // Year-end tab state
+  const [yearEndRows, setYearEndRows] = useState<YearEndTotalRow[]>([]);
+  const [yearEndSeasons, setYearEndSeasons] = useState<number[]>([]);
+  const [yearEndSelectedSeason, setYearEndSelectedSeason] = useState<number | null>(null);
+  const [yearEndLoading, setYearEndLoading] = useState(false);
+  const [yearEndError, setYearEndError] = useState<string | null>(null);
+
   // Editing state
   const [editingShipmentId, setEditingShipmentId] = useState<string | null>(null);
 
@@ -66,26 +83,43 @@ export default function BayerShipmentsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Load initial data
+  // Load pricing options + NO_TREATMENT id + packaging products for the selected season
+  const loadSeasonData = useCallback(async (year: number) => {
+    setDataError(null);
+    try {
+      const [opts, ntId, pkgProducts] = await Promise.all([
+        fetchPricingOptions(year),
+        fetchNoTreatmentId(),
+        fetchPackagingProducts(),
+      ]);
+      if (opts.length === 0) {
+        setDataError(`No pricing options found for ${year}.`);
+      }
+      setPricingOptions(opts);
+      setNoTreatmentId(ntId);
+      setPackagingProducts(pkgProducts);
+    } catch (err) {
+      setDataError(err instanceof Error ? err.message : "Failed to load data.");
+    }
+  }, []);
+
+  // Load available seasons on mount, default to newest
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const year = await fetchNewestSeasonYear();
+        const s = await fetchSeasons();
         if (cancelled) return;
-        if (year === null) {
+        if (s.length === 0) {
           setDataError(
             "No seasons found. Add pricing data before recording shipments."
           );
           return;
         }
-        setSeasonYear(year);
-        const opts = await fetchPricingOptions(year);
-        if (cancelled) return;
-        if (opts.length === 0) {
-          setDataError(`No pricing options found for ${year}.`);
-        }
-        setPricingOptions(opts);
+        setFormSeasons(s);
+        const defaultYear = s[0]; // newest season (already desc-sorted)
+        setSeasonYear(defaultYear);
+        await loadSeasonData(defaultYear);
       } catch (err) {
         if (!cancelled) {
           setDataError(
@@ -97,7 +131,17 @@ export default function BayerShipmentsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadSeasonData]);
+
+  // Handle season dropdown change
+  const handleFormSeasonChange = (year: number) => {
+    setSeasonYear(year);
+    // Clear items since product/treatment options will change
+    setItems([createEmptyShipmentItem()]);
+    setFormErrors({});
+    setRowErrors({});
+    loadSeasonData(year);
+  };
 
   // Load seasons + shipments when switching to list view
   const loadShipments = useCallback(async (season: number) => {
@@ -140,6 +184,82 @@ export default function BayerShipmentsPage() {
     loadShipments(season);
   };
 
+  // Load year-end data when switching to yearEnd tab
+  const loadYearEndTotals = useCallback(async (season: number) => {
+    setYearEndLoading(true);
+    setYearEndError(null);
+    try {
+      const rows = await fetchYearEndTotals(season);
+      setYearEndRows(rows);
+    } catch (err) {
+      setYearEndError(err instanceof Error ? err.message : "Failed to load year-end totals");
+    } finally {
+      setYearEndLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (view !== "yearEnd") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await fetchShipmentSeasons();
+        if (cancelled) return;
+        setYearEndSeasons(s);
+        const season = s.length > 0 ? s[0] : null;
+        setYearEndSelectedSeason(season);
+        if (season !== null) {
+          await loadYearEndTotals(season);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setYearEndError(err instanceof Error ? err.message : "Failed to load seasons");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [view, loadYearEndTotals]);
+
+  const handleYearEndSeasonChange = (season: number) => {
+    setYearEndSelectedSeason(season);
+    loadYearEndTotals(season);
+  };
+
+  // Year-end verify handler — optimistic UI
+  const handleYearEndVerify = async (
+    productId: string,
+    treatmentId: string,
+    verified: boolean
+  ) => {
+    // Optimistic patch
+    setYearEndRows((prev) =>
+      prev.map((r) =>
+        r.product_id === productId && r.treatment_id === treatmentId
+          ? { ...r, is_verified: verified, verified_at: verified ? new Date().toISOString() : null }
+          : r
+      )
+    );
+
+    try {
+      await upsertYearEndVerification(
+        yearEndSelectedSeason!,
+        productId,
+        treatmentId,
+        verified
+      );
+    } catch (err) {
+      // Revert on failure
+      setYearEndRows((prev) =>
+        prev.map((r) =>
+          r.product_id === productId && r.treatment_id === treatmentId
+            ? { ...r, is_verified: !verified, verified_at: !verified ? new Date().toISOString() : null }
+            : r
+        )
+      );
+      throw err;
+    }
+  };
+
   // Form state
   const [shipmentDate, setShipmentDate] = useState(todayISO);
   const [shipmentNumber, setShipmentNumber] = useState("");
@@ -164,7 +284,7 @@ export default function BayerShipmentsPage() {
 
   // Validation for button enable
   const validLines = items.filter(
-    (it) => it.productId && it.treatmentId && it.units > 0
+    (it) => it.productId && it.treatmentId && it.units !== 0
   );
   const canSave =
     shipmentNumber.trim().length > 0 && validLines.length > 0 && !isSaving;
@@ -197,6 +317,9 @@ export default function BayerShipmentsPage() {
       ok = false;
     }
 
+    // Track seen (productId, treatmentId) combos for duplicate detection
+    const seenLines = new Set<string>();
+
     for (const row of nonEmptyRows) {
       const rowErr: { product?: boolean; treatment?: boolean; units?: boolean } = {};
       if (!row.productId) {
@@ -207,10 +330,22 @@ export default function BayerShipmentsPage() {
         rowErr.treatment = true;
         ok = false;
       }
-      if (!row.units || row.units <= 0 || !Number.isInteger(row.units)) {
+      if (!row.units || !Number.isInteger(row.units)) {
         rowErr.units = true;
         ok = false;
       }
+
+      // Duplicate line check: same product + treatment
+      if (row.productId && row.treatmentId) {
+        const lineKey = `${row.productId}::${row.treatmentId}`;
+        if (seenLines.has(lineKey)) {
+          rowErr.product = true;
+          rowErr.treatment = true;
+          ok = false;
+        }
+        seenLines.add(lineKey);
+      }
+
       if (Object.keys(rowErr).length > 0) {
         rErrors[row.id] = rowErr;
       }
@@ -238,6 +373,7 @@ export default function BayerShipmentsPage() {
       const headerData = {
         shipment_date: shipmentDate,
         shipment_number: shipmentNumber.trim(),
+        season_year: seasonYear!,
       };
       const itemData = rowsToSave.map((row) => ({
         product_id: row.productId,
@@ -341,6 +477,14 @@ export default function BayerShipmentsPage() {
     setRowErrors({});
     setSaveError(null);
     setSaveSuccess(null);
+
+    // Set season dropdown to the shipment's stored season_year and load its pricing
+    const shipmentSeason = first.season_year;
+    if (shipmentSeason !== seasonYear) {
+      setSeasonYear(shipmentSeason);
+      loadSeasonData(shipmentSeason);
+    }
+
     setView("new");
   };
 
@@ -396,6 +540,12 @@ export default function BayerShipmentsPage() {
         >
           This Season Shipments
         </button>
+        <button
+          className={`${styles.toggleBtn} ${view === "yearEnd" ? styles.toggleActive : ""}`}
+          onClick={() => setView("yearEnd")}
+        >
+          Year End
+        </button>
       </div>
 
       {dataError && <div className={styles.error}>{dataError}</div>}
@@ -411,6 +561,16 @@ export default function BayerShipmentsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onVerify={handleVerify}
+        />
+      ) : view === "yearEnd" ? (
+        <YearEndTable
+          rows={yearEndRows}
+          seasons={yearEndSeasons}
+          selectedSeason={yearEndSelectedSeason}
+          onSeasonChange={handleYearEndSeasonChange}
+          loading={yearEndLoading}
+          error={yearEndError}
+          onVerify={handleYearEndVerify}
         />
       ) : (
         <>
@@ -464,12 +624,21 @@ export default function BayerShipmentsPage() {
               )}
             </div>
 
-            {/* Season (read-only) */}
+            {/* Season */}
             <div className={styles.field}>
               <label className={styles.label}>Season</label>
-              <span className={styles.readonlyBadge}>
-                {seasonYear ?? "\u2014"}
-              </span>
+              <select
+                className={styles.input}
+                value={seasonYear ?? ""}
+                onChange={(e) => handleFormSeasonChange(Number(e.target.value))}
+                disabled={isSaving || formSeasons.length === 0}
+              >
+                {formSeasons.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -484,6 +653,8 @@ export default function BayerShipmentsPage() {
             items={items}
             onChange={handleItemsChange}
             pricingOptions={pricingOptions}
+            packagingProducts={packagingProducts}
+            noTreatmentId={noTreatmentId}
             rowErrors={rowErrors}
             disabled={isSaving}
           />

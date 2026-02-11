@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { PricingOption } from "@/services/pricing.service";
+import type { PackagingProduct } from "@/services/bayer-shipment.service";
 import SearchableSelect, { type SelectOption } from "../orders/SearchableSelect";
 import styles from "./ShipmentItemsTable.module.css";
 
@@ -37,6 +38,7 @@ function productSortRank(name: string): number {
   const upper = name.toUpperCase();
   if (upper.startsWith("DKC")) return 0;
   if (upper.startsWith("DKB")) return 1;
+  if (upper === "PALLET" || upper === "SEEDPAK") return 3;
   return 2;
 }
 
@@ -44,6 +46,8 @@ interface Props {
   items: ShipmentItem[];
   onChange: (items: ShipmentItem[]) => void;
   pricingOptions: PricingOption[];
+  packagingProducts: PackagingProduct[];
+  noTreatmentId: string | null;
   rowErrors?: RowErrors;
   disabled?: boolean;
 }
@@ -52,14 +56,28 @@ export default function ShipmentItemsTable({
   items,
   onChange,
   pricingOptions,
+  packagingProducts,
+  noTreatmentId,
   rowErrors = {},
   disabled = false,
 }: Props) {
+  // Set of packaging product IDs for fast lookup
+  const packagingIds = useMemo(
+    () => new Set(packagingProducts.map((p) => p.id)),
+    [packagingProducts]
+  );
+
   const productSelectOptions = useMemo<SelectOption[]>(() => {
     const seen = new Map<string, { id: string; name: string }>();
     for (const o of pricingOptions) {
       if (!seen.has(o.product_id)) {
         seen.set(o.product_id, { id: o.product_id, name: o.product_name });
+      }
+    }
+    // Merge packaging products (not in pricing table)
+    for (const p of packagingProducts) {
+      if (!seen.has(p.id)) {
+        seen.set(p.id, { id: p.id, name: p.product_name });
       }
     }
     return Array.from(seen.values())
@@ -70,7 +88,7 @@ export default function ShipmentItemsTable({
         return a.name.localeCompare(b.name);
       })
       .map((p) => ({ value: p.id, label: p.name }));
-  }, [pricingOptions]);
+  }, [pricingOptions, packagingProducts]);
 
   const treatmentSelectByProduct = useMemo(() => {
     const map = new Map<string, SelectOption[]>();
@@ -84,6 +102,9 @@ export default function ShipmentItemsTable({
     return map;
   }, [pricingOptions]);
 
+  // NO_TREATMENT name constant for display (id comes from prop)
+  const NO_TREATMENT_NAME = "NO_TREATMENT";
+
   const updateItem = (index: number, patch: Partial<ShipmentItem>) => {
     if (disabled) return;
     const next = items.map((it, i) => (i === index ? { ...it, ...patch } : it));
@@ -92,15 +113,31 @@ export default function ShipmentItemsTable({
 
   const handleProductChange = (index: number, productId: string) => {
     if (disabled) return;
-    const opt = pricingOptions.find((o) => o.product_id === productId);
-    const productName = opt?.product_name ?? "";
 
-    const treatments = treatmentSelectByProduct.get(productId) ?? [];
+    // Look up product name from pricing options OR packaging products
+    let productName = "";
+    const pricingOpt = pricingOptions.find((o) => o.product_id === productId);
+    if (pricingOpt) {
+      productName = pricingOpt.product_name;
+    } else {
+      const pkgOpt = packagingProducts.find((p) => p.id === productId);
+      if (pkgOpt) productName = pkgOpt.product_name;
+    }
+
     let treatmentId = "";
     let treatmentName = "";
-    if (treatments.length === 1) {
-      treatmentId = treatments[0].value;
-      treatmentName = treatments[0].label;
+
+    if (packagingIds.has(productId) && noTreatmentId) {
+      // Packaging product → auto-assign NO_TREATMENT
+      treatmentId = noTreatmentId;
+      treatmentName = NO_TREATMENT_NAME;
+    } else {
+      // Normal seed product — auto-select if only one treatment
+      const treatments = treatmentSelectByProduct.get(productId) ?? [];
+      if (treatments.length === 1) {
+        treatmentId = treatments[0].value;
+        treatmentName = treatments[0].label;
+      }
     }
 
     updateItem(index, {
@@ -149,7 +186,7 @@ export default function ShipmentItemsTable({
             <tr>
               <th>Product</th>
               <th className={styles.colTreatment}>Treatment</th>
-              <th className={styles.colNum}>Units Received</th>
+              <th className={styles.colNum}>Units</th>
               <th className={styles.colAction}></th>
             </tr>
           </thead>
@@ -158,6 +195,7 @@ export default function ShipmentItemsTable({
               const treatmentOptions =
                 treatmentSelectByProduct.get(item.productId) ?? [];
               const errors = rowErrors[item.id] ?? {};
+              const noTreat = packagingIds.has(item.productId);
               return (
                 <tr key={item.id}>
                   <td>
@@ -172,29 +210,31 @@ export default function ShipmentItemsTable({
                     </div>
                   </td>
                   <td>
-                    <div className={errors.treatment ? styles.errorWrap : ""}>
-                      <SearchableSelect
-                        options={treatmentOptions}
-                        value={item.treatmentId}
-                        onChange={(v) => handleTreatmentChange(i, v)}
-                        placeholder="Select treatment…"
-                        disabled={disabled || !item.productId}
-                      />
-                    </div>
+                    {noTreat ? (
+                      <span className={styles.naText}>N/A</span>
+                    ) : (
+                      <div className={errors.treatment ? styles.errorWrap : ""}>
+                        <SearchableSelect
+                          options={treatmentOptions}
+                          value={item.treatmentId}
+                          onChange={(v) => handleTreatmentChange(i, v)}
+                          placeholder="Select treatment…"
+                          disabled={disabled || !item.productId}
+                        />
+                      </div>
+                    )}
                   </td>
                   <td>
                     <input
                       className={`${styles.numInput} ${errors.units ? styles.inputError : ""}`}
                       type="number"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      min={0}
+                      step={1}
                       value={item.units || ""}
                       placeholder="0"
                       disabled={disabled}
                       onChange={(e) =>
                         updateItem(i, {
-                          units: Math.max(0, parseInt(e.target.value) || 0),
+                          units: parseInt(e.target.value) || 0,
                         })
                       }
                     />
@@ -222,6 +262,7 @@ export default function ShipmentItemsTable({
           const treatmentOptions =
             treatmentSelectByProduct.get(item.productId) ?? [];
           const errors = rowErrors[item.id] ?? {};
+          const noTreat = packagingIds.has(item.productId);
           return (
             <div key={item.id} className={styles.card}>
               <div className={styles.cardHeader}>
@@ -250,40 +291,40 @@ export default function ShipmentItemsTable({
                   <span className={styles.errorText}>Select a product</span>
                 )}
               </div>
-              <div className={styles.cardField}>
-                <label className={styles.cardLabel}>Treatment</label>
-                <div className={errors.treatment ? styles.errorWrap : ""}>
-                  <SearchableSelect
-                    options={treatmentOptions}
-                    value={item.treatmentId}
-                    onChange={(v) => handleTreatmentChange(i, v)}
-                    placeholder="Select treatment…"
-                    disabled={disabled || !item.productId}
-                  />
+              {noTreat ? null : (
+                <div className={styles.cardField}>
+                  <label className={styles.cardLabel}>Treatment</label>
+                  <div className={errors.treatment ? styles.errorWrap : ""}>
+                    <SearchableSelect
+                      options={treatmentOptions}
+                      value={item.treatmentId}
+                      onChange={(v) => handleTreatmentChange(i, v)}
+                      placeholder="Select treatment…"
+                      disabled={disabled || !item.productId}
+                    />
+                  </div>
+                  {errors.treatment && (
+                    <span className={styles.errorText}>Select a treatment</span>
+                  )}
                 </div>
-                {errors.treatment && (
-                  <span className={styles.errorText}>Select a treatment</span>
-                )}
-              </div>
+              )}
               <div className={styles.cardField}>
-                <label className={styles.cardLabel}>Units Received</label>
+                <label className={styles.cardLabel}>Units</label>
                 <input
                   className={`${styles.cardNumInput} ${errors.units ? styles.inputError : ""}`}
                   type="number"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  min={0}
+                  step={1}
                   value={item.units || ""}
-                  placeholder="Units received"
+                  placeholder="Units"
                   disabled={disabled}
                   onChange={(e) =>
                     updateItem(i, {
-                      units: Math.max(0, parseInt(e.target.value) || 0),
+                      units: parseInt(e.target.value) || 0,
                     })
                   }
                 />
                 {errors.units && (
-                  <span className={styles.errorText}>Enter units &gt; 0</span>
+                  <span className={styles.errorText}>Enter a non-zero integer</span>
                 )}
               </div>
             </div>
