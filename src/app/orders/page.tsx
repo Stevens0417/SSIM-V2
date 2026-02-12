@@ -746,6 +746,11 @@ export default function OrdersPage() {
             <button className={styles.clearBtn} onClick={clearForm}>
               {editingOrderId ? "Cancel Edit" : "Clear Form"}
             </button>
+            {editingOrderId && (
+              <button className={styles.newOrderBtn} onClick={clearForm}>
+                New Order
+              </button>
+            )}
           </div>
         </>
       )}

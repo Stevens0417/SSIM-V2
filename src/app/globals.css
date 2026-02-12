@@ -40,6 +40,12 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ---- Global table centering — all cells centered under headers ---- */
+table th,
+table td {
+  text-align: center !important;
+}
+
 /* ---- Print utilities ---- */
 .print-only {
   display: none;
