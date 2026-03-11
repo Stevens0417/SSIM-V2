@@ -8,6 +8,7 @@ import DeliveryItemsTable, {
   createEmptyDeliveryItem,
 } from "@/components/deliveries/DeliveryItemsTable";
 import ThisSeasonDeliveriesTable from "@/components/deliveries/ThisSeasonDeliveriesTable";
+import CustomerOrderStatusTable from "@/components/deliveries/CustomerOrderStatusTable";
 import {
   fetchNewestSeasonYear,
   fetchPricingOptions,
@@ -20,10 +21,12 @@ import {
 import {
   createDeliveries,
   fetchDeliveriesThisSeason,
+  fetchCustomerOrderStatus,
   updateDelivery,
   deleteDelivery,
   type DeliveryInsert,
   type DeliveryViewRow,
+  type CustomerOrderStatusRow,
 } from "@/services/delivery.service";
 import SearchableSelect from "@/components/orders/SearchableSelect";
 import type {
@@ -142,6 +145,36 @@ export default function DeliveriesPage() {
     () => customers.find((c) => c.id === selectedCustomerId) ?? null,
     [customers, selectedCustomerId]
   );
+
+  // Customer order status
+  const [orderStatusRows, setOrderStatusRows] = useState<CustomerOrderStatusRow[]>([]);
+  const [orderStatusLoading, setOrderStatusLoading] = useState(false);
+  const [orderStatusError, setOrderStatusError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedCustomerId || !seasonYear) {
+      setOrderStatusRows([]);
+      setOrderStatusError(null);
+      return;
+    }
+    let cancelled = false;
+    setOrderStatusLoading(true);
+    setOrderStatusError(null);
+    fetchCustomerOrderStatus(selectedCustomerId, seasonYear)
+      .then((rows) => {
+        if (!cancelled) setOrderStatusRows(rows);
+      })
+      .catch((err) => {
+        if (!cancelled)
+          setOrderStatusError(err instanceof Error ? err.message : "Failed to load order status");
+      })
+      .finally(() => {
+        if (!cancelled) setOrderStatusLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCustomerId, seasonYear]);
 
   // Items state
   const [items, setItems] = useState<DeliveryItem[]>([
@@ -515,6 +548,15 @@ export default function DeliveriesPage() {
             style={{ width: "100%" }}
             disabled={isSaving}
           />
+
+          {/* ---- Customer Order Status ---- */}
+          {selectedCustomerId && (
+            <CustomerOrderStatusTable
+              rows={orderStatusRows}
+              loading={orderStatusLoading}
+              error={orderStatusError}
+            />
+          )}
 
           {/* ---- Desktop Actions (hidden on mobile) ---- */}
           <div className={styles.actions}>

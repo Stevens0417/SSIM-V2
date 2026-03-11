@@ -1,0 +1,128 @@
+/* ---- Section header ---- */
+.sectionHeader {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary-800);
+  margin-bottom: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-gray-200);
+}
+
+/* ---- Groups ---- */
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.group {
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.orderHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: var(--color-gray-100);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.orderDate {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary-800);
+}
+
+.orderId {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--color-gray-500);
+}
+
+/* ---- Table wrapper ---- */
+.wrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.table thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--color-gray-200);
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--color-gray-100);
+  color: var(--color-primary-800);
+}
+
+.table tbody tr:hover {
+  background: var(--color-gray-50);
+}
+
+/* ---- Alignment ---- */
+.center {
+  text-align: center;
+}
+
+/* ---- Status badges ---- */
+.badgeComplete {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.badgeOpen {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+/* ---- Empty / loading / error states ---- */
+.status {
+  padding: 14px 0 4px;
+  font-size: 13px;
+  color: var(--color-gray-500);
+}
+
+.error {
+  padding: 10px 14px;
+  background: #fdecea;
+  color: var(--color-red-600);
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* ---- Mobile ---- */
+@media (max-width: 768px) {
+  .table {
+    font-size: 11px;
+    min-width: 560px;
+  }
+}

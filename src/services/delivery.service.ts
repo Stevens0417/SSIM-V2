@@ -106,6 +106,41 @@ export async function updateDelivery(
   }
 }
 
+/* ---- Customer order status view ---- */
+
+export interface CustomerOrderStatusRow {
+  order_id: string;
+  order_date: string;
+  product_name: string;
+  treatment_name: string;
+  ordered_units: number;
+  delivered_units: number;
+  returned_units: number;
+  net_units: number;
+  customer_id: string;
+  season_year: number;
+}
+
+export async function fetchCustomerOrderStatus(
+  customerId: string,
+  seasonYear: number
+): Promise<CustomerOrderStatusRow[]> {
+  const supabase = getSupabaseBrowserClient();
+
+  const { data, error } = await supabase
+    .from("v_delivery_customer_order_status")
+    .select("*")
+    .eq("customer_id", customerId)
+    .eq("season_year", seasonYear)
+    .order("order_date", { ascending: false })
+    .order("order_id", { ascending: false })
+    .order("product_name", { ascending: true })
+    .order("treatment_name", { ascending: true });
+
+  if (error) throw new Error(error.message || "Failed to load order status");
+  return (data ?? []) as CustomerOrderStatusRow[];
+}
+
 /* ---- Delete a delivery ---- */
 
 export async function deleteDelivery(deliveryId: string): Promise<void> {
