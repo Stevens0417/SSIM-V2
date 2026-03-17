@@ -12,6 +12,16 @@
   font-size: 12px;
 }
 
+.headerCenter {
+  padding: 6px 10px;
+  text-align: center;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-primary-800);
+  color: var(--color-white);
+  border-bottom: 2px solid var(--color-primary-700);
+}
+
 .header,
 .stickyHeader {
   padding: 6px 10px;
@@ -54,11 +64,17 @@
   color: var(--color-gray-900);
 }
 
+.cellCenter {
+  text-align: center;
+  color: var(--color-gray-900);
+}
+
 .rowEven .stickyCell {
   background: var(--color-gray-50);
 }
 
-.rowEven .cell {
+.rowEven .cell,
+.rowEven .cellCenter {
   background: var(--color-gray-50);
 }
 

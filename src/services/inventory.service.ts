@@ -7,6 +7,7 @@ export interface InventoryDetailRow {
   product_name: string;
   treatment_id: string;
   treatment_name: string;
+  seed_size: string | null;
   units_received: number;
   units_delivered: number;
   units_returned: number;
@@ -35,7 +36,9 @@ export async function fetchInventoryDetail(): Promise<InventoryDetailRow[]> {
   rows.sort((a, b) => {
     const p = a.product_name.localeCompare(b.product_name);
     if (p !== 0) return p;
-    return a.treatment_name.localeCompare(b.treatment_name);
+    const t = a.treatment_name.localeCompare(b.treatment_name);
+    if (t !== 0) return t;
+    return (a.seed_size ?? "").localeCompare(b.seed_size ?? "");
   });
   return rows;
 }

@@ -229,12 +229,18 @@ export default function BayerShipmentsPage() {
   const handleYearEndVerify = async (
     productId: string,
     treatmentId: string,
+    seedSize: string | null,
     verified: boolean
   ) => {
+    const matchRow = (r: YearEndTotalRow) =>
+      r.product_id === productId &&
+      r.treatment_id === treatmentId &&
+      (r.seed_size ?? null) === (seedSize ?? null);
+
     // Optimistic patch
     setYearEndRows((prev) =>
       prev.map((r) =>
-        r.product_id === productId && r.treatment_id === treatmentId
+        matchRow(r)
           ? { ...r, is_verified: verified, verified_at: verified ? new Date().toISOString() : null }
           : r
       )
@@ -245,13 +251,14 @@ export default function BayerShipmentsPage() {
         yearEndSelectedSeason!,
         productId,
         treatmentId,
+        seedSize,
         verified
       );
     } catch (err) {
       // Revert on failure
       setYearEndRows((prev) =>
         prev.map((r) =>
-          r.product_id === productId && r.treatment_id === treatmentId
+          matchRow(r)
             ? { ...r, is_verified: !verified, verified_at: !verified ? new Date().toISOString() : null }
             : r
         )
@@ -379,6 +386,7 @@ export default function BayerShipmentsPage() {
         product_id: row.productId,
         treatment_id: row.treatmentId,
         units_received: row.units,
+        seed_size: row.seedSize || null,
       }));
 
       let result;
@@ -470,6 +478,7 @@ export default function BayerShipmentsPage() {
         product: r.product_name,
         treatment: r.treatment_name,
         units: r.units_received,
+        seedSize: r.seed_size ?? "",
       }))
     );
     setEditingShipmentId(shipmentId);

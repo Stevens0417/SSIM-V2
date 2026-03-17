@@ -13,6 +13,7 @@ export interface ShipmentItem {
   product: string;
   treatment: string;
   units: number;
+  seedSize: string;
 }
 
 export interface RowErrors {
@@ -31,6 +32,7 @@ export function createEmptyShipmentItem(): ShipmentItem {
     product: "",
     treatment: "",
     units: 0,
+    seedSize: "",
   };
 }
 
@@ -61,6 +63,16 @@ export default function ShipmentItemsTable({
   rowErrors = {},
   disabled = false,
 }: Props) {
+  const cropByProduct = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of pricingOptions) {
+      if (!map.has(o.product_id)) {
+        map.set(o.product_id, o.crop.toLowerCase());
+      }
+    }
+    return map;
+  }, [pricingOptions]);
+
   // Set of packaging product IDs for fast lookup
   const packagingIds = useMemo(
     () => new Set(packagingProducts.map((p) => p.id)),
@@ -140,11 +152,13 @@ export default function ShipmentItemsTable({
       }
     }
 
+    const crop = cropByProduct.get(productId) ?? "";
     updateItem(index, {
       productId,
       product: productName,
       treatmentId,
       treatment: treatmentName,
+      seedSize: crop === "corn" ? items[index].seedSize : "",
     });
   };
 
@@ -177,16 +191,18 @@ export default function ShipmentItemsTable({
       <div className={styles.wrapper}>
         <table className={styles.table}>
           <colgroup>
-            <col style={{ width: "38%" }} />
-            <col style={{ width: "30%" }} />
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "10%" }} />
+            <col style={{ width: "34%" }} />
+            <col style={{ width: "27%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "18%" }} />
+            <col style={{ width: "8%" }} />
           </colgroup>
           <thead>
             <tr>
               <th>Product</th>
               <th className={styles.colTreatment}>Treatment</th>
               <th className={styles.colNum}>Units</th>
+              <th className={styles.colTreatment}>Size</th>
               <th className={styles.colAction}></th>
             </tr>
           </thead>
@@ -238,6 +254,25 @@ export default function ShipmentItemsTable({
                         })
                       }
                     />
+                  </td>
+                  <td>
+                    {cropByProduct.get(item.productId) === "corn" ? (
+                      <select
+                        className={styles.sizeSelect}
+                        value={item.seedSize}
+                        disabled={disabled}
+                        onChange={(e) => updateItem(i, { seedSize: e.target.value })}
+                      >
+                        <option value="">—</option>
+                        <option value="AR">AR</option>
+                        <option value="AR2">AR2</option>
+                        <option value="AF">AF</option>
+                        <option value="AF2">AF2</option>
+                        <option value="P26">P26</option>
+                      </select>
+                    ) : (
+                      <select className={styles.sizeSelect} disabled value=""><option value="">—</option></select>
+                    )}
                   </td>
                   <td style={{ textAlign: "center" }}>
                     <button
@@ -327,6 +362,24 @@ export default function ShipmentItemsTable({
                   <span className={styles.errorText}>Enter a non-zero integer</span>
                 )}
               </div>
+              {cropByProduct.get(item.productId) === "corn" && (
+                <div className={styles.cardField}>
+                  <label className={styles.cardLabel}>Seed Size</label>
+                  <select
+                    className={styles.cardSizeSelect}
+                    value={item.seedSize}
+                    disabled={disabled}
+                    onChange={(e) => updateItem(i, { seedSize: e.target.value })}
+                  >
+                    <option value="">—</option>
+                    <option value="AR">AR</option>
+                    <option value="AR2">AR2</option>
+                    <option value="AF">AF</option>
+                    <option value="AF2">AF2</option>
+                    <option value="P26">P26</option>
+                  </select>
+                </div>
+              )}
             </div>
           );
         })}

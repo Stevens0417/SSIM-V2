@@ -102,6 +102,7 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
               <tr>
                 <th>Product</th>
                 <th>Treatment</th>
+                <th className={styles.center}>Size</th>
                 <th className={styles.right}>Units Received</th>
                 <th className={styles.right}>Units Delivered</th>
                 <th className={styles.right}>Units Returned</th>
@@ -110,9 +111,10 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
             </thead>
             <tbody>
               {filtered.map((r) => (
-                <tr key={`${r.product_id}-${r.treatment_id}`}>
+                <tr key={`${r.product_id}-${r.treatment_id}-${r.seed_size ?? ""}`}>
                   <td>{r.product_name}</td>
                   <td>{r.treatment_name}</td>
+                  <td className={styles.center}>{r.seed_size || "\u2014"}</td>
                   <td className={styles.mono}>{r.units_received}</td>
                   <td className={styles.mono}>{r.units_delivered}</td>
                   <td className={styles.mono}>{r.units_returned}</td>

@@ -9,7 +9,7 @@ interface Props {
   error: string | null;
 }
 
-const EXCLUDE_KEYS = new Set(["product_id", "product_name"]);
+const EXCLUDE_KEYS = new Set(["product_id", "product_name", "seed_size"]);
 
 function formatCell(value: string | number | null): string {
   if (value == null) return "\u2014";
@@ -39,6 +39,7 @@ export default function InventoryWideTable({ rows, loading, error }: Props) {
         <thead>
           <tr>
             <th className={styles.stickyHeader}>Product</th>
+            <th className={styles.headerCenter}>Size</th>
             {treatmentColumns.map((key) => (
               <th key={key} className={styles.header}>
                 {key}
@@ -48,9 +49,12 @@ export default function InventoryWideTable({ rows, loading, error }: Props) {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={String(row.product_id ?? i)} className={i % 2 === 0 ? styles.rowEven : undefined}>
+            <tr key={`${String(row.product_id ?? i)}-${String(row.seed_size ?? "")}`} className={i % 2 === 0 ? styles.rowEven : undefined}>
               <td className={styles.stickyCell}>
                 {String(row.product_name ?? "\u2014")}
+              </td>
+              <td className={styles.cellCenter}>
+                {row.seed_size ? String(row.seed_size) : "\u2014"}
               </td>
               {treatmentColumns.map((key) => (
                 <td key={key} className={styles.cell}>

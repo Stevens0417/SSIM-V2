@@ -199,6 +199,7 @@ export interface OrderItemViewRow {
   customer_name: string;
   product_name: string;
   treatment_name: string;
+  seed_size: string | null;
   units: number;
   retail_price_per_unit: number;
   brand_grower_pct: number;
@@ -211,7 +212,7 @@ export async function fetchOrderItemsThisSeason(): Promise<OrderItemViewRow[]> {
   const sb = getSupabaseBrowserClient();
   const { data, error } = await sb
     .from("v_order_items_this_season")
-    .select("order_item_id, order_id, order_date, customer_name, product_name, treatment_name, units, retail_price_per_unit, brand_grower_pct, early_pay_pct, line_total_after_all_discounts, line_total_profit")
+    .select("order_item_id, order_id, order_date, customer_name, product_name, treatment_name, seed_size, units, retail_price_per_unit, brand_grower_pct, early_pay_pct, line_total_after_all_discounts, line_total_profit")
     .order("order_date", { ascending: false })
     .order("customer_name", { ascending: true })
     .order("product_name", { ascending: true })

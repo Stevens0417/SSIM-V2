@@ -12,6 +12,7 @@ export interface DeliveryItem {
   product: string;
   treatment: string;
   units: number;
+  seedSize: string;
 }
 
 export interface RowErrors {
@@ -30,6 +31,7 @@ export function createEmptyDeliveryItem(): DeliveryItem {
     product: "",
     treatment: "",
     units: 0,
+    seedSize: "",
   };
 }
 
@@ -84,6 +86,16 @@ export default function DeliveryItemsTable({
     return map;
   }, [pricingOptions]);
 
+  const cropByProduct = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of pricingOptions) {
+      if (!map.has(o.product_id)) {
+        map.set(o.product_id, o.crop.toLowerCase());
+      }
+    }
+    return map;
+  }, [pricingOptions]);
+
   const updateItem = (index: number, patch: Partial<DeliveryItem>) => {
     if (disabled) return;
     const next = items.map((it, i) => (i === index ? { ...it, ...patch } : it));
@@ -104,11 +116,13 @@ export default function DeliveryItemsTable({
       treatmentName = treatments[0].label;
     }
 
+    const crop = cropByProduct.get(productId) ?? "";
     updateItem(index, {
       productId,
       product: productName,
       treatmentId,
       treatment: treatmentName,
+      seedSize: crop === "corn" ? items[index].seedSize : "",
     });
   };
 
@@ -141,16 +155,18 @@ export default function DeliveryItemsTable({
       <div className={styles.wrapper}>
         <table className={styles.table}>
           <colgroup>
-            <col style={{ width: "38%" }} />
-            <col style={{ width: "30%" }} />
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "10%" }} />
+            <col style={{ width: "33%" }} />
+            <col style={{ width: "26%" }} />
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "19%" }} />
+            <col style={{ width: "8%" }} />
           </colgroup>
           <thead>
             <tr>
               <th>Product</th>
               <th className={styles.colTreatment}>Treatment</th>
               <th className={styles.colNum}>Units Delivered</th>
+              <th className={styles.colTreatment}>Size</th>
               <th className={styles.colAction}></th>
             </tr>
           </thead>
@@ -199,6 +215,25 @@ export default function DeliveryItemsTable({
                         })
                       }
                     />
+                  </td>
+                  <td>
+                    {cropByProduct.get(item.productId) === "corn" ? (
+                      <select
+                        className={styles.sizeSelect}
+                        value={item.seedSize}
+                        disabled={disabled}
+                        onChange={(e) => updateItem(i, { seedSize: e.target.value })}
+                      >
+                        <option value="">—</option>
+                        <option value="AR">AR</option>
+                        <option value="AR2">AR2</option>
+                        <option value="AF">AF</option>
+                        <option value="AF2">AF2</option>
+                        <option value="P26">P26</option>
+                      </select>
+                    ) : (
+                      <select className={styles.sizeSelect} disabled value=""><option value="">—</option></select>
+                    )}
                   </td>
                   <td style={{ textAlign: "center" }}>
                     <button
@@ -287,6 +322,24 @@ export default function DeliveryItemsTable({
                   <span className={styles.errorText}>Enter units &gt; 0</span>
                 )}
               </div>
+              {cropByProduct.get(item.productId) === "corn" && (
+                <div className={styles.cardField}>
+                  <label className={styles.cardLabel}>Seed Size</label>
+                  <select
+                    className={styles.cardNumInput}
+                    value={item.seedSize}
+                    disabled={disabled}
+                    onChange={(e) => updateItem(i, { seedSize: e.target.value })}
+                  >
+                    <option value="">—</option>
+                    <option value="AR">AR</option>
+                    <option value="AR2">AR2</option>
+                    <option value="AF">AF</option>
+                    <option value="AF2">AF2</option>
+                    <option value="P26">P26</option>
+                  </select>
+                </div>
+              )}
             </div>
           );
         })}

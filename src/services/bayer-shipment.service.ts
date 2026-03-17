@@ -11,6 +11,7 @@ export interface ShipmentItemInsert {
   product_id: string;
   treatment_id: string;
   units_received: number;
+  seed_size: string | null;
 }
 
 export interface CreateShipmentResult {
@@ -47,6 +48,7 @@ export async function createBayerShipment(
     product_id: it.product_id,
     treatment_id: it.treatment_id,
     units_received: it.units_received,
+    seed_size: it.seed_size,
   }));
 
   const { error: itemsError } = await supabase
@@ -90,6 +92,7 @@ export interface ShipmentViewRow {
   treatment_id: string;
   treatment_name: string;
   units_received: number;
+  seed_size: string | null;
   is_verified: boolean;
   verified_at: string | null;
   verified_by: string | null;
@@ -160,6 +163,7 @@ export async function updateBayerShipment(
     product_id: it.product_id,
     treatment_id: it.treatment_id,
     units_received: it.units_received,
+    seed_size: it.seed_size,
   }));
 
   const { error: itemsError } = await supabase
@@ -265,6 +269,7 @@ export interface YearEndTotalRow {
   product_name: string;
   treatment_id: string;
   treatment_name: string;
+  seed_size: string | null;
   net_units: number;
   is_verified: boolean;
   verified_at: string | null;
@@ -296,6 +301,7 @@ export async function upsertYearEndVerification(
   seasonYear: number,
   productId: string,
   treatmentId: string,
+  seedSize: string | null,
   isVerified: boolean
 ): Promise<void> {
   const supabase = getSupabaseBrowserClient();
@@ -314,9 +320,10 @@ export async function upsertYearEndVerification(
         season_year: seasonYear,
         product_id: productId,
         treatment_id: treatmentId,
+        seed_size: seedSize,
         is_verified: isVerified,
       },
-      { onConflict: "user_id,season_year,product_id,treatment_id" }
+      { onConflict: "user_id,season_year,product_id,treatment_id,seed_size" }
     );
 
   if (error) {

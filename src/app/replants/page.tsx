@@ -238,6 +238,7 @@ export default function ReplantsPage() {
       product_id: row.productId,
       treatment_id: row.treatmentId,
       units_replanted: row.units,
+      seed_size: row.seedSize || null,
       order_id: null,
       order_item_id: null,
       notes: notes.trim() || null,
@@ -362,6 +363,7 @@ export default function ReplantsPage() {
       product_id: string;
       treatment_id: string;
       units_replanted: number;
+      seed_size: string | null;
       notes: string | null;
     }
   ) => {

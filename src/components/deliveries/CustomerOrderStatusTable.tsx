@@ -58,6 +58,7 @@ export default function CustomerOrderStatusTable({
                     <tr>
                       <th>Product</th>
                       <th>Treatment</th>
+                      <th className={styles.center}>Size</th>
                       <th className={styles.center}>Ordered</th>
                       <th className={styles.center}>Delivered</th>
                       <th className={styles.center}>Returned</th>
@@ -74,6 +75,7 @@ export default function CustomerOrderStatusTable({
                         <tr key={`${row.order_id}-${i}`}>
                           <td>{row.product_name}</td>
                           <td>{row.treatment_name}</td>
+                          <td className={styles.center}>{row.seed_size || "—"}</td>
                           <td className={styles.center}>{row.ordered_units}</td>
                           <td className={styles.center}>{row.delivered_units}</td>
                           <td className={styles.center}>{row.returned_units}</td>

@@ -17,7 +17,10 @@
       "Bash(del c:ProjectsSSIMV2srcsmoke.test.ts)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && grep \"\"create table\\\\|create or replace view\\\\|bayer_shipment\"\" {}')"
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && grep \"\"create table\\\\|create or replace view\\\\|bayer_shipment\"\" {}')",
+      "Bash(wc -l /c/Projects/SSIMV2/supabase/migrations/*.sql)",
+      "Bash(cat /c/Projects/SSIMV2/supabase/migrations/*.sql)",
+      "Bash(find /c/Projects/SSIMV2/src -type f \\\\\\(-name *inventory* -o -path *inventory* \\\\\\))"
     ]
   }
 }

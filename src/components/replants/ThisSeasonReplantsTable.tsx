@@ -22,6 +22,7 @@ interface Props {
       product_id: string;
       treatment_id: string;
       units_replanted: number;
+      seed_size: string | null;
       notes: string | null;
     }
   ) => void;
@@ -44,6 +45,7 @@ export default function ThisSeasonReplantsTable({
     product_id: string;
     treatment_id: string;
     units_replanted: number;
+    seed_size: string;
     notes: string;
   } | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -93,6 +95,14 @@ export default function ThisSeasonReplantsTable({
     [customers]
   );
 
+  const cropByProduct = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of pricingOptions) {
+      if (!map.has(o.product_id)) map.set(o.product_id, o.crop.toLowerCase());
+    }
+    return map;
+  }, [pricingOptions]);
+
   const startEdit = (row: ReplantViewRow) => {
     setEditingId(row.replant_id);
     setEditForm({
@@ -101,6 +111,7 @@ export default function ThisSeasonReplantsTable({
       product_id: row.product_id,
       treatment_id: row.treatment_id,
       units_replanted: row.units_replanted,
+      seed_size: row.seed_size ?? "",
       notes: row.notes ?? "",
     });
     setEditError(null);
@@ -142,6 +153,7 @@ export default function ThisSeasonReplantsTable({
       product_id: editForm.product_id,
       treatment_id: editForm.treatment_id,
       units_replanted: editForm.units_replanted,
+      seed_size: cropByProduct.get(editForm.product_id) === "corn" ? (editForm.seed_size || null) : null,
       notes: editForm.notes.trim() || null,
     });
     cancelEdit();
@@ -151,10 +163,12 @@ export default function ThisSeasonReplantsTable({
     if (!editForm) return;
     const treatments = pricingOptions.filter((o) => o.product_id === productId);
     const treatmentId = treatments.length === 1 ? treatments[0].treatment_id : "";
+    const crop = cropByProduct.get(productId) ?? "";
     setEditForm({
       ...editForm,
       product_id: productId,
       treatment_id: treatmentId,
+      seed_size: crop === "corn" ? editForm.seed_size : "",
     });
   };
 
@@ -198,6 +212,7 @@ export default function ThisSeasonReplantsTable({
                 <th>Customer</th>
                 <th>Product</th>
                 <th>Treatment</th>
+                <th className={styles.center}>Size</th>
                 <th className={styles.right}>Units</th>
                 <th>Notes</th>
                 <th className={styles.center}>Actions</th>
@@ -213,6 +228,7 @@ export default function ThisSeasonReplantsTable({
                   <td>{r.customer_name}</td>
                   <td>{r.product_name}</td>
                   <td>{r.treatment_name}</td>
+                  <td className={styles.center}>{r.seed_size || "—"}</td>
                   <td className={styles.mono}>{r.units_replanted}</td>
                   <td className={styles.notes}>
                     {r.notes ? (
@@ -334,6 +350,24 @@ export default function ThisSeasonReplantsTable({
                   min={1}
                 />
               </div>
+
+              {cropByProduct.get(editForm.product_id) === "corn" && (
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>Seed Size</label>
+                  <select
+                    className={styles.formInput}
+                    value={editForm.seed_size}
+                    onChange={(e) => setEditForm({ ...editForm, seed_size: e.target.value })}
+                  >
+                    <option value="">—</option>
+                    <option value="AR">AR</option>
+                    <option value="AR2">AR2</option>
+                    <option value="AF">AF</option>
+                    <option value="AF2">AF2</option>
+                    <option value="P26">P26</option>
+                  </select>
+                </div>
+              )}
 
               <div className={styles.formField}>
                 <label className={styles.formLabel}>Notes</label>

@@ -173,6 +173,44 @@
   border-color: var(--color-accent-500);
 }
 
+.sizeSelect {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 2px;
+  font-size: 10px;
+  text-align: center;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 3px;
+  background: var(--color-white);
+  outline: none;
+  cursor: pointer;
+}
+
+.sizeSelect:focus {
+  border-color: var(--color-accent-500);
+}
+
+.sizeSelect:disabled {
+  background: var(--color-gray-50);
+  cursor: not-allowed;
+  color: var(--color-gray-400);
+}
+
+.cardSizeSelect {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 16px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  background: var(--color-white);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.cardSizeSelect:focus {
+  border-color: var(--color-accent-500);
+}
+
 /* ---- No-treatment indicator ---- */
 .naText {
   display: inline-block;
