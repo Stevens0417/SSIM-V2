@@ -283,6 +283,15 @@ export default function BayerShipmentsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
+  // Map product_id → crop for corn-aware duplicate detection
+  const cropByProduct = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of pricingOptions) {
+      if (!map.has(o.product_id)) map.set(o.product_id, o.crop.toLowerCase());
+    }
+    return map;
+  }, [pricingOptions]);
+
   // Derived total units
   const totalUnits = useMemo(
     () => items.reduce((sum, it) => sum + it.units, 0),
@@ -317,14 +326,21 @@ export default function BayerShipmentsPage() {
       ok = false;
     }
 
-    const nonEmptyRows = items.filter((r) => !isRowEmpty(r));
+    // Normalize: non-corn rows must have seedSize cleared
+    const nonEmptyRows = items
+      .filter((r) => !isRowEmpty(r))
+      .map((r) => {
+        const isCorn = cropByProduct.get(r.productId) === "corn";
+        return isCorn ? r : { ...r, seedSize: "" };
+      });
 
     if (nonEmptyRows.length === 0) {
       fErrors.noRows = true;
       ok = false;
     }
 
-    // Track seen (productId, treatmentId) combos for duplicate detection
+    // Track seen combos for duplicate detection
+    // corn: product + treatment + seedSize; non-corn: product + treatment
     const seenLines = new Set<string>();
 
     for (const row of nonEmptyRows) {
@@ -342,9 +358,11 @@ export default function BayerShipmentsPage() {
         ok = false;
       }
 
-      // Duplicate line check: same product + treatment
       if (row.productId && row.treatmentId) {
-        const lineKey = `${row.productId}::${row.treatmentId}`;
+        const isCorn = cropByProduct.get(row.productId) === "corn";
+        const lineKey = isCorn
+          ? `${row.productId}::${row.treatmentId}::${row.seedSize}`
+          : `${row.productId}::${row.treatmentId}`;
         if (seenLines.has(lineKey)) {
           rowErr.product = true;
           rowErr.treatment = true;
@@ -382,12 +400,15 @@ export default function BayerShipmentsPage() {
         shipment_number: shipmentNumber.trim(),
         season_year: seasonYear!,
       };
-      const itemData = rowsToSave.map((row) => ({
-        product_id: row.productId,
-        treatment_id: row.treatmentId,
-        units_received: row.units,
-        seed_size: row.seedSize || null,
-      }));
+      const itemData = rowsToSave.map((row) => {
+        const isCorn = cropByProduct.get(row.productId) === "corn";
+        return {
+          product_id: row.productId,
+          treatment_id: row.treatmentId,
+          units_received: row.units,
+          seed_size: isCorn ? (row.seedSize || null) : null,
+        };
+      });
 
       let result;
       if (editingShipmentId) {

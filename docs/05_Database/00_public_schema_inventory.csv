@@ -2613,6 +2613,228 @@
         },
         {
             "rls": {
+                "forced": false,
+                "enabled": false
+            },
+            "table": "webauthn_challenges",
+            "schema": "auth",
+            "columns": [
+                {
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "column_name": "id",
+                    "is_nullable": "NO",
+                    "column_default": "gen_random_uuid()",
+                    "ordinal_position": 1
+                },
+                {
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "column_name": "user_id",
+                    "is_nullable": "YES",
+                    "column_default": null,
+                    "ordinal_position": 2
+                },
+                {
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "column_name": "challenge_type",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 3
+                },
+                {
+                    "udt_name": "jsonb",
+                    "data_type": "jsonb",
+                    "column_name": "session_data",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 4
+                },
+                {
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "column_name": "created_at",
+                    "is_nullable": "NO",
+                    "column_default": "now()",
+                    "ordinal_position": 5
+                },
+                {
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "column_name": "expires_at",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 6
+                }
+            ],
+            "indexes": [
+                {
+                    "index_name": "webauthn_challenges_expires_at_idx",
+                    "index_definition": "CREATE INDEX webauthn_challenges_expires_at_idx ON auth.webauthn_challenges USING btree (expires_at)"
+                },
+                {
+                    "index_name": "webauthn_challenges_pkey",
+                    "index_definition": "CREATE UNIQUE INDEX webauthn_challenges_pkey ON auth.webauthn_challenges USING btree (id)"
+                },
+                {
+                    "index_name": "webauthn_challenges_user_id_idx",
+                    "index_definition": "CREATE INDEX webauthn_challenges_user_id_idx ON auth.webauthn_challenges USING btree (user_id)"
+                }
+            ],
+            "policies": [
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "rls": {
+                "forced": false,
+                "enabled": false
+            },
+            "table": "webauthn_credentials",
+            "schema": "auth",
+            "columns": [
+                {
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "column_name": "id",
+                    "is_nullable": "NO",
+                    "column_default": "gen_random_uuid()",
+                    "ordinal_position": 1
+                },
+                {
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "column_name": "user_id",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 2
+                },
+                {
+                    "udt_name": "bytea",
+                    "data_type": "bytea",
+                    "column_name": "credential_id",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 3
+                },
+                {
+                    "udt_name": "bytea",
+                    "data_type": "bytea",
+                    "column_name": "public_key",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 4
+                },
+                {
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "column_name": "attestation_type",
+                    "is_nullable": "NO",
+                    "column_default": "''::text",
+                    "ordinal_position": 5
+                },
+                {
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "column_name": "aaguid",
+                    "is_nullable": "YES",
+                    "column_default": null,
+                    "ordinal_position": 6
+                },
+                {
+                    "udt_name": "int8",
+                    "data_type": "bigint",
+                    "column_name": "sign_count",
+                    "is_nullable": "NO",
+                    "column_default": "0",
+                    "ordinal_position": 7
+                },
+                {
+                    "udt_name": "jsonb",
+                    "data_type": "jsonb",
+                    "column_name": "transports",
+                    "is_nullable": "NO",
+                    "column_default": "'[]'::jsonb",
+                    "ordinal_position": 8
+                },
+                {
+                    "udt_name": "bool",
+                    "data_type": "boolean",
+                    "column_name": "backup_eligible",
+                    "is_nullable": "NO",
+                    "column_default": "false",
+                    "ordinal_position": 9
+                },
+                {
+                    "udt_name": "bool",
+                    "data_type": "boolean",
+                    "column_name": "backed_up",
+                    "is_nullable": "NO",
+                    "column_default": "false",
+                    "ordinal_position": 10
+                },
+                {
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "column_name": "friendly_name",
+                    "is_nullable": "NO",
+                    "column_default": "''::text",
+                    "ordinal_position": 11
+                },
+                {
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "column_name": "created_at",
+                    "is_nullable": "NO",
+                    "column_default": "now()",
+                    "ordinal_position": 12
+                },
+                {
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "column_name": "updated_at",
+                    "is_nullable": "NO",
+                    "column_default": "now()",
+                    "ordinal_position": 13
+                },
+                {
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "column_name": "last_used_at",
+                    "is_nullable": "YES",
+                    "column_default": null,
+                    "ordinal_position": 14
+                }
+            ],
+            "indexes": [
+                {
+                    "index_name": "webauthn_credentials_credential_id_key",
+                    "index_definition": "CREATE UNIQUE INDEX webauthn_credentials_credential_id_key ON auth.webauthn_credentials USING btree (credential_id)"
+                },
+                {
+                    "index_name": "webauthn_credentials_pkey",
+                    "index_definition": "CREATE UNIQUE INDEX webauthn_credentials_pkey ON auth.webauthn_credentials USING btree (id)"
+                },
+                {
+                    "index_name": "webauthn_credentials_user_id_idx",
+                    "index_definition": "CREATE INDEX webauthn_credentials_user_id_idx ON auth.webauthn_credentials USING btree (user_id)"
+                }
+            ],
+            "policies": [
+            ],
+            "primary_key": [
+                "id"
+            ],
+            "foreign_keys": [
+            ]
+        },
+        {
+            "rls": {
                 "forced": true,
                 "enabled": true
             },
@@ -2730,8 +2952,8 @@
                     "index_definition": "CREATE INDEX bayer_shipment_items_shipment_idx ON public.bayer_shipment_items USING btree (shipment_id)"
                 },
                 {
-                    "index_name": "bayer_shipment_items_unique_line",
-                    "index_definition": "CREATE UNIQUE INDEX bayer_shipment_items_unique_line ON public.bayer_shipment_items USING btree (shipment_id, product_id, treatment_id)"
+                    "index_name": "bayer_shipment_items_unique_line_v2",
+                    "index_definition": "CREATE UNIQUE INDEX bayer_shipment_items_unique_line_v2 ON public.bayer_shipment_items USING btree (shipment_id, product_id, treatment_id, COALESCE(seed_size, ''::text))"
                 },
                 {
                     "index_name": "bayer_shipment_items_user_id_idx",
