@@ -13,11 +13,11 @@
   flex-direction: column;
   width: 190mm;
   height: 254mm;
-  margin: 0;
+  margin: 0 auto;
   padding: 6mm 8mm;
   overflow: hidden;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 9px;
+  font-size: 10px;
   color: #000;
   line-height: 1.35;
   box-sizing: border-box;
@@ -75,7 +75,7 @@
 }
 
 .headerLine4 {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 400;
   margin-top: 2px;
 }
@@ -115,7 +115,7 @@
 .sectionTitle {
   background: #222;
   color: #fff;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -145,14 +145,14 @@
 
 .infoLabel {
   font-weight: 700;
-  font-size: 8px;
+  font-size: 9px;
   text-transform: uppercase;
   white-space: nowrap;
   min-width: 72px;
 }
 
 .infoValue {
-  font-size: 9px;
+  font-size: 10px;
   border-bottom: 1px solid #aaa;
   flex: 1;
   min-height: 14px;
@@ -178,7 +178,7 @@
 .itemsTable thead th {
   background: #ddd;
   font-weight: 700;
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   padding: 2mm 3mm;
@@ -242,7 +242,7 @@
 /* ---- Comments ---- */
 .commentsBox {
   white-space: pre-wrap;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.5;
   overflow: hidden;
   height: 100%;
@@ -264,7 +264,7 @@
 
 .sigLabel {
   font-weight: 700;
-  font-size: 8px;
+  font-size: 9px;
   text-transform: uppercase;
   white-space: nowrap;
 }
