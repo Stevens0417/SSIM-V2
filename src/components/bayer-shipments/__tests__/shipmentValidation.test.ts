@@ -53,6 +53,8 @@ describe("Scenario 1: negative units (returns)", () => {
       product: "DKC62-89",
       treatment: "Acceleron",
       units: -10,
+      seedSize: "",
+      packageType: "bag",
     };
     expect(isRowEmpty(row)).toBe(false);
   });
@@ -68,6 +70,8 @@ describe("Scenario 1: negative units (returns)", () => {
       product: "DKC62-89",
       treatment: "Acceleron",
       units: -10,
+      seedSize: "",
+      packageType: "bag",
     };
     expect(canSaveLine(row)).toBe(true);
   });
@@ -100,6 +104,8 @@ describe("Scenario 2: Packaging products → NO_TREATMENT (ID-based)", () => {
       product: "Seedpak",
       treatment: "NO_TREATMENT",
       units: 5,
+      seedSize: "",
+      packageType: "bag",
     };
     expect(canSaveLine(row)).toBe(true);
   });
@@ -114,6 +120,8 @@ describe("Scenario 2: Packaging products → NO_TREATMENT (ID-based)", () => {
       product: "Pallet",
       treatment: "NO_TREATMENT",
       units: -3,
+      seedSize: "",
+      packageType: "bag",
     };
     expect(canSaveLine(row)).toBe(true);
   });
@@ -153,6 +161,8 @@ describe("Scenario 4: zero units rejected", () => {
       product: "DKC62-89",
       treatment: "Acceleron",
       units: 0,
+      seedSize: "",
+      packageType: "bag",
     };
     expect(canSaveLine(row)).toBe(false);
   });
@@ -175,6 +185,8 @@ describe("Scenario 4: zero units rejected", () => {
       product: "",
       treatment: "",
       units: 0,
+      seedSize: "",
+      packageType: "bag",
     };
     expect(isRowEmpty(row)).toBe(true);
   });
@@ -187,6 +199,8 @@ describe("Scenario 4: zero units rejected", () => {
       product: "DKC62-89",
       treatment: "Acceleron",
       units: 0,
+      seedSize: "",
+      packageType: "bag",
     };
     expect(isRowEmpty(row)).toBe(false);
     // But isUnitsValid still rejects it:
@@ -224,17 +238,17 @@ describe("Scenario 4: zero units rejected", () => {
 describe("Scenario 6: duplicate line detection", () => {
   it("no duplicates when all lines are unique", () => {
     const rows: ShipmentItem[] = [
-      { id: "a", productId: "p1", treatmentId: "t1", product: "", treatment: "", units: 5 },
-      { id: "b", productId: "p1", treatmentId: "t2", product: "", treatment: "", units: 3 },
-      { id: "c", productId: "p2", treatmentId: "t1", product: "", treatment: "", units: 2 },
+      { id: "a", productId: "p1", treatmentId: "t1", product: "", treatment: "", units: 5, seedSize: "", packageType: "bag" },
+      { id: "b", productId: "p1", treatmentId: "t2", product: "", treatment: "", units: 3, seedSize: "", packageType: "bag" },
+      { id: "c", productId: "p2", treatmentId: "t1", product: "", treatment: "", units: 2, seedSize: "", packageType: "bag" },
     ];
     expect(findDuplicateLines(rows).size).toBe(0);
   });
 
   it("flags second row when two rows share same product+treatment", () => {
     const rows: ShipmentItem[] = [
-      { id: "a", productId: "p1", treatmentId: "t1", product: "", treatment: "", units: 5 },
-      { id: "b", productId: "p1", treatmentId: "t1", product: "", treatment: "", units: 3 },
+      { id: "a", productId: "p1", treatmentId: "t1", product: "", treatment: "", units: 5, seedSize: "", packageType: "bag" },
+      { id: "b", productId: "p1", treatmentId: "t1", product: "", treatment: "", units: 3, seedSize: "", packageType: "bag" },
     ];
     const dupes = findDuplicateLines(rows);
     expect(dupes.size).toBe(1);
@@ -243,24 +257,24 @@ describe("Scenario 6: duplicate line detection", () => {
 
   it("ignores rows with missing productId or treatmentId", () => {
     const rows: ShipmentItem[] = [
-      { id: "a", productId: "", treatmentId: "t1", product: "", treatment: "", units: 5 },
-      { id: "b", productId: "p1", treatmentId: "", product: "", treatment: "", units: 3 },
+      { id: "a", productId: "", treatmentId: "t1", product: "", treatment: "", units: 5, seedSize: "", packageType: "bag" },
+      { id: "b", productId: "p1", treatmentId: "", product: "", treatment: "", units: 3, seedSize: "", packageType: "bag" },
     ];
     expect(findDuplicateLines(rows).size).toBe(0);
   });
 
   it("same product different treatment is NOT a duplicate", () => {
     const rows: ShipmentItem[] = [
-      { id: "a", productId: "p1", treatmentId: "t1", product: "", treatment: "", units: 5 },
-      { id: "b", productId: "p1", treatmentId: "t2", product: "", treatment: "", units: 3 },
+      { id: "a", productId: "p1", treatmentId: "t1", product: "", treatment: "", units: 5, seedSize: "", packageType: "bag" },
+      { id: "b", productId: "p1", treatmentId: "t2", product: "", treatment: "", units: 3, seedSize: "", packageType: "bag" },
     ];
     expect(findDuplicateLines(rows).size).toBe(0);
   });
 
   it("packaging products with same NO_TREATMENT are flagged as duplicates", () => {
     const rows: ShipmentItem[] = [
-      { id: "a", productId: "pallet-uuid", treatmentId: "no-treat", product: "Pallet", treatment: "NO_TREATMENT", units: 5 },
-      { id: "b", productId: "pallet-uuid", treatmentId: "no-treat", product: "Pallet", treatment: "NO_TREATMENT", units: -2 },
+      { id: "a", productId: "pallet-uuid", treatmentId: "no-treat", product: "Pallet", treatment: "NO_TREATMENT", units: 5, seedSize: "", packageType: "bag" },
+      { id: "b", productId: "pallet-uuid", treatmentId: "no-treat", product: "Pallet", treatment: "NO_TREATMENT", units: -2, seedSize: "", packageType: "bag" },
     ];
     const dupes = findDuplicateLines(rows);
     expect(dupes.size).toBe(1);

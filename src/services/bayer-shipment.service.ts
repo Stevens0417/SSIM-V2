@@ -50,6 +50,7 @@ export async function createBayerShipment(
     treatment_id: it.treatment_id,
     units_received: it.units_received,
     seed_size: it.seed_size,
+    package_type: it.package_type,
   }));
 
   const { error: itemsError } = await supabase
@@ -166,6 +167,7 @@ export async function updateBayerShipment(
     treatment_id: it.treatment_id,
     units_received: it.units_received,
     seed_size: it.seed_size,
+    package_type: it.package_type,
   }));
 
   const { error: itemsError } = await supabase
