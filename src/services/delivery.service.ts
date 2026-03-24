@@ -8,6 +8,7 @@ export interface DeliveryInsert {
   treatment_id: string;
   units_delivered: number;
   seed_size: string | null;
+  package_type: string;
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
@@ -50,6 +51,7 @@ export interface DeliveryViewRow {
   treatment_name: string;
   units_delivered: number;
   seed_size: string | null;
+  package_type: string;
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
@@ -90,6 +92,7 @@ export interface DeliveryUpdate {
   treatment_id: string;
   units_delivered: number;
   seed_size: string | null;
+  package_type: string;
   notes: string | null;
 }
 

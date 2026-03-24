@@ -5,3 +5,8 @@ export function fmtCurrency(value: number): string {
     minimumFractionDigits: 2,
   });
 }
+
+export function fmtPackageType(value: string | null | undefined): string {
+  if (!value) return "Bag";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}

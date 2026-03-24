@@ -360,6 +360,7 @@ export default function OrdersPage() {
       season_year: seasonYear!,
       brand_grower_pct: brandGrowerPct,
       early_pay_pct: earlyPayPct,
+      notes: notes.trim() || null,
       subtotal_before_discounts: orderTotals.subtotalBeforeDiscounts,
       brand_grower_discount_total: orderTotals.brandGrowerDiscountTotal,
       tote_bulk_discount_total: orderTotals.toteBulkDiscountTotal,

@@ -4306,6 +4306,14 @@
                     "is_nullable": "NO",
                     "column_default": null,
                     "ordinal_position": 18
+                },
+                {
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "column_name": "notes",
+                    "is_nullable": "YES",
+                    "column_default": null,
+                    "ordinal_position": 19
                 }
             ],
             "indexes": [

@@ -407,6 +407,7 @@ export default function BayerShipmentsPage() {
           treatment_id: row.treatmentId,
           units_received: row.units,
           seed_size: isCorn ? (row.seedSize || null) : null,
+          package_type: row.packageType,
         };
       });
 
@@ -500,6 +501,7 @@ export default function BayerShipmentsPage() {
         treatment: r.treatment_name,
         units: r.units_received,
         seedSize: r.seed_size ?? "",
+        packageType: (r.package_type as "bag" | "tote") ?? "bag",
       }))
     );
     setEditingShipmentId(shipmentId);

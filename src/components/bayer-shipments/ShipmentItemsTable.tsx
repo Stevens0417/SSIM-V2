@@ -14,6 +14,7 @@ export interface ShipmentItem {
   treatment: string;
   units: number;
   seedSize: string;
+  packageType: "bag" | "tote";
 }
 
 export interface RowErrors {
@@ -33,6 +34,7 @@ export function createEmptyShipmentItem(): ShipmentItem {
     treatment: "",
     units: 0,
     seedSize: "",
+    packageType: "bag",
   };
 }
 
@@ -191,10 +193,11 @@ export default function ShipmentItemsTable({
       <div className={styles.wrapper}>
         <table className={styles.table}>
           <colgroup>
-            <col style={{ width: "34%" }} />
-            <col style={{ width: "27%" }} />
-            <col style={{ width: "13%" }} />
-            <col style={{ width: "18%" }} />
+            <col style={{ width: "28%" }} />
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "11%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "16%" }} />
             <col style={{ width: "8%" }} />
           </colgroup>
           <thead>
@@ -203,6 +206,7 @@ export default function ShipmentItemsTable({
               <th className={styles.colTreatment}>Treatment</th>
               <th className={styles.colNum}>Units</th>
               <th className={styles.colTreatment}>Size</th>
+              <th className={styles.colTreatment}>Pkg</th>
               <th className={styles.colAction}></th>
             </tr>
           </thead>
@@ -273,6 +277,17 @@ export default function ShipmentItemsTable({
                     ) : (
                       <select className={styles.sizeSelect} disabled value=""><option value="">—</option></select>
                     )}
+                  </td>
+                  <td>
+                    <select
+                      className={styles.sizeSelect}
+                      value={item.packageType}
+                      disabled={disabled}
+                      onChange={(e) => updateItem(i, { packageType: e.target.value as "bag" | "tote" })}
+                    >
+                      <option value="bag">Bag</option>
+                      <option value="tote">Tote</option>
+                    </select>
                   </td>
                   <td style={{ textAlign: "center" }}>
                     <button
@@ -380,6 +395,18 @@ export default function ShipmentItemsTable({
                   </select>
                 </div>
               )}
+              <div className={styles.cardField}>
+                <label className={styles.cardLabel}>Package Type</label>
+                <select
+                  className={styles.cardSizeSelect}
+                  value={item.packageType}
+                  disabled={disabled}
+                  onChange={(e) => updateItem(i, { packageType: e.target.value as "bag" | "tote" })}
+                >
+                  <option value="bag">Bag</option>
+                  <option value="tote">Tote</option>
+                </select>
+              </div>
             </div>
           );
         })}

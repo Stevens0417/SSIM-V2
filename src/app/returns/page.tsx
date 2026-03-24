@@ -150,6 +150,7 @@ export default function ReturnsPage() {
 
   // Save state
   const [isSaving, setIsSaving] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -160,7 +161,7 @@ export default function ReturnsPage() {
   const validLines = items.filter(
     (it) => it.productId && it.treatmentId && it.units > 0
   );
-  const canSave = !!selectedCustomerId && validLines.length > 0 && !isSaving;
+  const canSave = !!selectedCustomerId && validLines.length > 0 && !isSaving && !hasSaved;
   const canPrint = !!selectedCustomerId && validLines.length > 0;
 
   // Full validation
@@ -243,6 +244,7 @@ export default function ReturnsPage() {
       treatment_id: row.treatmentId,
       units_returned: row.units,
       seed_size: row.seedSize || null,
+      package_type: row.packageType,
       order_id: null,
       order_item_id: null,
       notes: notes.trim() || null,
@@ -251,9 +253,7 @@ export default function ReturnsPage() {
     try {
       const result = await createReplants(payloadRows);
       setSaveSuccess(`Saved return (${result.ids.length} lines).`);
-      // Reset form but keep customer and date
-      setItems([createEmptyReturnItem()]);
-      setNotes("");
+      setHasSaved(true);
       setFormErrors({});
       setRowErrors({});
     } catch (err) {
@@ -321,6 +321,7 @@ export default function ReturnsPage() {
     setItems([createEmptyReturnItem()]);
     setSaveError(null);
     setSaveSuccess(null);
+    setHasSaved(false);
     setFormErrors({});
     setRowErrors({});
     setPrintError(null);
@@ -376,6 +377,7 @@ export default function ReturnsPage() {
       treatment_id: string;
       units_returned: number;
       seed_size: string | null;
+      package_type: string;
       notes: string | null;
     }
   ) => {
@@ -532,7 +534,7 @@ export default function ReturnsPage() {
               disabled={!canSave}
               onClick={handleSave}
             >
-              {isSaving ? "Saving…" : "Save Return"}
+              {isSaving ? "Saving…" : hasSaved ? "Saved ✓" : "Save Return"}
             </button>
             <button
               className={styles.clearBtn}
@@ -560,7 +562,7 @@ export default function ReturnsPage() {
               disabled={!canSave}
               onClick={handleSave}
             >
-              {isSaving ? "Saving…" : "Save Return"}
+              {isSaving ? "Saving…" : hasSaved ? "Saved ✓" : "Save Return"}
             </button>
             <button
               className={styles.stickyClearBtn}

@@ -5,6 +5,7 @@ import type { PricingOption } from "@/services/pricing.service";
 import type { CustomerOption } from "@/services/customer.service";
 import type { ReplantViewRow } from "@/services/replant.service";
 import SearchableSelect from "@/components/orders/SearchableSelect";
+import { fmtPackageType } from "@/lib/fmt";
 import styles from "./ThisSeasonReturnsTable.module.css";
 
 interface Props {
@@ -23,6 +24,7 @@ interface Props {
       treatment_id: string;
       units_returned: number;
       seed_size: string | null;
+      package_type: string;
       notes: string | null;
     }
   ) => void;
@@ -46,6 +48,7 @@ export default function ThisSeasonReturnsTable({
     treatment_id: string;
     units_returned: number;
     seed_size: string;
+    package_type: string;
     notes: string;
   } | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -111,6 +114,7 @@ export default function ThisSeasonReturnsTable({
       treatment_id: row.treatment_id,
       units_returned: row.units_returned,
       seed_size: row.seed_size ?? "",
+      package_type: row.package_type ?? "bag",
       notes: row.notes ?? "",
     });
     setEditError(null);
@@ -154,6 +158,7 @@ export default function ThisSeasonReturnsTable({
       treatment_id: editForm.treatment_id,
       units_returned: editForm.units_returned,
       seed_size: cropByProduct.get(editForm.product_id) === "corn" ? (editForm.seed_size || null) : null,
+      package_type: editForm.package_type,
       notes: editForm.notes.trim() || null,
     });
     cancelEdit();
@@ -213,6 +218,7 @@ export default function ThisSeasonReturnsTable({
                 <th>Product</th>
                 <th>Treatment</th>
                 <th className={styles.center}>Size</th>
+                <th className={styles.center}>Pkg</th>
                 <th className={styles.right}>Units</th>
                 <th>Notes</th>
                 <th className={styles.center}>Actions</th>
@@ -229,6 +235,7 @@ export default function ThisSeasonReturnsTable({
                   <td>{r.product_name}</td>
                   <td>{r.treatment_name}</td>
                   <td className={styles.center}>{r.seed_size || "—"}</td>
+                  <td className={styles.center}>{fmtPackageType(r.package_type)}</td>
                   <td className={styles.mono}>{r.units_returned}</td>
                   <td className={styles.notes}>
                     {r.notes ? (
@@ -368,6 +375,18 @@ export default function ThisSeasonReturnsTable({
                   </select>
                 </div>
               )}
+
+              <div className={styles.formField}>
+                <label className={styles.formLabel}>Package Type</label>
+                <select
+                  className={styles.formInput}
+                  value={editForm.package_type}
+                  onChange={(e) => setEditForm({ ...editForm, package_type: e.target.value })}
+                >
+                  <option value="bag">Bag</option>
+                  <option value="tote">Tote</option>
+                </select>
+              </div>
 
               <div className={styles.formField}>
                 <label className={styles.formLabel}>Notes</label>

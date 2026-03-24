@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { ShipmentViewRow } from "@/services/bayer-shipment.service";
+import { fmtPackageType } from "@/lib/fmt";
 import styles from "./ThisSeasonShipmentsTable.module.css";
 
 interface Props {
@@ -141,6 +142,8 @@ export default function ThisSeasonShipmentsTable({
                 <th>Shipment #</th>
                 <th>Product</th>
                 <th>Treatment</th>
+                <th className={styles.center}>Size</th>
+                <th className={styles.center}>Pkg</th>
                 <th className={styles.right}>Units Received</th>
                 <th className={styles.center}>Actions</th>
               </tr>
@@ -169,6 +172,8 @@ export default function ThisSeasonShipmentsTable({
                     <td>{r.shipment_number}</td>
                     <td>{r.product_name}</td>
                     <td>{r.treatment_name}</td>
+                    <td className={styles.center}>{r.seed_size || "—"}</td>
+                    <td className={styles.center}>{fmtPackageType(r.package_type)}</td>
                     <td className={styles.mono}>{r.units_received}</td>
                     <td className={styles.center}>
                       {isFirstForShipment && (

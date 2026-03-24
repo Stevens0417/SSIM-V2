@@ -6,6 +6,7 @@ export interface OrderPayload {
   season_year: number;
   brand_grower_pct: number;
   early_pay_pct: number;
+  notes: string | null;
   subtotal_before_discounts: number;
   brand_grower_discount_total: number;
   tote_bulk_discount_total: number;
@@ -132,7 +133,7 @@ export async function fetchOrderWithItems(
 
   const { data: order, error: orderError } = await sb
     .from("orders")
-    .select("id, order_date, customer_id, season_year, brand_grower_pct, early_pay_pct")
+    .select("id, order_date, customer_id, season_year, brand_grower_pct, early_pay_pct, notes")
     .eq("id", orderId)
     .single();
 
@@ -146,8 +147,7 @@ export async function fetchOrderWithItems(
   if (itemsError) throw new Error(itemsError.message || "Failed to load order items");
 
   return {
-    ...(order as Omit<OrderWithItems, "items" | "notes">),
-    notes: null,
+    ...(order as Omit<OrderWithItems, "items">),
     items: (items ?? []) as OrderItemPayload[],
   };
 }
@@ -196,15 +196,26 @@ export interface OrderItemViewRow {
   order_item_id: string;
   order_id: string;
   order_date: string;
+  customer_id: string;
   customer_name: string;
+  notes: string | null;
+  product_id: string;
   product_name: string;
+  treatment_id: string;
   treatment_name: string;
   seed_size: string | null;
+  package_type: string;
   units: number;
   retail_price_per_unit: number;
   brand_grower_pct: number;
   early_pay_pct: number;
+  brand_grower_discount_amount: number;
+  tote_bulk_discount_amount: number;
+  early_pay_discount_amount: number;
+  line_total_after_discounts_before_early_pay: number;
   line_total_after_all_discounts: number;
+  break_even_price_per_unit: number;
+  profit_per_unit: number;
   line_total_profit: number;
 }
 
@@ -212,7 +223,7 @@ export async function fetchOrderItemsThisSeason(): Promise<OrderItemViewRow[]> {
   const sb = getSupabaseBrowserClient();
   const { data, error } = await sb
     .from("v_order_items_this_season")
-    .select("order_item_id, order_id, order_date, customer_name, product_name, treatment_name, seed_size, units, retail_price_per_unit, brand_grower_pct, early_pay_pct, line_total_after_all_discounts, line_total_profit")
+    .select("order_item_id, order_id, order_date, customer_id, customer_name, notes, product_id, product_name, treatment_id, treatment_name, seed_size, package_type, units, retail_price_per_unit, brand_grower_pct, early_pay_pct, brand_grower_discount_amount, tote_bulk_discount_amount, early_pay_discount_amount, line_total_after_discounts_before_early_pay, line_total_after_all_discounts, break_even_price_per_unit, profit_per_unit, line_total_profit")
     .order("order_date", { ascending: false })
     .order("customer_name", { ascending: true })
     .order("product_name", { ascending: true })

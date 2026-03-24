@@ -12,6 +12,7 @@ export interface ShipmentItemInsert {
   treatment_id: string;
   units_received: number;
   seed_size: string | null;
+  package_type: string;
 }
 
 export interface CreateShipmentResult {
@@ -93,6 +94,7 @@ export interface ShipmentViewRow {
   treatment_name: string;
   units_received: number;
   seed_size: string | null;
+  package_type: string;
   is_verified: boolean;
   verified_at: string | null;
   verified_by: string | null;

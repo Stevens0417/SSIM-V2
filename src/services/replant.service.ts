@@ -8,6 +8,7 @@ export interface ReplantInsert {
   treatment_id: string;
   units_returned: number;
   seed_size: string | null;
+  package_type: string;
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
@@ -50,6 +51,7 @@ export interface ReplantViewRow {
   treatment_name: string;
   units_returned: number;
   seed_size: string | null;
+  package_type: string;
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
@@ -90,6 +92,7 @@ export interface ReplantUpdate {
   treatment_id: string;
   units_returned: number;
   seed_size: string | null;
+  package_type: string;
   notes: string | null;
 }
 
