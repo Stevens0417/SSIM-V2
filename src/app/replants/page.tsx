@@ -30,6 +30,12 @@ import type {
   ReplantPrintItem,
   ReplantPrintCustomer,
 } from "@/components/print/ReplantPrintView";
+import {
+  fetchCustomerOrderStatus,
+  type CustomerOrderStatusRow,
+} from "@/services/delivery.service";
+import CustomerOrderStatusTable from "@/components/deliveries/CustomerOrderStatusTable";
+import { findOrderLineMatches } from "@/services/orderMatching.service";
 import styles from "./replants.module.css";
 
 function todayISO(): string {
@@ -133,6 +139,33 @@ export default function ReplantsPage() {
   const [replantDate, setReplantDate] = useState(todayISO);
   const [notes, setNotes] = useState("");
 
+  // Customer order status
+  const [orderStatusRows, setOrderStatusRows] = useState<CustomerOrderStatusRow[]>([]);
+  const [orderStatusLoading, setOrderStatusLoading] = useState(false);
+  const [orderStatusError, setOrderStatusError] = useState<string | null>(null);
+
+  const loadOrderStatus = useCallback(async (customerId: string, season: number) => {
+    setOrderStatusLoading(true);
+    setOrderStatusError(null);
+    try {
+      const rows = await fetchCustomerOrderStatus(customerId, season);
+      setOrderStatusRows(rows);
+    } catch (err) {
+      setOrderStatusError(err instanceof Error ? err.message : "Failed to load order status");
+    } finally {
+      setOrderStatusLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCustomerId || !seasonYear) {
+      setOrderStatusRows([]);
+      setOrderStatusError(null);
+      return;
+    }
+    loadOrderStatus(selectedCustomerId, seasonYear);
+  }, [selectedCustomerId, seasonYear, loadOrderStatus]);
+
   const customerSelectOptions = useMemo(
     () => customers.map((c) => ({ value: c.id, label: c.customer_name })),
     [customers]
@@ -155,6 +188,7 @@ export default function ReplantsPage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [rowErrors, setRowErrors] = useState<RowErrors>({});
+  const [linkErrors, setLinkErrors] = useState<string[]>([]);
   const [printError, setPrintError] = useState<string | null>(null);
 
   // Validation for button enable (simple check)
@@ -221,37 +255,70 @@ export default function ReplantsPage() {
     setSaveError(null);
     setSaveSuccess(null);
     setPrintError(null);
+    setLinkErrors([]);
 
     const { ok, formErrors: fErrs, rowErrors: rErrs, rowsToSave } = validateForm();
     setFormErrors(fErrs);
     setRowErrors(rErrs);
 
-    if (!ok) {
-      return;
-    }
+    if (!ok) return;
 
     setIsSaving(true);
 
-    const payloadRows: ReplantEntryInsert[] = rowsToSave.map((row) => ({
-      replant_date: replantDate,
-      season_year: seasonYear!,
-      customer_id: selectedCustomerId!,
-      product_id: row.productId,
-      treatment_id: row.treatmentId,
-      units_replanted: row.units,
-      seed_size: row.seedSize || null,
-      package_type: row.packageType,
-      order_id: null,
-      order_item_id: null,
-      notes: notes.trim() || null,
-    }));
-
     try {
+      const linesToMatch = rowsToSave.map((row) => ({
+        product_id: row.productId,
+        treatment_id: row.treatmentId,
+        seed_size: row.seedSize || null,
+        package_type: row.packageType,
+      }));
+
+      const matches = await findOrderLineMatches(
+        selectedCustomerId!,
+        seasonYear!,
+        linesToMatch
+      );
+
+      const ambiguousErrors: string[] = [];
+      matches.forEach((match, i) => {
+        if (match === "ambiguous") {
+          const row = rowsToSave[i];
+          ambiguousErrors.push(
+            `${row.product} / ${row.treatment}${row.seedSize ? ` (${row.seedSize})` : ""}: multiple matching order lines found — resolve the ambiguity before saving.`
+          );
+        }
+      });
+
+      if (ambiguousErrors.length > 0) {
+        setLinkErrors(ambiguousErrors);
+        return;
+      }
+
+      const payloadRows: ReplantEntryInsert[] = rowsToSave.map((row, i) => {
+        const match = matches[i];
+        return {
+          replant_date: replantDate,
+          season_year: seasonYear!,
+          customer_id: selectedCustomerId!,
+          product_id: row.productId,
+          treatment_id: row.treatmentId,
+          units_replanted: row.units,
+          seed_size: row.seedSize || null,
+          package_type: row.packageType,
+          order_id: match && match !== "ambiguous" ? match.order_id : null,
+          order_item_id: match && match !== "ambiguous" ? match.order_item_id : null,
+          notes: notes.trim() || null,
+        };
+      });
+
       const result = await createReplantEntries(payloadRows);
       setSaveSuccess(`Saved replant (${result.ids.length} lines).`);
       setHasSaved(true);
       setFormErrors({});
       setRowErrors({});
+      if (selectedCustomerId && seasonYear) {
+        loadOrderStatus(selectedCustomerId, seasonYear);
+      }
     } catch (err) {
       console.error("Replant save error:", err);
       setSaveError("Could not save replant. Please try again.");
@@ -336,12 +403,9 @@ export default function ReplantsPage() {
 
   const handleItemsChange = (newItems: ReplantItem[]) => {
     setItems(newItems);
-    if (Object.keys(rowErrors).length > 0) {
-      setRowErrors({});
-    }
-    if (formErrors.noRows) {
-      setFormErrors((prev) => ({ ...prev, noRows: false }));
-    }
+    if (Object.keys(rowErrors).length > 0) setRowErrors({});
+    if (formErrors.noRows) setFormErrors((prev) => ({ ...prev, noRows: false }));
+    if (linkErrors.length > 0) setLinkErrors([]);
     setSaveSuccess(null);
     setPrintError(null);
   };
@@ -431,6 +495,14 @@ export default function ReplantsPage() {
           {saveSuccess && <div className={styles.success}>{saveSuccess}</div>}
           {saveError && <div className={styles.error}>{saveError}</div>}
           {printError && <div className={styles.error}>{printError}</div>}
+          {linkErrors.length > 0 && (
+            <div className={styles.error}>
+              Could not auto-link to order line:
+              <ul style={{ margin: "4px 0 0 0", paddingLeft: 20 }}>
+                {linkErrors.map((msg, i) => <li key={i}>{msg}</li>)}
+              </ul>
+            </div>
+          )}
           {hasErrors && (
             <div className={styles.error}>Fix the highlighted fields.</div>
           )}
@@ -513,6 +585,15 @@ export default function ReplantsPage() {
             style={{ width: "100%" }}
             disabled={isSaving}
           />
+
+          {/* ---- Customer Order Status ---- */}
+          {selectedCustomerId && (
+            <CustomerOrderStatusTable
+              rows={orderStatusRows}
+              loading={orderStatusLoading}
+              error={orderStatusError}
+            />
+          )}
 
           {/* ---- Desktop Actions (hidden on mobile) ---- */}
           <div className={styles.actions}>

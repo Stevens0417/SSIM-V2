@@ -117,13 +117,17 @@ export async function updateDelivery(
 export interface CustomerOrderStatusRow {
   order_id: string;
   order_date: string;
+  order_item_id: string;
   product_name: string;
   treatment_name: string;
   seed_size: string | null;
+  package_type: string;
   ordered_units: number;
   delivered_units: number;
   returned_units: number;
+  replanted_units: number;
   net_units: number;
+  is_complete: boolean;
   customer_id: string;
   season_year: number;
 }

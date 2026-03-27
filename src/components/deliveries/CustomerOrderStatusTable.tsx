@@ -59,39 +59,38 @@ export default function CustomerOrderStatusTable({
                       <th>Product</th>
                       <th>Treatment</th>
                       <th className={styles.center}>Size</th>
+                      <th className={styles.center}>Pkg</th>
                       <th className={styles.center}>Ordered</th>
                       <th className={styles.center}>Delivered</th>
+                      <th className={styles.center}>Replanted</th>
                       <th className={styles.center}>Returned</th>
                       <th className={styles.center}>Net Units</th>
                       <th className={styles.center}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {group.lines.map((row, i) => {
-                      const netUnits =
-                        row.ordered_units - row.delivered_units + row.returned_units;
-                      const isComplete = netUnits <= 0;
-                      return (
-                        <tr key={`${row.order_id}-${i}`}>
-                          <td>{row.product_name}</td>
-                          <td>{row.treatment_name}</td>
-                          <td className={styles.center}>{row.seed_size || "—"}</td>
-                          <td className={styles.center}>{row.ordered_units}</td>
-                          <td className={styles.center}>{row.delivered_units}</td>
-                          <td className={styles.center}>{row.returned_units}</td>
-                          <td className={styles.center}>{netUnits}</td>
-                          <td className={styles.center}>
-                            <span
-                              className={
-                                isComplete ? styles.badgeComplete : styles.badgeOpen
-                              }
-                            >
-                              {isComplete ? "Complete" : "Open"}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {group.lines.map((row) => (
+                      <tr key={row.order_item_id}>
+                        <td>{row.product_name}</td>
+                        <td>{row.treatment_name}</td>
+                        <td className={styles.center}>{row.seed_size || "—"}</td>
+                        <td className={styles.center}>{row.package_type}</td>
+                        <td className={styles.center}>{row.ordered_units}</td>
+                        <td className={styles.center}>{row.delivered_units}</td>
+                        <td className={styles.center}>{row.replanted_units || "—"}</td>
+                        <td className={styles.center}>{row.returned_units || "—"}</td>
+                        <td className={styles.center}>{row.net_units}</td>
+                        <td className={styles.center}>
+                          <span
+                            className={
+                              row.is_complete ? styles.badgeComplete : styles.badgeOpen
+                            }
+                          >
+                            {row.is_complete ? "Complete" : "Open"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

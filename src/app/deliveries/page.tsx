@@ -28,6 +28,7 @@ import {
   type DeliveryViewRow,
   type CustomerOrderStatusRow,
 } from "@/services/delivery.service";
+import { findOrderLineMatches } from "@/services/orderMatching.service";
 import SearchableSelect from "@/components/orders/SearchableSelect";
 import type {
   DeliveryPrintItem,
@@ -151,30 +152,27 @@ export default function DeliveriesPage() {
   const [orderStatusLoading, setOrderStatusLoading] = useState(false);
   const [orderStatusError, setOrderStatusError] = useState<string | null>(null);
 
+  const loadOrderStatus = useCallback(async (customerId: string, season: number) => {
+    setOrderStatusLoading(true);
+    setOrderStatusError(null);
+    try {
+      const rows = await fetchCustomerOrderStatus(customerId, season);
+      setOrderStatusRows(rows);
+    } catch (err) {
+      setOrderStatusError(err instanceof Error ? err.message : "Failed to load order status");
+    } finally {
+      setOrderStatusLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!selectedCustomerId || !seasonYear) {
       setOrderStatusRows([]);
       setOrderStatusError(null);
       return;
     }
-    let cancelled = false;
-    setOrderStatusLoading(true);
-    setOrderStatusError(null);
-    fetchCustomerOrderStatus(selectedCustomerId, seasonYear)
-      .then((rows) => {
-        if (!cancelled) setOrderStatusRows(rows);
-      })
-      .catch((err) => {
-        if (!cancelled)
-          setOrderStatusError(err instanceof Error ? err.message : "Failed to load order status");
-      })
-      .finally(() => {
-        if (!cancelled) setOrderStatusLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedCustomerId, seasonYear]);
+    loadOrderStatus(selectedCustomerId, seasonYear);
+  }, [selectedCustomerId, seasonYear, loadOrderStatus]);
 
   // Items state
   const [items, setItems] = useState<DeliveryItem[]>([
@@ -188,6 +186,7 @@ export default function DeliveriesPage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [rowErrors, setRowErrors] = useState<RowErrors>({});
+  const [linkErrors, setLinkErrors] = useState<string[]>([]);
   const [printError, setPrintError] = useState<string | null>(null);
 
   // Validation for button enable (simple check)
@@ -258,6 +257,7 @@ export default function DeliveriesPage() {
     setSaveError(null);
     setSaveSuccess(null);
     setPrintError(null);
+    setLinkErrors([]);
 
     const { ok, formErrors: fErrs, rowErrors: rErrs, rowsToSave } = validateForm();
     setFormErrors(fErrs);
@@ -269,26 +269,62 @@ export default function DeliveriesPage() {
 
     setIsSaving(true);
 
-    const payloadRows: DeliveryInsert[] = rowsToSave.map((row) => ({
-      delivery_date: deliveryDate,
-      season_year: seasonYear!,
-      customer_id: selectedCustomerId!,
-      product_id: row.productId,
-      treatment_id: row.treatmentId,
-      units_delivered: row.units,
-      seed_size: row.seedSize || null,
-      package_type: row.packageType,
-      order_id: null,
-      order_item_id: null,
-      notes: notes.trim() || null,
-    }));
-
     try {
+      // Resolve order line matches for each row
+      const linesToMatch = rowsToSave.map((row) => ({
+        product_id: row.productId,
+        treatment_id: row.treatmentId,
+        seed_size: row.seedSize || null,
+        package_type: row.packageType,
+      }));
+
+      const matches = await findOrderLineMatches(
+        selectedCustomerId!,
+        seasonYear!,
+        linesToMatch
+      );
+
+      const ambiguousErrors: string[] = [];
+      matches.forEach((match, i) => {
+        if (match === "ambiguous") {
+          const row = rowsToSave[i];
+          ambiguousErrors.push(
+            `${row.product} / ${row.treatment}${row.seedSize ? ` (${row.seedSize})` : ""}: multiple matching order lines found — resolve the ambiguity before saving.`
+          );
+        }
+      });
+
+      if (ambiguousErrors.length > 0) {
+        setLinkErrors(ambiguousErrors);
+        return;
+      }
+
+      const payloadRows: DeliveryInsert[] = rowsToSave.map((row, i) => {
+        const match = matches[i];
+        return {
+          delivery_date: deliveryDate,
+          season_year: seasonYear!,
+          customer_id: selectedCustomerId!,
+          product_id: row.productId,
+          treatment_id: row.treatmentId,
+          units_delivered: row.units,
+          seed_size: row.seedSize || null,
+          package_type: row.packageType,
+          order_id: match && match !== "ambiguous" ? match.order_id : null,
+          order_item_id: match && match !== "ambiguous" ? match.order_item_id : null,
+          notes: notes.trim() || null,
+        };
+      });
+
       const result = await createDeliveries(payloadRows);
       setSaveSuccess(`Saved delivery (${result.ids.length} lines).`);
       setHasSaved(true);
       setFormErrors({});
       setRowErrors({});
+      // Refresh order status immediately
+      if (selectedCustomerId && seasonYear) {
+        loadOrderStatus(selectedCustomerId, seasonYear);
+      }
     } catch (err) {
       console.error("Delivery save error:", err);
       setSaveError("Could not save delivery. Please try again.");
@@ -380,6 +416,7 @@ export default function DeliveriesPage() {
     if (formErrors.noRows) {
       setFormErrors((prev) => ({ ...prev, noRows: false }));
     }
+    if (linkErrors.length > 0) setLinkErrors([]);
     setSaveSuccess(null);
     setPrintError(null);
   };
@@ -470,6 +507,14 @@ export default function DeliveriesPage() {
           {saveSuccess && <div className={styles.success}>{saveSuccess}</div>}
           {saveError && <div className={styles.error}>{saveError}</div>}
           {printError && <div className={styles.error}>{printError}</div>}
+          {linkErrors.length > 0 && (
+            <div className={styles.error}>
+              Could not auto-link to order line:
+              <ul style={{ margin: "4px 0 0 0", paddingLeft: 20 }}>
+                {linkErrors.map((msg, i) => <li key={i}>{msg}</li>)}
+              </ul>
+            </div>
+          )}
           {hasErrors && (
             <div className={styles.error}>Fix the highlighted fields.</div>
           )}
