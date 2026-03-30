@@ -17,7 +17,7 @@
         },
         {
             "view_name": "v_bayer_shipments",
-            "definition": " SELECT s.id AS shipment_id,\n    s.shipment_date,\n    s.season_year,\n    s.shipment_number,\n    i.id AS shipment_item_id,\n    i.product_id,\n    p.product_name,\n    p.crop,\n    i.treatment_id,\n    t.treatment_name,\n    i.seed_size,\n    i.units_received,\n    i.is_verified,\n    i.verified_at,\n    i.verified_by,\n    s.created_at,\n    s.updated_at\n   FROM bayer_shipments s\n     JOIN bayer_shipment_items i ON i.shipment_id = s.id\n     JOIN products p ON p.id = i.product_id\n     JOIN treatments t ON t.id = i.treatment_id\n  WHERE s.user_id = auth.uid() AND i.user_id = auth.uid();",
+            "definition": " SELECT s.id AS shipment_id,\n    s.shipment_date,\n    s.season_year,\n    s.shipment_number,\n    i.id AS shipment_item_id,\n    i.product_id,\n    p.product_name,\n    p.crop,\n    i.treatment_id,\n    t.treatment_name,\n    i.seed_size,\n    i.package_type,\n    i.units_received,\n    i.is_verified,\n    i.verified_at,\n    i.verified_by,\n    s.created_at,\n    s.updated_at\n   FROM bayer_shipments s\n     JOIN bayer_shipment_items i ON i.shipment_id = s.id\n     JOIN products p ON p.id = i.product_id\n     JOIN treatments t ON t.id = i.treatment_id\n  WHERE s.user_id = auth.uid() AND i.user_id = auth.uid();",
             "view_schema": "public"
         },
         {
@@ -62,27 +62,27 @@
         },
         {
             "view_name": "v_deliveries_this_season",
-            "definition": " SELECT d.id AS delivery_id,\n    d.delivery_date,\n    d.season_year,\n    d.customer_id,\n    c.customer_name,\n    d.product_id,\n    p.product_name,\n    p.crop,\n    d.treatment_id,\n    t.treatment_name,\n    d.seed_size,\n    d.units_delivered,\n    d.order_id,\n    d.order_item_id,\n    d.notes,\n    d.created_at,\n    d.updated_at\n   FROM deliveries d\n     JOIN customers c ON c.id = d.customer_id\n     JOIN products p ON p.id = d.product_id\n     JOIN treatments t ON t.id = d.treatment_id\n  WHERE d.user_id = auth.uid() AND c.user_id = auth.uid() AND d.season_year = (( SELECT max(pr.season_year) AS max\n           FROM pricing pr));",
+            "definition": " SELECT d.id AS delivery_id,\n    d.delivery_date,\n    d.season_year,\n    d.customer_id,\n    c.customer_name,\n    d.product_id,\n    p.product_name,\n    p.crop,\n    d.treatment_id,\n    t.treatment_name,\n    d.seed_size,\n    d.package_type,\n    d.units_delivered,\n    d.order_id,\n    d.order_item_id,\n    d.notes,\n    d.created_at,\n    d.updated_at\n   FROM deliveries d\n     JOIN customers c ON c.id = d.customer_id\n     JOIN products p ON p.id = d.product_id\n     JOIN treatments t ON t.id = d.treatment_id\n  WHERE d.user_id = auth.uid() AND c.user_id = auth.uid() AND d.season_year = (( SELECT max(pr.season_year) AS max\n           FROM pricing pr));",
             "view_schema": "public"
         },
         {
             "view_name": "v_delivery_customer_order_status",
-            "definition": " WITH delivered AS (\n         SELECT d_1.user_id,\n            d_1.order_item_id,\n            sum(d_1.units_delivered)::integer AS delivered_units\n           FROM deliveries d_1\n          WHERE d_1.user_id = auth.uid() AND d_1.order_item_id IS NOT NULL\n          GROUP BY d_1.user_id, d_1.order_item_id\n        ), returned AS (\n         SELECT r_1.user_id,\n            r_1.order_item_id,\n            sum(r_1.units_returned)::integer AS returned_units\n           FROM returns r_1\n          WHERE r_1.user_id = auth.uid() AND r_1.order_item_id IS NOT NULL\n          GROUP BY r_1.user_id, r_1.order_item_id\n        )\n SELECT o.season_year,\n    o.customer_id,\n    c.customer_name,\n    o.id AS order_id,\n    o.order_date,\n    oi.id AS order_item_id,\n    oi.product_id,\n    p.product_name,\n    p.crop,\n    oi.treatment_id,\n    t.treatment_name,\n    oi.seed_size,\n    oi.units AS ordered_units,\n    COALESCE(d.delivered_units, 0) AS delivered_units,\n    COALESCE(r.returned_units, 0) AS returned_units,\n    oi.units - COALESCE(d.delivered_units, 0) + COALESCE(r.returned_units, 0) AS net_units,\n        CASE\n            WHEN (oi.units - COALESCE(d.delivered_units, 0) + COALESCE(r.returned_units, 0)) <= 0 THEN true\n            ELSE false\n        END AS is_complete\n   FROM orders o\n     JOIN customers c ON c.id = o.customer_id AND c.user_id = o.user_id\n     JOIN order_items oi ON oi.order_id = o.id AND oi.user_id = o.user_id\n     JOIN products p ON p.id = oi.product_id\n     JOIN treatments t ON t.id = oi.treatment_id\n     LEFT JOIN delivered d ON d.order_item_id = oi.id AND d.user_id = o.user_id\n     LEFT JOIN returned r ON r.order_item_id = oi.id AND r.user_id = o.user_id\n  WHERE o.user_id = auth.uid();",
+            "definition": " WITH delivered AS (\n         SELECT d_1.user_id,\n            d_1.order_item_id,\n            sum(d_1.units_delivered)::integer AS delivered_units\n           FROM deliveries d_1\n          WHERE d_1.user_id = auth.uid() AND d_1.order_item_id IS NOT NULL\n          GROUP BY d_1.user_id, d_1.order_item_id\n        ), returned AS (\n         SELECT r_1.user_id,\n            r_1.order_item_id,\n            sum(r_1.units_returned)::integer AS returned_units\n           FROM returns r_1\n          WHERE r_1.user_id = auth.uid() AND r_1.order_item_id IS NOT NULL\n          GROUP BY r_1.user_id, r_1.order_item_id\n        ), replanted AS (\n         SELECT rp_1.user_id,\n            rp_1.order_item_id,\n            sum(rp_1.units_replanted)::integer AS replanted_units\n           FROM replants rp_1\n          WHERE rp_1.user_id = auth.uid() AND rp_1.order_item_id IS NOT NULL\n          GROUP BY rp_1.user_id, rp_1.order_item_id\n        )\n SELECT o.season_year,\n    o.customer_id,\n    c.customer_name,\n    o.id AS order_id,\n    o.order_date,\n    oi.id AS order_item_id,\n    oi.product_id,\n    p.product_name,\n    p.crop,\n    oi.treatment_id,\n    t.treatment_name,\n    oi.seed_size,\n    oi.package_type,\n    oi.units AS ordered_units,\n    COALESCE(d.delivered_units, 0) AS delivered_units,\n    COALESCE(r.returned_units, 0) AS returned_units,\n    COALESCE(rp.replanted_units, 0) AS replanted_units,\n    oi.units - COALESCE(d.delivered_units, 0) - COALESCE(rp.replanted_units, 0) + COALESCE(r.returned_units, 0) AS net_units,\n        CASE\n            WHEN (oi.units - COALESCE(d.delivered_units, 0) - COALESCE(rp.replanted_units, 0) + COALESCE(r.returned_units, 0)) <= 0 THEN true\n            ELSE false\n        END AS is_complete\n   FROM orders o\n     JOIN customers c ON c.id = o.customer_id AND c.user_id = o.user_id\n     JOIN order_items oi ON oi.order_id = o.id AND oi.user_id = o.user_id\n     JOIN products p ON p.id = oi.product_id\n     JOIN treatments t ON t.id = oi.treatment_id\n     LEFT JOIN delivered d ON d.order_item_id = oi.id AND d.user_id = o.user_id\n     LEFT JOIN returned r ON r.order_item_id = oi.id AND r.user_id = o.user_id\n     LEFT JOIN replanted rp ON rp.order_item_id = oi.id AND rp.user_id = o.user_id\n  WHERE o.user_id = auth.uid();",
             "view_schema": "public"
         },
         {
             "view_name": "v_on_hand_inventory",
-            "definition": " WITH received AS (\n         SELECT i.product_id,\n            i.treatment_id,\n                CASE\n                    WHEN p_1.crop = 'corn'::text THEN i.seed_size\n                    ELSE NULL::text\n                END AS seed_size,\n            sum(i.units_received)::integer AS units_received\n           FROM bayer_shipment_items i\n             JOIN products p_1 ON p_1.id = i.product_id\n          WHERE i.user_id = auth.uid() AND COALESCE(p_1.seed_trait, ''::text) <> 'PACKAGING'::text AND COALESCE(p_1.crop, ''::text) <> 'packaging'::text\n          GROUP BY i.product_id, i.treatment_id, (\n                CASE\n                    WHEN p_1.crop = 'corn'::text THEN i.seed_size\n                    ELSE NULL::text\n                END)\n        ), delivered AS (\n         SELECT d.product_id,\n            d.treatment_id,\n                CASE\n                    WHEN p_1.crop = 'corn'::text THEN d.seed_size\n                    ELSE NULL::text\n                END AS seed_size,\n            sum(d.units_delivered)::integer AS units_delivered\n           FROM deliveries d\n             JOIN products p_1 ON p_1.id = d.product_id\n          WHERE d.user_id = auth.uid() AND COALESCE(p_1.seed_trait, ''::text) <> 'PACKAGING'::text AND COALESCE(p_1.crop, ''::text) <> 'packaging'::text\n          GROUP BY d.product_id, d.treatment_id, (\n                CASE\n                    WHEN p_1.crop = 'corn'::text THEN d.seed_size\n                    ELSE NULL::text\n                END)\n        ), returned AS (\n         SELECT r.product_id,\n            r.treatment_id,\n                CASE\n                    WHEN p_1.crop = 'corn'::text THEN r.seed_size\n                    ELSE NULL::text\n                END AS seed_size,\n            sum(r.units_returned)::integer AS units_returned\n           FROM returns r\n             JOIN products p_1 ON p_1.id = r.product_id\n          WHERE r.user_id = auth.uid() AND COALESCE(p_1.seed_trait, ''::text) <> 'PACKAGING'::text AND COALESCE(p_1.crop, ''::text) <> 'packaging'::text\n          GROUP BY r.product_id, r.treatment_id, (\n                CASE\n                    WHEN p_1.crop = 'corn'::text THEN r.seed_size\n                    ELSE NULL::text\n                END)\n        ), keys AS (\n         SELECT received.product_id,\n            received.treatment_id,\n            received.seed_size\n           FROM received\n        UNION\n         SELECT delivered.product_id,\n            delivered.treatment_id,\n            delivered.seed_size\n           FROM delivered\n        UNION\n         SELECT returned.product_id,\n            returned.treatment_id,\n            returned.seed_size\n           FROM returned\n        )\n SELECT k.product_id,\n    p.product_name,\n    p.crop,\n    k.treatment_id,\n    t.treatment_name,\n        CASE\n            WHEN p.crop = 'corn'::text THEN k.seed_size\n            ELSE NULL::text\n        END AS seed_size,\n    COALESCE(rc.units_received, 0) AS units_received,\n    COALESCE(dv.units_delivered, 0) AS units_delivered,\n    COALESCE(rt.units_returned, 0) AS units_returned,\n    COALESCE(rc.units_received, 0) - COALESCE(dv.units_delivered, 0) + COALESCE(rt.units_returned, 0) AS units_on_hand\n   FROM keys k\n     JOIN products p ON p.id = k.product_id\n     JOIN treatments t ON t.id = k.treatment_id\n     LEFT JOIN received rc ON rc.product_id = k.product_id AND rc.treatment_id = k.treatment_id AND NOT rc.seed_size IS DISTINCT FROM k.seed_size\n     LEFT JOIN delivered dv ON dv.product_id = k.product_id AND dv.treatment_id = k.treatment_id AND NOT dv.seed_size IS DISTINCT FROM k.seed_size\n     LEFT JOIN returned rt ON rt.product_id = k.product_id AND rt.treatment_id = k.treatment_id AND NOT rt.seed_size IS DISTINCT FROM k.seed_size\n  WHERE COALESCE(p.seed_trait, ''::text) <> 'PACKAGING'::text AND COALESCE(p.crop, ''::text) <> 'packaging'::text;",
+            "definition": " WITH received AS (\n         SELECT i.product_id,\n            i.treatment_id,\n            NULL::text AS seed_size,\n            sum(i.units_received)::integer AS units_received\n           FROM bayer_shipment_items i\n          WHERE i.user_id = auth.uid()\n          GROUP BY i.product_id, i.treatment_id\n        ), delivered AS (\n         SELECT d.product_id,\n            d.treatment_id,\n            d.seed_size,\n            sum(d.units_delivered)::integer AS units_delivered\n           FROM deliveries d\n          WHERE d.user_id = auth.uid()\n          GROUP BY d.product_id, d.treatment_id, d.seed_size\n        ), returned AS (\n         SELECT r.product_id,\n            r.treatment_id,\n            r.seed_size,\n            sum(r.units_returned)::integer AS units_returned\n           FROM returns r\n          WHERE r.user_id = auth.uid()\n          GROUP BY r.product_id, r.treatment_id, r.seed_size\n        ), keys AS (\n         SELECT received.product_id,\n            received.treatment_id,\n            received.seed_size\n           FROM received\n        UNION\n         SELECT delivered.product_id,\n            delivered.treatment_id,\n            delivered.seed_size\n           FROM delivered\n        UNION\n         SELECT returned.product_id,\n            returned.treatment_id,\n            returned.seed_size\n           FROM returned\n        )\n SELECT k.product_id,\n    p.product_name,\n    k.treatment_id,\n    t.treatment_name,\n    k.seed_size,\n    COALESCE(rc.units_received, 0) AS units_received,\n    COALESCE(dv.units_delivered, 0) AS units_delivered,\n    COALESCE(rt.units_returned, 0) AS units_returned,\n    COALESCE(rc.units_received, 0) - COALESCE(dv.units_delivered, 0) + COALESCE(rt.units_returned, 0) AS units_on_hand\n   FROM keys k\n     JOIN products p ON p.id = k.product_id\n     JOIN treatments t ON t.id = k.treatment_id\n     LEFT JOIN received rc ON rc.product_id = k.product_id AND rc.treatment_id = k.treatment_id AND NOT rc.seed_size IS DISTINCT FROM k.seed_size\n     LEFT JOIN delivered dv ON dv.product_id = k.product_id AND dv.treatment_id = k.treatment_id AND NOT dv.seed_size IS DISTINCT FROM k.seed_size\n     LEFT JOIN returned rt ON rt.product_id = k.product_id AND rt.treatment_id = k.treatment_id AND NOT rt.seed_size IS DISTINCT FROM k.seed_size;",
             "view_schema": "public"
         },
         {
             "view_name": "v_on_hand_inventory_wide",
-            "definition": " SELECT v.product_id,\n    v.product_name,\n    v.crop,\n    v.seed_size,\n    max(\n        CASE\n            WHEN t.treatment_name = 'DIAMIDE'::text THEN v.units_on_hand\n            ELSE NULL::integer\n        END) AS \"DIAMIDE\",\n    max(\n        CASE\n            WHEN t.treatment_name = 'Fung/Insect'::text THEN v.units_on_hand\n            ELSE NULL::integer\n        END) AS \"Fung/Insect\",\n    max(\n        CASE\n            WHEN t.treatment_name = 'Fung/Insect/Ilevo'::text THEN v.units_on_hand\n            ELSE NULL::integer\n        END) AS \"Fung/Insect/Ilevo\",\n    max(\n        CASE\n            WHEN t.treatment_name = 'Fung/Insect/Opt'::text THEN v.units_on_hand\n            ELSE NULL::integer\n        END) AS \"Fung/Insect/Opt\",\n    max(\n        CASE\n            WHEN t.treatment_name = 'FUNGICIDE'::text THEN v.units_on_hand\n            ELSE NULL::integer\n        END) AS \"FUNGICIDE\",\n    max(\n        CASE\n            WHEN t.treatment_name = 'FUNGICIDE OPTIMIZE'::text THEN v.units_on_hand\n            ELSE NULL::integer\n        END) AS \"FUNGICIDE OPTIMIZE\",\n    max(\n        CASE\n            WHEN t.treatment_name = 'PONCHO'::text THEN v.units_on_hand\n            ELSE NULL::integer\n        END) AS \"PONCHO\",\n    max(\n        CASE\n            WHEN t.treatment_name = 'Poncho/i-374'::text THEN v.units_on_hand\n            ELSE NULL::integer\n        END) AS \"Poncho/i-374\"\n   FROM v_on_hand_inventory v\n     JOIN treatments t ON t.id = v.treatment_id\n  GROUP BY v.product_id, v.product_name, v.crop, v.seed_size\n  ORDER BY v.product_name, v.seed_size NULLS FIRST;",
+            "definition": " SELECT product_id,\n    product_name,\n    sum(\n        CASE\n            WHEN treatment_name = 'DIAMIDE'::text THEN units_on_hand\n            ELSE 0\n        END) AS \"DIAMIDE\",\n    sum(\n        CASE\n            WHEN treatment_name = 'Fung/Insect'::text THEN units_on_hand\n            ELSE 0\n        END) AS \"Fung/Insect\",\n    sum(\n        CASE\n            WHEN treatment_name = 'Fung/Insect/Ilevo'::text THEN units_on_hand\n            ELSE 0\n        END) AS \"Fung/Insect/Ilevo\",\n    sum(\n        CASE\n            WHEN treatment_name = 'Fung/Insect/Opt'::text THEN units_on_hand\n            ELSE 0\n        END) AS \"Fung/Insect/Opt\",\n    sum(\n        CASE\n            WHEN treatment_name = 'FUNGICIDE'::text THEN units_on_hand\n            ELSE 0\n        END) AS \"FUNGICIDE\",\n    sum(\n        CASE\n            WHEN treatment_name = 'FUNGICIDE OPTIMIZE'::text THEN units_on_hand\n            ELSE 0\n        END) AS \"FUNGICIDE OPTIMIZE\",\n    sum(\n        CASE\n            WHEN treatment_name = 'PONCHO'::text THEN units_on_hand\n            ELSE 0\n        END) AS \"PONCHO\",\n    sum(\n        CASE\n            WHEN treatment_name = 'Poncho/i-374'::text THEN units_on_hand\n            ELSE 0\n        END) AS \"Poncho/i-374\"\n   FROM v_on_hand_inventory v\n  WHERE treatment_name <> 'NO_TREATMENT'::text\n  GROUP BY product_id, product_name\n  ORDER BY product_name;",
             "view_schema": "public"
         },
         {
             "view_name": "v_order_items_this_season",
-            "definition": " SELECT oi.id AS order_item_id,\n    oi.order_id,\n    o.order_date,\n    o.customer_id,\n    c.customer_name,\n    oi.product_id,\n    p.product_name,\n    p.crop,\n    oi.treatment_id,\n    t.treatment_name,\n    oi.seed_size,\n    oi.units,\n    oi.retail_price_per_unit,\n    o.brand_grower_pct,\n    o.early_pay_pct,\n    oi.brand_grower_discount_amount,\n    oi.tote_bulk_discount_amount,\n    oi.early_pay_discount_amount,\n    oi.line_total_after_discounts_before_early_pay,\n    oi.line_total_after_all_discounts,\n    oi.break_even_price_per_unit,\n    oi.profit_per_unit,\n    oi.total_profit AS line_total_profit\n   FROM order_items oi\n     JOIN orders o ON o.id = oi.order_id\n     JOIN customers c ON c.id = o.customer_id\n     JOIN products p ON p.id = oi.product_id\n     JOIN treatments t ON t.id = oi.treatment_id\n  WHERE oi.user_id = auth.uid() AND o.user_id = auth.uid() AND c.user_id = auth.uid() AND o.season_year = (( SELECT max(pr.season_year) AS max\n           FROM pricing pr));",
+            "definition": " SELECT oi.id AS order_item_id,\n    oi.order_id,\n    o.order_date,\n    o.customer_id,\n    c.customer_name,\n    o.notes,\n    oi.product_id,\n    p.product_name,\n    oi.treatment_id,\n    t.treatment_name,\n    oi.seed_size,\n    oi.package_type,\n    oi.units,\n    oi.retail_price_per_unit,\n    o.brand_grower_pct,\n    o.early_pay_pct,\n    oi.brand_grower_discount_amount,\n    oi.tote_bulk_discount_amount,\n    oi.early_pay_discount_amount,\n    oi.line_total_after_discounts_before_early_pay,\n    oi.line_total_after_all_discounts,\n    oi.break_even_price_per_unit,\n    oi.profit_per_unit,\n    oi.total_profit AS line_total_profit\n   FROM order_items oi\n     JOIN orders o ON o.id = oi.order_id\n     JOIN customers c ON c.id = o.customer_id\n     JOIN products p ON p.id = oi.product_id\n     JOIN treatments t ON t.id = oi.treatment_id\n  WHERE oi.user_id = auth.uid() AND o.user_id = auth.uid() AND c.user_id = auth.uid() AND o.season_year = (( SELECT max(pr.season_year) AS max\n           FROM pricing pr));",
             "view_schema": "public"
         },
         {
@@ -117,12 +117,12 @@
         },
         {
             "view_name": "v_replants_this_season",
-            "definition": " SELECT rp.id AS replant_id,\n    rp.replant_date,\n    rp.season_year,\n    rp.customer_id,\n    c.customer_name,\n    rp.product_id,\n    p.product_name,\n    p.crop,\n    rp.treatment_id,\n    t.treatment_name,\n    rp.seed_size,\n    rp.units_replanted,\n    rp.order_id,\n    rp.order_item_id,\n    rp.notes,\n    rp.created_at,\n    rp.updated_at\n   FROM replants rp\n     JOIN customers c ON c.id = rp.customer_id\n     JOIN products p ON p.id = rp.product_id\n     JOIN treatments t ON t.id = rp.treatment_id\n  WHERE rp.user_id = auth.uid() AND c.user_id = auth.uid() AND rp.season_year = (( SELECT max(pr.season_year) AS max\n           FROM pricing pr));",
+            "definition": " SELECT rp.id AS replant_id,\n    rp.replant_date,\n    rp.season_year,\n    rp.customer_id,\n    c.customer_name,\n    rp.product_id,\n    p.product_name,\n    p.crop,\n    rp.treatment_id,\n    t.treatment_name,\n    rp.seed_size,\n    rp.package_type,\n    rp.units_replanted,\n    rp.order_id,\n    rp.order_item_id,\n    rp.original_delivery_id,\n    rp.original_return_id,\n    rp.replant_reason,\n    rp.notes,\n    rp.created_at,\n    rp.updated_at\n   FROM replants rp\n     JOIN customers c ON c.id = rp.customer_id\n     JOIN products p ON p.id = rp.product_id\n     JOIN treatments t ON t.id = rp.treatment_id\n  WHERE rp.user_id = auth.uid() AND c.user_id = auth.uid() AND rp.season_year = (( SELECT max(pr.season_year) AS max\n           FROM pricing pr));",
             "view_schema": "public"
         },
         {
             "view_name": "v_returns_this_season",
-            "definition": " SELECT r.id AS return_id,\n    r.return_date,\n    r.season_year,\n    r.customer_id,\n    c.customer_name,\n    r.product_id,\n    p.product_name,\n    p.crop,\n    r.treatment_id,\n    t.treatment_name,\n    r.seed_size,\n    r.units_returned,\n    r.order_id,\n    r.order_item_id,\n    r.notes,\n    r.created_at,\n    r.updated_at\n   FROM returns r\n     JOIN customers c ON c.id = r.customer_id\n     JOIN products p ON p.id = r.product_id\n     JOIN treatments t ON t.id = r.treatment_id\n  WHERE r.user_id = auth.uid() AND c.user_id = auth.uid() AND r.season_year = (( SELECT max(pr.season_year) AS max\n           FROM pricing pr));",
+            "definition": " SELECT r.id AS return_id,\n    r.return_date,\n    r.season_year,\n    r.customer_id,\n    c.customer_name,\n    r.product_id,\n    p.product_name,\n    p.crop,\n    r.treatment_id,\n    t.treatment_name,\n    r.seed_size,\n    r.package_type,\n    r.units_returned,\n    r.order_id,\n    r.order_item_id,\n    r.notes,\n    r.created_at,\n    r.updated_at\n   FROM returns r\n     JOIN customers c ON c.id = r.customer_id\n     JOIN products p ON p.id = r.product_id\n     JOIN treatments t ON t.id = r.treatment_id\n  WHERE r.user_id = auth.uid() AND c.user_id = auth.uid() AND r.season_year = (( SELECT max(pr.season_year) AS max\n           FROM pricing pr));",
             "view_schema": "public"
         },
         {
@@ -2936,9 +2936,21 @@
                     "is_nullable": "YES",
                     "column_default": null,
                     "ordinal_position": 12
+                },
+                {
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "column_name": "package_type",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 13
                 }
             ],
             "indexes": [
+                {
+                    "index_name": "bayer_shipment_items_package_type_idx",
+                    "index_definition": "CREATE INDEX bayer_shipment_items_package_type_idx ON public.bayer_shipment_items USING btree (package_type)"
+                },
                 {
                     "index_name": "bayer_shipment_items_pkey",
                     "index_definition": "CREATE UNIQUE INDEX bayer_shipment_items_pkey ON public.bayer_shipment_items USING btree (id)"
@@ -3621,6 +3633,14 @@
                     "is_nullable": "YES",
                     "column_default": null,
                     "ordinal_position": 14
+                },
+                {
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "column_name": "package_type",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 15
                 }
             ],
             "indexes": [
@@ -3631,6 +3651,10 @@
                 {
                     "index_name": "deliveries_order_item_idx",
                     "index_definition": "CREATE INDEX deliveries_order_item_idx ON public.deliveries USING btree (order_item_id)"
+                },
+                {
+                    "index_name": "deliveries_package_type_idx",
+                    "index_definition": "CREATE INDEX deliveries_package_type_idx ON public.deliveries USING btree (package_type)"
                 },
                 {
                     "index_name": "deliveries_pkey",
@@ -4752,6 +4776,14 @@
                     "is_nullable": "YES",
                     "column_default": null,
                     "ordinal_position": 17
+                },
+                {
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "column_name": "package_type",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 18
                 }
             ],
             "indexes": [
@@ -4770,6 +4802,10 @@
                 {
                     "index_name": "replants_original_return_idx",
                     "index_definition": "CREATE INDEX replants_original_return_idx ON public.replants USING btree (original_return_id)"
+                },
+                {
+                    "index_name": "replants_package_type_idx",
+                    "index_definition": "CREATE INDEX replants_package_type_idx ON public.replants USING btree (package_type)"
                 },
                 {
                     "index_name": "replants_pkey",
@@ -5008,6 +5044,14 @@
                     "is_nullable": "YES",
                     "column_default": null,
                     "ordinal_position": 14
+                },
+                {
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "column_name": "package_type",
+                    "is_nullable": "NO",
+                    "column_default": null,
+                    "ordinal_position": 15
                 }
             ],
             "indexes": [
@@ -5018,6 +5062,10 @@
                 {
                     "index_name": "returns_order_item_idx",
                     "index_definition": "CREATE INDEX returns_order_item_idx ON public.returns USING btree (order_item_id)"
+                },
+                {
+                    "index_name": "returns_package_type_idx",
+                    "index_definition": "CREATE INDEX returns_package_type_idx ON public.returns USING btree (package_type)"
                 },
                 {
                     "index_name": "returns_pkey",

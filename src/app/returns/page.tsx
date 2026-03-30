@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import type {
   ReturnPrintItem,
   ReturnPrintCustomer,
@@ -36,6 +35,11 @@ import {
 } from "@/services/delivery.service";
 import CustomerOrderStatusTable from "@/components/deliveries/CustomerOrderStatusTable";
 import { findOrderLineMatches } from "@/services/orderMatching.service";
+import {
+  fetchPackagingProducts,
+  fetchNoTreatmentId,
+  type PackagingProduct,
+} from "@/services/products.service";
 import styles from "./returns.module.css";
 
 function todayISO(): string {
@@ -59,14 +63,14 @@ function isRowEmpty(row: ReturnItem): boolean {
 }
 
 export default function ReturnsPage() {
-  const router = useRouter();
-
   // View toggle
   const [view, setView] = useState<View>("new");
 
   // Season + pricing data
   const [seasonYear, setSeasonYear] = useState<number | null>(null);
   const [pricingOptions, setPricingOptions] = useState<PricingOption[]>([]);
+  const [packagingProducts, setPackagingProducts] = useState<PackagingProduct[]>([]);
+  const [noTreatmentId, setNoTreatmentId] = useState<string | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [dataError, setDataError] = useState<string | null>(null);
 
@@ -80,12 +84,16 @@ export default function ReturnsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [year, custs] = await Promise.all([
+        const [year, custs, pkgProducts, noTrtId] = await Promise.all([
           fetchNewestSeasonYear(),
           fetchCustomers(),
+          fetchPackagingProducts(),
+          fetchNoTreatmentId(),
         ]);
         if (cancelled) return;
         setCustomers(custs);
+        setPackagingProducts(pkgProducts);
+        setNoTreatmentId(noTrtId);
         if (year === null) {
           setDataError(
             "No seasons found. Add pricing data before recording returns."
@@ -377,7 +385,7 @@ export default function ReturnsPage() {
       notes,
     };
     sessionStorage.setItem("ssim-return-print-data", JSON.stringify(printData));
-    router.push("/returns/print");
+    window.open("/returns/print", "_blank");
   };
 
   // Clear form completely (including customer)
@@ -582,6 +590,8 @@ export default function ReturnsPage() {
             items={items}
             onChange={handleItemsChange}
             pricingOptions={pricingOptions}
+            packagingProducts={packagingProducts}
+            noTreatmentId={noTreatmentId}
             rowErrors={rowErrors}
             disabled={isSaving}
           />

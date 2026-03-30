@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { PricingOption } from "@/services/pricing.service";
+import type { PackagingProduct } from "@/services/products.service";
 import SearchableSelect, { type SelectOption } from "../orders/SearchableSelect";
 import styles from "./DeliveryItemsTable.module.css";
 
@@ -48,6 +49,8 @@ interface Props {
   items: DeliveryItem[];
   onChange: (items: DeliveryItem[]) => void;
   pricingOptions: PricingOption[];
+  packagingProducts?: PackagingProduct[];
+  noTreatmentId?: string | null;
   rowErrors?: RowErrors;
   disabled?: boolean;
 }
@@ -56,25 +59,34 @@ export default function DeliveryItemsTable({
   items,
   onChange,
   pricingOptions,
+  packagingProducts = [],
+  noTreatmentId = null,
   rowErrors = {},
   disabled = false,
 }: Props) {
   const productSelectOptions = useMemo<SelectOption[]>(() => {
-    const seen = new Map<string, { id: string; name: string }>();
+    const seen = new Map<string, { id: string; name: string; isPackaging: boolean }>();
     for (const o of pricingOptions) {
       if (!seen.has(o.product_id)) {
-        seen.set(o.product_id, { id: o.product_id, name: o.product_name });
+        seen.set(o.product_id, { id: o.product_id, name: o.product_name, isPackaging: false });
+      }
+    }
+    for (const p of packagingProducts) {
+      if (!seen.has(p.id)) {
+        seen.set(p.id, { id: p.id, name: p.product_name, isPackaging: true });
       }
     }
     return Array.from(seen.values())
       .sort((a, b) => {
+        // Packaging products go after all seed products
+        if (a.isPackaging !== b.isPackaging) return a.isPackaging ? 1 : -1;
         const ra = productSortRank(a.name);
         const rb = productSortRank(b.name);
         if (ra !== rb) return ra - rb;
         return a.name.localeCompare(b.name);
       })
       .map((p) => ({ value: p.id, label: p.name }));
-  }, [pricingOptions]);
+  }, [pricingOptions, packagingProducts]);
 
   const treatmentSelectByProduct = useMemo(() => {
     const map = new Map<string, SelectOption[]>();
@@ -85,8 +97,13 @@ export default function DeliveryItemsTable({
         arr.push({ value: o.treatment_id, label: o.treatment_name });
       }
     }
+    if (noTreatmentId) {
+      for (const p of packagingProducts) {
+        map.set(p.id, [{ value: noTreatmentId, label: "NO_TREATMENT" }]);
+      }
+    }
     return map;
-  }, [pricingOptions]);
+  }, [pricingOptions, packagingProducts, noTreatmentId]);
 
   const cropByProduct = useMemo(() => {
     const map = new Map<string, string>();
@@ -95,8 +112,11 @@ export default function DeliveryItemsTable({
         map.set(o.product_id, o.crop.toLowerCase());
       }
     }
+    for (const p of packagingProducts) {
+      map.set(p.id, "packaging");
+    }
     return map;
-  }, [pricingOptions]);
+  }, [pricingOptions, packagingProducts]);
 
   const updateItem = (index: number, patch: Partial<DeliveryItem>) => {
     if (disabled) return;
@@ -106,10 +126,16 @@ export default function DeliveryItemsTable({
 
   const handleProductChange = (index: number, productId: string) => {
     if (disabled) return;
-    const opt = pricingOptions.find((o) => o.product_id === productId);
-    const productName = opt?.product_name ?? "";
+    const isPackaging = cropByProduct.get(productId) === "packaging";
 
-    // Auto-select treatment if only one
+    let productName = "";
+    if (isPackaging) {
+      productName = packagingProducts.find((p) => p.id === productId)?.product_name ?? "";
+    } else {
+      productName = pricingOptions.find((o) => o.product_id === productId)?.product_name ?? "";
+    }
+
+    // Auto-select treatment if only one option (always true for packaging)
     const treatments = treatmentSelectByProduct.get(productId) ?? [];
     let treatmentId = "";
     let treatmentName = "";
@@ -179,6 +205,7 @@ export default function DeliveryItemsTable({
               const treatmentOptions =
                 treatmentSelectByProduct.get(item.productId) ?? [];
               const errors = rowErrors[item.id] ?? {};
+              const isPackaging = cropByProduct.get(item.productId) === "packaging";
               return (
                 <tr key={item.id}>
                   <td>
@@ -199,7 +226,7 @@ export default function DeliveryItemsTable({
                         value={item.treatmentId}
                         onChange={(v) => handleTreatmentChange(i, v)}
                         placeholder="Select treatment…"
-                        disabled={disabled || !item.productId}
+                        disabled={disabled || !item.productId || isPackaging}
                       />
                     </div>
                   </td>
@@ -240,15 +267,19 @@ export default function DeliveryItemsTable({
                     )}
                   </td>
                   <td>
-                    <select
-                      className={styles.sizeSelect}
-                      value={item.packageType}
-                      disabled={disabled}
-                      onChange={(e) => updateItem(i, { packageType: e.target.value as "bag" | "tote" })}
-                    >
-                      <option value="bag">Bag</option>
-                      <option value="tote">Tote</option>
-                    </select>
+                    {isPackaging ? (
+                      <select className={styles.sizeSelect} disabled value=""><option value="">—</option></select>
+                    ) : (
+                      <select
+                        className={styles.sizeSelect}
+                        value={item.packageType}
+                        disabled={disabled}
+                        onChange={(e) => updateItem(i, { packageType: e.target.value as "bag" | "tote" })}
+                      >
+                        <option value="bag">Bag</option>
+                        <option value="tote">Tote</option>
+                      </select>
+                    )}
                   </td>
                   <td style={{ textAlign: "center" }}>
                     <button
@@ -273,6 +304,7 @@ export default function DeliveryItemsTable({
           const treatmentOptions =
             treatmentSelectByProduct.get(item.productId) ?? [];
           const errors = rowErrors[item.id] ?? {};
+          const isPackaging = cropByProduct.get(item.productId) === "packaging";
           return (
             <div key={item.id} className={styles.card}>
               <div className={styles.cardHeader}>
@@ -301,21 +333,23 @@ export default function DeliveryItemsTable({
                   <span className={styles.errorText}>Select a product</span>
                 )}
               </div>
-              <div className={styles.cardField}>
-                <label className={styles.cardLabel}>Treatment</label>
-                <div className={errors.treatment ? styles.errorWrap : ""}>
-                  <SearchableSelect
-                    options={treatmentOptions}
-                    value={item.treatmentId}
-                    onChange={(v) => handleTreatmentChange(i, v)}
-                    placeholder="Select treatment…"
-                    disabled={disabled || !item.productId}
-                  />
+              {!isPackaging && (
+                <div className={styles.cardField}>
+                  <label className={styles.cardLabel}>Treatment</label>
+                  <div className={errors.treatment ? styles.errorWrap : ""}>
+                    <SearchableSelect
+                      options={treatmentOptions}
+                      value={item.treatmentId}
+                      onChange={(v) => handleTreatmentChange(i, v)}
+                      placeholder="Select treatment…"
+                      disabled={disabled || !item.productId}
+                    />
+                  </div>
+                  {errors.treatment && (
+                    <span className={styles.errorText}>Select a treatment</span>
+                  )}
                 </div>
-                {errors.treatment && (
-                  <span className={styles.errorText}>Select a treatment</span>
-                )}
-              </div>
+              )}
               <div className={styles.cardField}>
                 <label className={styles.cardLabel}>Units Delivered</label>
                 <input
@@ -355,18 +389,20 @@ export default function DeliveryItemsTable({
                   </select>
                 </div>
               )}
-              <div className={styles.cardField}>
-                <label className={styles.cardLabel}>Package Type</label>
-                <select
-                  className={styles.cardNumInput}
-                  value={item.packageType}
-                  disabled={disabled}
-                  onChange={(e) => updateItem(i, { packageType: e.target.value as "bag" | "tote" })}
-                >
-                  <option value="bag">Bag</option>
-                  <option value="tote">Tote</option>
-                </select>
-              </div>
+              {!isPackaging && (
+                <div className={styles.cardField}>
+                  <label className={styles.cardLabel}>Package Type</label>
+                  <select
+                    className={styles.cardNumInput}
+                    value={item.packageType}
+                    disabled={disabled}
+                    onChange={(e) => updateItem(i, { packageType: e.target.value as "bag" | "tote" })}
+                  >
+                    <option value="bag">Bag</option>
+                    <option value="tote">Tote</option>
+                  </select>
+                </div>
+              )}
             </div>
           );
         })}

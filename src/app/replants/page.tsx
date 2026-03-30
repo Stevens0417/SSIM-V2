@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import ReplantItemsTable, {
   type ReplantItem,
   type RowErrors,
@@ -59,8 +58,6 @@ function isRowEmpty(row: ReplantItem): boolean {
 }
 
 export default function ReplantsPage() {
-  const router = useRouter();
-
   // View toggle
   const [view, setView] = useState<View>("new");
 
@@ -366,7 +363,7 @@ export default function ReplantsPage() {
     };
 
     sessionStorage.setItem("ssim-replant-print-data", JSON.stringify(printData));
-    router.push("/replants/print");
+    window.open("/replants/print", "_blank");
   };
 
   // Clear form

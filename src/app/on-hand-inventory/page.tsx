@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import InventoryWideTable from "@/components/inventory/InventoryWideTable";
 import InventoryDetailTable from "@/components/inventory/InventoryDetailTable";
 import {
   fetchInventoryWide,
   fetchInventoryDetail,
+  fetchInventoryPrintData,
   type InventoryWideRow,
   type InventoryDetailRow,
 } from "@/services/inventory.service";
@@ -14,6 +16,7 @@ import styles from "./on-hand-inventory.module.css";
 type View = "wide" | "detail";
 
 export default function OnHandInventoryPage() {
+  const router = useRouter();
   const [view, setView] = useState<View>("wide");
 
   // Wide view state
@@ -75,6 +78,25 @@ export default function OnHandInventoryPage() {
     setFilteredDetailRows(rows);
   }, []);
 
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const handlePrint = useCallback(async () => {
+    setIsPrinting(true);
+    try {
+      const printRows = await fetchInventoryPrintData();
+      const printDate = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+      sessionStorage.setItem(
+        "ssim-inventory-print-data",
+        JSON.stringify({ rows: printRows, printDate })
+      );
+      router.push("/on-hand-inventory/print");
+    } catch {
+      // silently ignore — user can try again
+    } finally {
+      setIsPrinting(false);
+    }
+  }, [router]);
+
   return (
     <div>
       {/* ---- Header Band ---- */}
@@ -101,6 +123,13 @@ export default function OnHandInventoryPage() {
             onClick={() => setView("detail")}
           >
             Detail View
+          </button>
+          <button
+            className={styles.toggleBtn}
+            onClick={handlePrint}
+            disabled={isPrinting}
+          >
+            {isPrinting ? "Loading\u2026" : "Print Sheet"}
           </button>
         </div>
         <button

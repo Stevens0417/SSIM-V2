@@ -1,0 +1,138 @@
+/* ===== On-Hand Inventory Print Sheet ===== */
+
+@page {
+  margin-top: 12mm;
+  margin-bottom: 12mm;
+  margin-left: 12mm;
+  margin-right: 12mm;
+  size: letter portrait;
+}
+
+.page {
+  width: 186mm;
+  margin: 0 auto;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  color: #000;
+  line-height: 1.4;
+}
+
+/* ---- Header ---- */
+.header {
+  border-bottom: 2px solid #000;
+  padding-bottom: 4mm;
+  margin-bottom: 4mm;
+}
+
+.headerTitle {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.headerMeta {
+  display: flex;
+  gap: 24px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #444;
+}
+
+.headerTotal {
+  font-weight: 700;
+  font-size: 13px;
+  color: #000;
+}
+
+/* ---- Inventory Table ---- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+}
+
+.table thead {
+  display: table-header-group;
+}
+
+.table thead th {
+  background: #222;
+  color: #fff;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2.5mm 3mm;
+  border: 1px solid #000;
+  text-align: left;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.colProduct   { width: 38%; }
+.colTreatment { width: 30%; }
+.colSize      { width: 16%; text-align: center !important; }
+.colUnits     { width: 16%; text-align: right !important; }
+
+.table tbody td {
+  padding: 1.5mm 3mm;
+  border: 1px solid #ccc;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table tbody tr:first-child td {
+  border-top: 1px solid #000;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 1px solid #000;
+}
+
+.center {
+  text-align: center;
+}
+
+.right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Zebra stripe for readability */
+.table tbody tr:nth-child(even) td {
+  background: #f8f8f8;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* Crop section dividers */
+.cropDivider td {
+  background: #e8e8e8 !important;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1.5mm 3mm;
+  border-top: 1.5px solid #000 !important;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ---- Footer / watermark ---- */
+.footer {
+  margin-top: 6mm;
+  font-size: 9px;
+  color: #888;
+  text-align: right;
+}
+
+@media print {
+  .page {
+    max-width: none;
+  }
+}

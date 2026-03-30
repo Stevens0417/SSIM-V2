@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import DeliveryItemsTable, {
   type DeliveryItem,
   type RowErrors,
@@ -29,6 +28,11 @@ import {
   type CustomerOrderStatusRow,
 } from "@/services/delivery.service";
 import { findOrderLineMatches } from "@/services/orderMatching.service";
+import {
+  fetchPackagingProducts,
+  fetchNoTreatmentId,
+  type PackagingProduct,
+} from "@/services/products.service";
 import SearchableSelect from "@/components/orders/SearchableSelect";
 import type {
   DeliveryPrintItem,
@@ -57,14 +61,14 @@ function isRowEmpty(row: DeliveryItem): boolean {
 }
 
 export default function DeliveriesPage() {
-  const router = useRouter();
-
   // View toggle
   const [view, setView] = useState<View>("new");
 
   // Season + pricing data
   const [seasonYear, setSeasonYear] = useState<number | null>(null);
   const [pricingOptions, setPricingOptions] = useState<PricingOption[]>([]);
+  const [packagingProducts, setPackagingProducts] = useState<PackagingProduct[]>([]);
+  const [noTreatmentId, setNoTreatmentId] = useState<string | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [dataError, setDataError] = useState<string | null>(null);
 
@@ -78,12 +82,16 @@ export default function DeliveriesPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [year, custs] = await Promise.all([
+        const [year, custs, pkgProducts, noTrtId] = await Promise.all([
           fetchNewestSeasonYear(),
           fetchCustomers(),
+          fetchPackagingProducts(),
+          fetchNoTreatmentId(),
         ]);
         if (cancelled) return;
         setCustomers(custs);
+        setPackagingProducts(pkgProducts);
+        setNoTreatmentId(noTrtId);
         if (year === null) {
           setDataError(
             "No seasons found. Add pricing data before recording deliveries."
@@ -372,7 +380,7 @@ export default function DeliveriesPage() {
     };
 
     sessionStorage.setItem("ssim-delivery-print-data", JSON.stringify(printData));
-    router.push("/deliveries/print");
+    window.open("/deliveries/print", "_blank");
   };
 
   // Clear form completely (including customer)
@@ -582,6 +590,8 @@ export default function DeliveriesPage() {
             items={items}
             onChange={handleItemsChange}
             pricingOptions={pricingOptions}
+            packagingProducts={packagingProducts}
+            noTreatmentId={noTreatmentId}
             rowErrors={rowErrors}
             disabled={isSaving}
           />

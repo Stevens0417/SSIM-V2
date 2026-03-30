@@ -24,6 +24,26 @@ export async function fetchInventoryWide(): Promise<InventoryWideRow[]> {
   return (data ?? []) as InventoryWideRow[];
 }
 
+export interface InventoryPrintRow {
+  product_id: string;
+  crop: string;
+  product_name: string;
+  treatment_id: string;
+  treatment_name: string;
+  seed_size: string | null;
+  units_on_hand: number;
+}
+
+export async function fetchInventoryPrintData(): Promise<InventoryPrintRow[]> {
+  const sb = getSupabaseBrowserClient();
+  const { data, error } = await sb
+    .from("v_inventory_print_sheet")
+    .select("*");
+
+  if (error) throw new Error(error.message || "Failed to load inventory print data");
+  return (data ?? []) as InventoryPrintRow[];
+}
+
 export async function fetchInventoryDetail(): Promise<InventoryDetailRow[]> {
   const sb = getSupabaseBrowserClient();
   const { data, error } = await sb
