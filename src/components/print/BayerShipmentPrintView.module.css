@@ -1,0 +1,232 @@
+/* ===== Bayer Shipment Receipt Print View ===== */
+
+@page {
+  margin-top: 4mm;
+  margin-bottom: 6mm;
+  margin-left: 8mm;
+  margin-right: 8mm;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  width: 190mm;
+  margin: 0 auto;
+  padding: 6mm 8mm;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  color: #000;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+/* ---- Header ---- */
+.header {
+  flex-shrink: 0;
+  position: relative;
+  text-align: center;
+  border-bottom: 2.5px solid #000;
+  height: 42mm;
+  padding: 6mm 8mm;
+  margin-bottom: 4mm;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38mm;
+  max-height: 28mm;
+  height: auto;
+  display: block;
+}
+
+.headerText {
+  display: inline-block;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.headerLine1 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.headerLine2 {
+  font-size: 13px;
+  font-weight: 400;
+  margin-top: 3px;
+}
+
+.headerLine3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.headerLine4 {
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+/* ---- Section boxes ---- */
+.section {
+  flex-shrink: 0;
+  border: 1.5px solid #000;
+  margin-bottom: 4mm;
+  overflow: hidden;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  box-sizing: border-box;
+}
+
+.sectionInfo {
+  min-height: 24mm;
+}
+
+.sectionItems {
+  /* grows to fit items */
+}
+
+.sectionTitle {
+  background: #222;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  line-height: 1.4;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.sectionBody {
+  padding: 3mm 6mm;
+  box-sizing: border-box;
+}
+
+/* ---- Shipment info grid ---- */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+}
+
+.infoRow {
+  display: flex;
+  gap: 3px;
+  align-items: baseline;
+}
+
+.infoLabel {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  min-width: 90px;
+}
+
+.infoValue {
+  font-size: 12px;
+  border-bottom: 1px solid #aaa;
+  flex: 1;
+  min-height: 14px;
+  padding-bottom: 1px;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Items table ---- */
+.itemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.itemsTable thead {
+  display: table-header-group;
+}
+
+.itemsTable thead th {
+  background: #ddd;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 1.5mm 3mm;
+  border: 1px solid #000;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* Column widths */
+.colProduct { width: 40%; }
+.colTreatment { width: 30%; }
+.colSize { width: 10%; text-align: center; }
+.colUnits { width: 20%; text-align: right; }
+
+.itemsTable tbody td {
+  padding: 0.75mm 3mm;
+  border: 1px solid #bbb;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+  vertical-align: middle;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemsTable tbody tr {
+  height: 6mm;
+}
+
+.itemsTable tbody tr:last-child td {
+  border-bottom: 1px solid #000;
+}
+
+.centerCell {
+  text-align: center;
+}
+
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRow {
+  height: 8mm !important;
+}
+
+.totalRow td {
+  font-weight: 700;
+  font-size: 14px;
+  border-top: 2px solid #000 !important;
+  border-bottom: 2px solid #000 !important;
+  background: #eee;
+  padding: 2mm 3mm;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ---- Print overrides ---- */
+@media print {
+  .page {
+    max-width: none;
+  }
+}

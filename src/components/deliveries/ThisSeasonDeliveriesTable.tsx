@@ -4,6 +4,10 @@ import { useState, useMemo } from "react";
 import type { DeliveryViewRow } from "@/services/delivery.service";
 import type { PricingOption } from "@/services/pricing.service";
 import type { CustomerOption } from "@/services/customer.service";
+import type {
+  DeliveryPrintItem,
+  DeliveryPrintCustomer,
+} from "@/components/print/DeliveryPrintView";
 import SearchableSelect from "@/components/orders/SearchableSelect";
 import { fmtPackageType } from "@/lib/fmt";
 import styles from "./ThisSeasonDeliveriesTable.module.css";
@@ -177,6 +181,35 @@ export default function ThisSeasonDeliveriesTable({
     });
   };
 
+  const handlePrintRow = (row: DeliveryViewRow) => {
+    const customer = customers.find((c) => c.id === row.customer_id);
+    const printCustomer: DeliveryPrintCustomer = {
+      name: customer?.customer_name ?? row.customer_name,
+      farmName: customer?.farm_name ?? "",
+      tsaNumber: customer?.tsa_number ?? "",
+      phone: customer?.phone_number ?? "",
+      address: customer?.address ?? "",
+      city: customer?.city ?? "",
+      province: customer?.province ?? "",
+      postalCode: customer?.postal_code ?? "",
+    };
+    const printItems: DeliveryPrintItem[] = [
+      {
+        product: row.product_name,
+        treatment: row.treatment_name,
+        units: row.units_delivered,
+      },
+    ];
+    const printData = {
+      deliveryDate: row.delivery_date,
+      customer: printCustomer,
+      items: printItems,
+      notes: row.notes ?? "",
+    };
+    sessionStorage.setItem("ssim-delivery-print-data", JSON.stringify(printData));
+    window.open("/deliveries/print", "_blank");
+  };
+
   if (loading) return <div className={styles.status}>Loading deliveries…</div>;
   if (error) return <div className={styles.error}>{error}</div>;
 
@@ -255,6 +288,12 @@ export default function ThisSeasonDeliveriesTable({
                         onClick={() => startEdit(r)}
                       >
                         Edit
+                      </button>
+                      <button
+                        className={styles.printBtn}
+                        onClick={() => handlePrintRow(r)}
+                      >
+                        Print
                       </button>
                       <button
                         className={styles.deleteBtn}
@@ -404,6 +443,15 @@ export default function ThisSeasonDeliveriesTable({
             <div className={styles.modalFooter}>
               <button className={styles.cancelBtn} onClick={cancelEdit}>
                 Cancel
+              </button>
+              <button
+                className={styles.printBtn}
+                onClick={() => {
+                  const row = rows.find((r) => r.delivery_id === editingId);
+                  if (row) handlePrintRow(row);
+                }}
+              >
+                Print
               </button>
               <button className={styles.saveBtn} onClick={saveEdit}>
                 Save Changes

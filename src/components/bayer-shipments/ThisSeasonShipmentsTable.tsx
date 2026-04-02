@@ -15,6 +15,7 @@ interface Props {
   onEdit: (shipmentId: string) => void;
   onDelete: (shipmentId: string) => void | Promise<void>;
   onVerify: (shipmentItemId: string, verified: boolean) => Promise<void>;
+  onPrint: (shipmentId: string) => void;
 }
 
 export default function ThisSeasonShipmentsTable({
@@ -27,6 +28,7 @@ export default function ThisSeasonShipmentsTable({
   onEdit,
   onDelete,
   onVerify,
+  onPrint,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; label: string } | null>(null);
@@ -183,6 +185,12 @@ export default function ThisSeasonShipmentsTable({
                             onClick={() => onEdit(r.shipment_id)}
                           >
                             Edit
+                          </button>
+                          <button
+                            className={styles.printBtn}
+                            onClick={() => onPrint(r.shipment_id)}
+                          >
+                            Print
                           </button>
                           <button
                             className={styles.deleteBtn}

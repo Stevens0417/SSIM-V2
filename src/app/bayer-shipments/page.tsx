@@ -546,6 +546,27 @@ export default function BayerShipmentsPage() {
     }
   };
 
+  // Print handler
+  const handlePrint = (shipmentId: string) => {
+    const shipmentItems = shipmentRows.filter((r) => r.shipment_id === shipmentId);
+    if (shipmentItems.length === 0) return;
+    const first = shipmentItems[0];
+    const printData = {
+      shipmentDate: first.shipment_date,
+      shipmentNumber: first.shipment_number,
+      seasonYear: first.season_year,
+      items: shipmentItems.map((r) => ({
+        product: r.product_name,
+        treatment: r.treatment_name,
+        units: r.units_received,
+        seedSize: r.seed_size ?? null,
+        packageType: r.package_type,
+      })),
+    };
+    sessionStorage.setItem("ssim-bayer-shipment-print-data", JSON.stringify(printData));
+    window.open("/bayer-shipments/print", "_blank");
+  };
+
   // Delete handler
   const handleDelete = async (shipmentId: string) => {
     try {
@@ -593,6 +614,7 @@ export default function BayerShipmentsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onVerify={handleVerify}
+          onPrint={handlePrint}
         />
       ) : view === "yearEnd" ? (
         <YearEndTable
