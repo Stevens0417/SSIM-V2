@@ -328,7 +328,7 @@ export default function OrderItemsTable({
                       }
                     >
                       <option value="bag">Bag</option>
-                      <option value="tote">Tote</option>
+                      <option value="tote">Seedpak</option>
                     </select>
                   </td>
                   <td>

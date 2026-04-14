@@ -8,5 +8,6 @@ export function fmtCurrency(value: number): string {
 
 export function fmtPackageType(value: string | null | undefined): string {
   if (!value) return "Bag";
+  if (value.toLowerCase() === "tote") return "Seedpak";
   return value.charAt(0).toUpperCase() + value.slice(1);
 }

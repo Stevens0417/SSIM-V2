@@ -8,6 +8,7 @@ export interface InventoryDetailRow {
   treatment_id: string;
   treatment_name: string;
   seed_size: string | null;
+  package_type: string;
   units_received: number;
   units_delivered: number;
   units_returned: number;
@@ -31,6 +32,7 @@ export interface InventoryPrintRow {
   treatment_id: string;
   treatment_name: string;
   seed_size: string | null;
+  package_type: string;
   units_on_hand: number;
 }
 
@@ -58,7 +60,9 @@ export async function fetchInventoryDetail(): Promise<InventoryDetailRow[]> {
     if (p !== 0) return p;
     const t = a.treatment_name.localeCompare(b.treatment_name);
     if (t !== 0) return t;
-    return (a.seed_size ?? "").localeCompare(b.seed_size ?? "");
+    const s = (a.seed_size ?? "").localeCompare(b.seed_size ?? "");
+    if (s !== 0) return s;
+    return (a.package_type ?? "").localeCompare(b.package_type ?? "");
   });
   return rows;
 }

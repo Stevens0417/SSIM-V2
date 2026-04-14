@@ -274,6 +274,7 @@ export interface YearEndTotalRow {
   treatment_id: string;
   treatment_name: string;
   seed_size: string | null;
+  package_type: string;
   net_units: number;
   is_verified: boolean;
   verified_at: string | null;
@@ -306,6 +307,7 @@ export async function upsertYearEndVerification(
   productId: string,
   treatmentId: string,
   seedSize: string | null,
+  packageType: string,
   isVerified: boolean
 ): Promise<void> {
   const supabase = getSupabaseBrowserClient();
@@ -325,9 +327,10 @@ export async function upsertYearEndVerification(
         product_id: productId,
         treatment_id: treatmentId,
         seed_size: seedSize,
+        package_type: packageType,
         is_verified: isVerified,
       },
-      { onConflict: "user_id,season_year,product_id,treatment_id,seed_size" }
+      { onConflict: "user_id,season_year,product_id,treatment_id,seed_size,package_type" }
     );
 
   if (error) {

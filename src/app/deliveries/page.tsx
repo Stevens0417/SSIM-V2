@@ -278,54 +278,71 @@ export default function DeliveriesPage() {
     setIsSaving(true);
 
     try {
-      // Resolve order line matches for each row
+      // Resolve and auto-allocate order lines for each row
       const linesToMatch = rowsToSave.map((row) => ({
         product_id: row.productId,
         treatment_id: row.treatmentId,
         seed_size: row.seedSize || null,
         package_type: row.packageType,
+        units: row.units,
       }));
 
-      const matches = await findOrderLineMatches(
+      const allAllocations = await findOrderLineMatches(
         selectedCustomerId!,
         seasonYear!,
         linesToMatch
       );
 
-      const ambiguousErrors: string[] = [];
-      matches.forEach((match, i) => {
-        if (match === "ambiguous") {
-          const row = rowsToSave[i];
-          ambiguousErrors.push(
-            `${row.product} / ${row.treatment}${row.seedSize ? ` (${row.seedSize})` : ""}: multiple matching order lines found — resolve the ambiguity before saving.`
-          );
-        }
-      });
+      const payloadRows: DeliveryInsert[] = [];
 
-      if (ambiguousErrors.length > 0) {
-        setLinkErrors(ambiguousErrors);
-        return;
-      }
-
-      const payloadRows: DeliveryInsert[] = rowsToSave.map((row, i) => {
-        const match = matches[i];
-        return {
+      for (let i = 0; i < rowsToSave.length; i++) {
+        const row = rowsToSave[i];
+        const allocations = allAllocations[i];
+        const base = {
           delivery_date: deliveryDate,
           season_year: seasonYear!,
           customer_id: selectedCustomerId!,
           product_id: row.productId,
           treatment_id: row.treatmentId,
-          units_delivered: row.units,
           seed_size: row.seedSize || null,
           package_type: row.packageType,
-          order_id: match && match !== "ambiguous" ? match.order_id : null,
-          order_item_id: match && match !== "ambiguous" ? match.order_item_id : null,
           notes: notes.trim() || null,
         };
-      });
+
+        if (allocations.length === 0) {
+          // No matching open order lines — save as unlinked
+          payloadRows.push({
+            ...base,
+            units_delivered: row.units,
+            order_id: null,
+            order_item_id: null,
+          });
+        } else {
+          let totalAllocated = 0;
+          for (const alloc of allocations) {
+            payloadRows.push({
+              ...base,
+              units_delivered: alloc.units,
+              order_id: alloc.order_id,
+              order_item_id: alloc.order_item_id,
+            });
+            totalAllocated += alloc.units;
+          }
+          // Any units beyond open order quantity go as an unlinked row
+          const remainder = row.units - totalAllocated;
+          if (remainder > 0) {
+            payloadRows.push({
+              ...base,
+              units_delivered: remainder,
+              order_id: null,
+              order_item_id: null,
+            });
+          }
+        }
+      }
 
       const result = await createDeliveries(payloadRows);
-      setSaveSuccess(`Saved delivery (${result.ids.length} lines).`);
+      setSaveSuccess(`Saved delivery (${rowsToSave.length} line${rowsToSave.length !== 1 ? "s" : ""}, ${result.ids.length} DB row${result.ids.length !== 1 ? "s" : ""}).`);
       setHasSaved(true);
       setFormErrors({});
       setRowErrors({});
@@ -515,14 +532,6 @@ export default function DeliveriesPage() {
           {saveSuccess && <div className={styles.success}>{saveSuccess}</div>}
           {saveError && <div className={styles.error}>{saveError}</div>}
           {printError && <div className={styles.error}>{printError}</div>}
-          {linkErrors.length > 0 && (
-            <div className={styles.error}>
-              Could not auto-link to order line:
-              <ul style={{ margin: "4px 0 0 0", paddingLeft: 20 }}>
-                {linkErrors.map((msg, i) => <li key={i}>{msg}</li>)}
-              </ul>
-            </div>
-          )}
           {hasErrors && (
             <div className={styles.error}>Fix the highlighted fields.</div>
           )}

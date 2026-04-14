@@ -423,7 +423,7 @@ export default function ThisSeasonReplantsTable({
                   onChange={(e) => setEditForm({ ...editForm, package_type: e.target.value })}
                 >
                   <option value="bag">Bag</option>
-                  <option value="tote">Tote</option>
+                  <option value="tote">Seedpak</option>
                 </select>
               </div>
 

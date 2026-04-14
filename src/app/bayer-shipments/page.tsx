@@ -230,12 +230,14 @@ export default function BayerShipmentsPage() {
     productId: string,
     treatmentId: string,
     seedSize: string | null,
+    packageType: string,
     verified: boolean
   ) => {
     const matchRow = (r: YearEndTotalRow) =>
       r.product_id === productId &&
       r.treatment_id === treatmentId &&
-      (r.seed_size ?? null) === (seedSize ?? null);
+      (r.seed_size ?? null) === (seedSize ?? null) &&
+      (r.package_type ?? "") === (packageType ?? "");
 
     // Optimistic patch
     setYearEndRows((prev) =>
@@ -252,6 +254,7 @@ export default function BayerShipmentsPage() {
         productId,
         treatmentId,
         seedSize,
+        packageType,
         verified
       );
     } catch (err) {
@@ -361,8 +364,8 @@ export default function BayerShipmentsPage() {
       if (row.productId && row.treatmentId) {
         const isCorn = cropByProduct.get(row.productId) === "corn";
         const lineKey = isCorn
-          ? `${row.productId}::${row.treatmentId}::${row.seedSize}`
-          : `${row.productId}::${row.treatmentId}`;
+          ? `${row.productId}::${row.treatmentId}::${row.seedSize}::${row.packageType}`
+          : `${row.productId}::${row.treatmentId}::${row.packageType}`;
         if (seenLines.has(lineKey)) {
           rowErr.product = true;
           rowErr.treatment = true;

@@ -283,31 +283,18 @@ export default function ReturnsPage() {
         treatment_id: row.treatmentId,
         seed_size: row.seedSize || null,
         package_type: row.packageType,
+        units: row.units,
       }));
 
-      const matches = await findOrderLineMatches(
+      const allAllocations = await findOrderLineMatches(
         selectedCustomerId!,
         seasonYear!,
         linesToMatch
       );
 
-      const ambiguousErrors: string[] = [];
-      matches.forEach((match, i) => {
-        if (match === "ambiguous") {
-          const row = rowsToSave[i];
-          ambiguousErrors.push(
-            `${row.product} / ${row.treatment}${row.seedSize ? ` (${row.seedSize})` : ""}: multiple matching order lines found — resolve the ambiguity before saving.`
-          );
-        }
-      });
-
-      if (ambiguousErrors.length > 0) {
-        setLinkErrors(ambiguousErrors);
-        return;
-      }
-
       const payloadRows: ReplantInsert[] = rowsToSave.map((row, i) => {
-        const match = matches[i];
+        // Use highest-priority matching order line (first allocation), or null if none
+        const match = allAllocations[i][0] ?? null;
         return {
           return_date: replantDate,
           season_year: seasonYear!,
@@ -317,8 +304,8 @@ export default function ReturnsPage() {
           units_returned: row.units,
           seed_size: row.seedSize || null,
           package_type: row.packageType,
-          order_id: match && match !== "ambiguous" ? match.order_id : null,
-          order_item_id: match && match !== "ambiguous" ? match.order_item_id : null,
+          order_id: match?.order_id ?? null,
+          order_item_id: match?.order_item_id ?? null,
           notes: notes.trim() || null,
         };
       });

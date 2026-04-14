@@ -71,6 +71,11 @@
             "view_schema": "public"
         },
         {
+            "view_name": "v_inventory_print_sheet",
+            "definition": " SELECT v.product_id,\n    p.crop,\n    v.product_name,\n    v.treatment_id,\n    v.treatment_name,\n    v.seed_size,\n    v.units_on_hand\n   FROM v_on_hand_inventory v\n     JOIN products p ON p.id = v.product_id\n  WHERE v.treatment_name <> 'NO_TREATMENT'::text\n  ORDER BY (\n        CASE\n            WHEN lower(p.crop) = 'corn'::text THEN 0\n            ELSE 1\n        END), v.product_name, v.treatment_name, v.seed_size;",
+            "view_schema": "public"
+        },
+        {
             "view_name": "v_on_hand_inventory",
             "definition": " WITH received AS (\n         SELECT i.product_id,\n            i.treatment_id,\n            NULL::text AS seed_size,\n            sum(i.units_received)::integer AS units_received\n           FROM bayer_shipment_items i\n          WHERE i.user_id = auth.uid()\n          GROUP BY i.product_id, i.treatment_id\n        ), delivered AS (\n         SELECT d.product_id,\n            d.treatment_id,\n            d.seed_size,\n            sum(d.units_delivered)::integer AS units_delivered\n           FROM deliveries d\n          WHERE d.user_id = auth.uid()\n          GROUP BY d.product_id, d.treatment_id, d.seed_size\n        ), returned AS (\n         SELECT r.product_id,\n            r.treatment_id,\n            r.seed_size,\n            sum(r.units_returned)::integer AS units_returned\n           FROM returns r\n          WHERE r.user_id = auth.uid()\n          GROUP BY r.product_id, r.treatment_id, r.seed_size\n        ), keys AS (\n         SELECT received.product_id,\n            received.treatment_id,\n            received.seed_size\n           FROM received\n        UNION\n         SELECT delivered.product_id,\n            delivered.treatment_id,\n            delivered.seed_size\n           FROM delivered\n        UNION\n         SELECT returned.product_id,\n            returned.treatment_id,\n            returned.seed_size\n           FROM returned\n        )\n SELECT k.product_id,\n    p.product_name,\n    k.treatment_id,\n    t.treatment_name,\n    k.seed_size,\n    COALESCE(rc.units_received, 0) AS units_received,\n    COALESCE(dv.units_delivered, 0) AS units_delivered,\n    COALESCE(rt.units_returned, 0) AS units_returned,\n    COALESCE(rc.units_received, 0) - COALESCE(dv.units_delivered, 0) + COALESCE(rt.units_returned, 0) AS units_on_hand\n   FROM keys k\n     JOIN products p ON p.id = k.product_id\n     JOIN treatments t ON t.id = k.treatment_id\n     LEFT JOIN received rc ON rc.product_id = k.product_id AND rc.treatment_id = k.treatment_id AND NOT rc.seed_size IS DISTINCT FROM k.seed_size\n     LEFT JOIN delivered dv ON dv.product_id = k.product_id AND dv.treatment_id = k.treatment_id AND NOT dv.seed_size IS DISTINCT FROM k.seed_size\n     LEFT JOIN returned rt ON rt.product_id = k.product_id AND rt.treatment_id = k.treatment_id AND NOT rt.seed_size IS DISTINCT FROM k.seed_size;",
             "view_schema": "public"
@@ -5980,6 +5985,14 @@
                     "is_nullable": "YES",
                     "column_default": null,
                     "ordinal_position": 9
+                },
+                {
+                    "udt_name": "jsonb",
+                    "data_type": "jsonb",
+                    "column_name": "metadata",
+                    "is_nullable": "YES",
+                    "column_default": null,
+                    "ordinal_position": 10
                 }
             ],
             "indexes": [
@@ -6324,15 +6337,15 @@
             "function_schema": "auth"
         },
         {
-            "arguments": "bytea, text[], text[]",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.armor(bytea, text[], text[])\n RETURNS text\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_armor$function$\n",
+            "arguments": "bytea",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.armor(bytea)\n RETURNS text\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_armor$function$\n",
             "return_type": "text",
             "function_name": "armor",
             "function_schema": "extensions"
         },
         {
-            "arguments": "bytea",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.armor(bytea)\n RETURNS text\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_armor$function$\n",
+            "arguments": "bytea, text[], text[]",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.armor(bytea, text[], text[])\n RETURNS text\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_armor$function$\n",
             "return_type": "text",
             "function_name": "armor",
             "function_schema": "extensions"
@@ -6408,15 +6421,15 @@
             "function_schema": "extensions"
         },
         {
-            "arguments": "text",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.gen_salt(text)\n RETURNS text\n LANGUAGE c\n PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_gen_salt$function$\n",
+            "arguments": "text, integer",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.gen_salt(text, integer)\n RETURNS text\n LANGUAGE c\n PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_gen_salt_rounds$function$\n",
             "return_type": "text",
             "function_name": "gen_salt",
             "function_schema": "extensions"
         },
         {
-            "arguments": "text, integer",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.gen_salt(text, integer)\n RETURNS text\n LANGUAGE c\n PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_gen_salt_rounds$function$\n",
+            "arguments": "text",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.gen_salt(text)\n RETURNS text\n LANGUAGE c\n PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_gen_salt$function$\n",
             "return_type": "text",
             "function_name": "gen_salt",
             "function_schema": "extensions"
@@ -6443,15 +6456,15 @@
             "function_schema": "extensions"
         },
         {
-            "arguments": "bytea, bytea, text",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.hmac(bytea, bytea, text)\n RETURNS bytea\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_hmac$function$\n",
+            "arguments": "text, text, text",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.hmac(text, text, text)\n RETURNS bytea\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_hmac$function$\n",
             "return_type": "bytea",
             "function_name": "hmac",
             "function_schema": "extensions"
         },
         {
-            "arguments": "text, text, text",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.hmac(text, text, text)\n RETURNS bytea\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_hmac$function$\n",
+            "arguments": "bytea, bytea, text",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.hmac(bytea, bytea, text)\n RETURNS bytea\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pg_hmac$function$\n",
             "return_type": "bytea",
             "function_name": "hmac",
             "function_schema": "extensions"
@@ -6492,13 +6505,6 @@
             "function_schema": "extensions"
         },
         {
-            "arguments": "bytea, bytea, text",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea, text)\n RETURNS text\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$\n",
-            "return_type": "text",
-            "function_name": "pgp_pub_decrypt",
-            "function_schema": "extensions"
-        },
-        {
             "arguments": "bytea, bytea",
             "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea)\n RETURNS text\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$\n",
             "return_type": "text",
@@ -6513,8 +6519,15 @@
             "function_schema": "extensions"
         },
         {
-            "arguments": "bytea, bytea, text, text",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt_bytea(bytea, bytea, text, text)\n RETURNS bytea\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$\n",
+            "arguments": "bytea, bytea, text",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea, text)\n RETURNS text\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$\n",
+            "return_type": "text",
+            "function_name": "pgp_pub_decrypt",
+            "function_schema": "extensions"
+        },
+        {
+            "arguments": "bytea, bytea",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt_bytea(bytea, bytea)\n RETURNS bytea\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$\n",
             "return_type": "bytea",
             "function_name": "pgp_pub_decrypt_bytea",
             "function_schema": "extensions"
@@ -6527,8 +6540,8 @@
             "function_schema": "extensions"
         },
         {
-            "arguments": "bytea, bytea",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt_bytea(bytea, bytea)\n RETURNS bytea\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$\n",
+            "arguments": "bytea, bytea, text, text",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt_bytea(bytea, bytea, text, text)\n RETURNS bytea\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$\n",
             "return_type": "bytea",
             "function_name": "pgp_pub_decrypt_bytea",
             "function_schema": "extensions"
@@ -6590,15 +6603,15 @@
             "function_schema": "extensions"
         },
         {
-            "arguments": "text, text",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_sym_encrypt(text, text)\n RETURNS bytea\n LANGUAGE c\n PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$\n",
+            "arguments": "text, text, text",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_sym_encrypt(text, text, text)\n RETURNS bytea\n LANGUAGE c\n PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$\n",
             "return_type": "bytea",
             "function_name": "pgp_sym_encrypt",
             "function_schema": "extensions"
         },
         {
-            "arguments": "text, text, text",
-            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_sym_encrypt(text, text, text)\n RETURNS bytea\n LANGUAGE c\n PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$\n",
+            "arguments": "text, text",
+            "definition": "CREATE OR REPLACE FUNCTION extensions.pgp_sym_encrypt(text, text)\n RETURNS bytea\n LANGUAGE c\n PARALLEL SAFE STRICT\nAS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$\n",
             "return_type": "bytea",
             "function_name": "pgp_sym_encrypt",
             "function_schema": "extensions"
@@ -6864,8 +6877,8 @@
         },
         {
             "arguments": "publication name, slot_name name, max_changes integer, max_record_bytes integer",
-            "definition": "CREATE OR REPLACE FUNCTION realtime.list_changes(publication name, slot_name name, max_changes integer, max_record_bytes integer)\n RETURNS SETOF realtime.wal_rls\n LANGUAGE sql\n SET log_min_messages TO 'fatal'\nAS $function$\n      with pub as (\n        select\n          concat_ws(\n            ',',\n            case when bool_or(pubinsert) then 'insert' else null end,\n            case when bool_or(pubupdate) then 'update' else null end,\n            case when bool_or(pubdelete) then 'delete' else null end\n          ) as w2j_actions,\n          coalesce(\n            string_agg(\n              realtime.quote_wal2json(format('%I.%I', schemaname, tablename)::regclass),\n              ','\n            ) filter (where ppt.tablename is not null and ppt.tablename not like '% %'),\n            ''\n          ) w2j_add_tables\n        from\n          pg_publication pp\n          left join pg_publication_tables ppt\n            on pp.pubname = ppt.pubname\n        where\n          pp.pubname = publication\n        group by\n          pp.pubname\n        limit 1\n      ),\n      w2j as (\n        select\n          x.*, pub.w2j_add_tables\n        from\n          pub,\n          pg_logical_slot_get_changes(\n            slot_name, null, max_changes,\n            'include-pk', 'true',\n            'include-transaction', 'false',\n            'include-timestamp', 'true',\n            'include-type-oids', 'true',\n            'format-version', '2',\n            'actions', pub.w2j_actions,\n            'add-tables', pub.w2j_add_tables\n          ) x\n      )\n      select\n        xyz.wal,\n        xyz.is_rls_enabled,\n        xyz.subscription_ids,\n        xyz.errors\n      from\n        w2j,\n        realtime.apply_rls(\n          wal := w2j.data::jsonb,\n          max_record_bytes := max_record_bytes\n        ) xyz(wal, is_rls_enabled, subscription_ids, errors)\n      where\n        w2j.w2j_add_tables <> ''\n        and xyz.subscription_ids[1] is not null\n    $function$\n",
-            "return_type": "SETOF realtime.wal_rls",
+            "definition": "CREATE OR REPLACE FUNCTION realtime.list_changes(publication name, slot_name name, max_changes integer, max_record_bytes integer)\n RETURNS TABLE(wal jsonb, is_rls_enabled boolean, subscription_ids uuid[], errors text[], slot_changes_count bigint)\n LANGUAGE sql\n SET log_min_messages TO 'fatal'\nAS $function$\n  WITH pub AS (\n    SELECT\n      concat_ws(\n        ',',\n        CASE WHEN bool_or(pubinsert) THEN 'insert' ELSE NULL END,\n        CASE WHEN bool_or(pubupdate) THEN 'update' ELSE NULL END,\n        CASE WHEN bool_or(pubdelete) THEN 'delete' ELSE NULL END\n      ) AS w2j_actions,\n      coalesce(\n        string_agg(\n          realtime.quote_wal2json(format('%I.%I', schemaname, tablename)::regclass),\n          ','\n        ) filter (WHERE ppt.tablename IS NOT NULL AND ppt.tablename NOT LIKE '% %'),\n        ''\n      ) AS w2j_add_tables\n    FROM pg_publication pp\n    LEFT JOIN pg_publication_tables ppt ON pp.pubname = ppt.pubname\n    WHERE pp.pubname = publication\n    GROUP BY pp.pubname\n    LIMIT 1\n  ),\n  -- MATERIALIZED ensures pg_logical_slot_get_changes is called exactly once\n  w2j AS MATERIALIZED (\n    SELECT x.*, pub.w2j_add_tables\n    FROM pub,\n         pg_logical_slot_get_changes(\n           slot_name, null, max_changes,\n           'include-pk', 'true',\n           'include-transaction', 'false',\n           'include-timestamp', 'true',\n           'include-type-oids', 'true',\n           'format-version', '2',\n           'actions', pub.w2j_actions,\n           'add-tables', pub.w2j_add_tables\n         ) x\n  ),\n  -- Count raw slot entries before apply_rls/subscription filter\n  slot_count AS (\n    SELECT count(*)::bigint AS cnt\n    FROM w2j\n    WHERE w2j.w2j_add_tables <> ''\n  ),\n  -- Apply RLS and filter as before\n  rls_filtered AS (\n    SELECT xyz.wal, xyz.is_rls_enabled, xyz.subscription_ids, xyz.errors\n    FROM w2j,\n         realtime.apply_rls(\n           wal := w2j.data::jsonb,\n           max_record_bytes := max_record_bytes\n         ) xyz(wal, is_rls_enabled, subscription_ids, errors)\n    WHERE w2j.w2j_add_tables <> ''\n      AND xyz.subscription_ids[1] IS NOT NULL\n  )\n  -- Real rows with slot count attached\n  SELECT rf.wal, rf.is_rls_enabled, rf.subscription_ids, rf.errors, sc.cnt\n  FROM rls_filtered rf, slot_count sc\n\n  UNION ALL\n\n  -- Sentinel row: always returned when no real rows exist so Elixir can\n  -- always read slot_changes_count. Identified by wal IS NULL.\n  SELECT null, null, null, null, sc.cnt\n  FROM slot_count sc\n  WHERE NOT EXISTS (SELECT 1 FROM rls_filtered)\n$function$\n",
+            "return_type": "TABLE(wal jsonb, is_rls_enabled boolean, subscription_ids uuid[], errors text[], slot_changes_count bigint)",
             "function_name": "list_changes",
             "function_schema": "realtime"
         },
@@ -6903,6 +6916,20 @@
             "return_type": "text",
             "function_name": "topic",
             "function_schema": "realtime"
+        },
+        {
+            "arguments": "expected_operations text[]",
+            "definition": "CREATE OR REPLACE FUNCTION storage.allow_any_operation(expected_operations text[])\n RETURNS boolean\n LANGUAGE sql\n STABLE\nAS $function$\n  WITH current_operation AS (\n    SELECT storage.operation() AS raw_operation\n  ),\n  normalized AS (\n    SELECT CASE\n      WHEN raw_operation LIKE 'storage.%' THEN substr(raw_operation, 9)\n      ELSE raw_operation\n    END AS current_operation\n    FROM current_operation\n  )\n  SELECT EXISTS (\n    SELECT 1\n    FROM normalized n\n    CROSS JOIN LATERAL unnest(expected_operations) AS expected_operation\n    WHERE expected_operation IS NOT NULL\n      AND expected_operation <> ''\n      AND n.current_operation = CASE\n        WHEN expected_operation LIKE 'storage.%' THEN substr(expected_operation, 9)\n        ELSE expected_operation\n      END\n  );\n$function$\n",
+            "return_type": "boolean",
+            "function_name": "allow_any_operation",
+            "function_schema": "storage"
+        },
+        {
+            "arguments": "expected_operation text",
+            "definition": "CREATE OR REPLACE FUNCTION storage.allow_only_operation(expected_operation text)\n RETURNS boolean\n LANGUAGE sql\n STABLE\nAS $function$\n  WITH current_operation AS (\n    SELECT storage.operation() AS raw_operation\n  ),\n  normalized AS (\n    SELECT\n      CASE\n        WHEN raw_operation LIKE 'storage.%' THEN substr(raw_operation, 9)\n        ELSE raw_operation\n      END AS current_operation,\n      CASE\n        WHEN expected_operation LIKE 'storage.%' THEN substr(expected_operation, 9)\n        ELSE expected_operation\n      END AS requested_operation\n    FROM current_operation\n  )\n  SELECT CASE\n    WHEN requested_operation IS NULL OR requested_operation = '' THEN FALSE\n    ELSE COALESCE(current_operation = requested_operation, FALSE)\n  END\n  FROM normalized;\n$function$\n",
+            "return_type": "boolean",
+            "function_name": "allow_only_operation",
+            "function_schema": "storage"
         },
         {
             "arguments": "bucketid text, name text, owner uuid, metadata jsonb",

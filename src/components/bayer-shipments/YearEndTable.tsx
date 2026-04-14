@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { YearEndTotalRow } from "@/services/bayer-shipment.service";
+import { fmtPackageType } from "@/lib/fmt";
 import styles from "./YearEndTable.module.css";
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
   onSeasonChange: (season: number) => void;
   loading: boolean;
   error: string | null;
-  onVerify: (productId: string, treatmentId: string, seedSize: string | null, verified: boolean) => Promise<void>;
+  onVerify: (productId: string, treatmentId: string, seedSize: string | null, packageType: string, verified: boolean) => Promise<void>;
 }
 
 export default function YearEndTable({
@@ -27,14 +28,14 @@ export default function YearEndTable({
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
   const handleVerifyToggle = async (row: YearEndTotalRow) => {
-    const key = `${row.product_id}::${row.treatment_id}::${row.seed_size ?? ""}`;
+    const key = `${row.product_id}::${row.treatment_id}::${row.seed_size ?? ""}::${row.package_type ?? ""}`;
     const newValue = !row.is_verified;
 
     setPendingVerify((prev) => new Set(prev).add(key));
     setVerifyError(null);
 
     try {
-      await onVerify(row.product_id, row.treatment_id, row.seed_size ?? null, newValue);
+      await onVerify(row.product_id, row.treatment_id, row.seed_size ?? null, row.package_type ?? "", newValue);
     } catch (err) {
       const detail = err instanceof Error ? err.message : "Unknown error";
       setVerifyError(
@@ -101,13 +102,14 @@ export default function YearEndTable({
                 <th>Product</th>
                 <th>Treatment</th>
                 <th className={styles.center}>Size</th>
+                <th className={styles.center}>Pkg</th>
                 <th className={styles.right}>Net Units</th>
                 <th>Verified At</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
-                const key = `${r.product_id}::${r.treatment_id}::${r.seed_size ?? ""}`;
+                const key = `${r.product_id}::${r.treatment_id}::${r.seed_size ?? ""}::${r.package_type ?? ""}`;
                 const isPending = pendingVerify.has(key);
 
                 return (
@@ -127,6 +129,7 @@ export default function YearEndTable({
                     <td>{r.product_name}</td>
                     <td>{r.treatment_name}</td>
                     <td className={styles.center}>{r.seed_size || "\u2014"}</td>
+                    <td className={styles.center}>{fmtPackageType(r.package_type)}</td>
                     <td className={styles.mono}>{r.net_units}</td>
                     <td>
                       {r.verified_at ? (

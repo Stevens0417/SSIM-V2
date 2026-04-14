@@ -20,7 +20,9 @@
       "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && grep \"\"create table\\\\|create or replace view\\\\|bayer_shipment\"\" {}')",
       "Bash(wc -l /c/Projects/SSIMV2/supabase/migrations/*.sql)",
       "Bash(cat /c/Projects/SSIMV2/supabase/migrations/*.sql)",
-      "Bash(find /c/Projects/SSIMV2/src -type f \\\\\\(-name *inventory* -o -path *inventory* \\\\\\))"
+      "Bash(find /c/Projects/SSIMV2/src -type f \\\\\\(-name *inventory* -o -path *inventory* \\\\\\))",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && grep -n \"package_type\" {}')",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

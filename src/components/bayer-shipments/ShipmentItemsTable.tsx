@@ -286,7 +286,7 @@ export default function ShipmentItemsTable({
                       onChange={(e) => updateItem(i, { packageType: e.target.value as "bag" | "tote" })}
                     >
                       <option value="bag">Bag</option>
-                      <option value="tote">Tote</option>
+                      <option value="tote">Seedpak</option>
                     </select>
                   </td>
                   <td style={{ textAlign: "center" }}>
@@ -404,7 +404,7 @@ export default function ShipmentItemsTable({
                   onChange={(e) => updateItem(i, { packageType: e.target.value as "bag" | "tote" })}
                 >
                   <option value="bag">Bag</option>
-                  <option value="tote">Tote</option>
+                  <option value="tote">Seedpak</option>
                 </select>
               </div>
             </div>

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import type { InventoryDetailRow } from "@/services/inventory.service";
+import { fmtPackageType } from "@/lib/fmt";
 import styles from "./InventoryDetailTable.module.css";
 
 interface Props {
@@ -103,6 +104,7 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
                 <th>Product</th>
                 <th>Treatment</th>
                 <th className={styles.center}>Size</th>
+                <th className={styles.center}>Pkg</th>
                 <th className={styles.right}>Units Received</th>
                 <th className={styles.right}>Units Delivered</th>
                 <th className={styles.right}>Units Returned</th>
@@ -111,10 +113,11 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
             </thead>
             <tbody>
               {filtered.map((r) => (
-                <tr key={`${r.product_id}-${r.treatment_id}-${r.seed_size ?? ""}`}>
+                <tr key={`${r.product_id}-${r.treatment_id}-${r.seed_size ?? ""}-${r.package_type ?? ""}`}>
                   <td>{r.product_name}</td>
                   <td>{r.treatment_name}</td>
                   <td className={styles.center}>{r.seed_size || "\u2014"}</td>
+                  <td className={styles.center}>{fmtPackageType(r.package_type)}</td>
                   <td className={styles.mono}>{r.units_received}</td>
                   <td className={styles.mono}>{r.units_delivered}</td>
                   <td className={styles.mono}>{r.units_returned}</td>
