@@ -26,6 +26,12 @@ const NAV_SECTIONS = [
       { href: "/bayer-shipments", label: "Bayer Shipments" },
     ],
   },
+  {
+    label: "Admin",
+    items: [
+      { href: "/customers", label: "Customers" },
+    ],
+  },
 ];
 
 export default function Sidebar() {
