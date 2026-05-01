@@ -24,7 +24,10 @@
       "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && grep -n \"package_type\" {}')",
       "Bash(echo \"EXIT:$?\")",
       "Bash(ls -lh /c/Projects/SSIMV2/supabase/migrations/*.sql)",
-      "Bash(awk '{print $9, $5}')"
+      "Bash(awk '{print $9, $5}')",
+      "Bash(git ls-files *)",
+      "Bash(git rm *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
