@@ -2,11 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateText, stepCountIs } from "ai";
 import { getSupabaseServerClient } from "@/lib/supabase/serverClient";
+import { makeGetOnHandInventoryTool } from "@/lib/agent/tools";
 
-const SYSTEM_PROMPT =
-  "You are the SSIM assistant. Help users understand and work with their seed sales and inventory management system. In this phase, you do not have access to live business data or database tools yet. If the user asks for specific data, explain that data tools will be added in a future phase.";
+const SYSTEM_PROMPT = `You are the SSIM assistant for Stevens Seeds Inventory Management. Help users understand and work with their seed sales and inventory management system.
+
+## Available tool: get_on_hand_inventory
+
+Call this tool whenever the user asks about current inventory — including:
+- How much inventory / how many units do I have?
+- What products are in stock?
+- How many Bags or Seedpaks do I have?
+- What [treatment] inventory is left? (e.g. PONCHO, FUNGICIDE, DIAMIDE)
+- Do I have [product] on hand?
+- Show me remaining inventory.
+- Any other question about current stock levels or quantities.
+
+### Filter rules — pass ONLY the filters that apply, omit the rest:
+- User mentions a product name → set productName (partial name is fine)
+- User mentions a treatment (e.g. "PONCHO", "FUNGICIDE") → set treatmentName
+- User asks about "Seedpak" or "seedpaks" → set packageType to "Seedpak"
+- User asks about "Bag" or "bags" → set packageType to "Bag"
+- User mentions a seed size → set seedSize
+- User asks about all inventory → call with no filters
+
+### Presenting results:
+- Package types are "Bag" and "Seedpak" — never say "tote".
+- State total units on hand and highlight key rows.
+- If results are truncated, mention that more rows exist.
+- For large result sets, summarize by product or treatment rather than listing every row.
+
+## Scope
+You do NOT yet have tools for orders, deliveries, customers, pricing, or Bayer shipments. If asked about those topics, explain that data tools for those areas will be added in a future phase.
+
+Respond in a concise, business-friendly tone.`;
 
 export async function POST(req: NextRequest) {
   // Authenticate user via session cookie
@@ -79,13 +109,25 @@ export async function POST(req: NextRequest) {
     .reverse()
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-  // Call OpenAI
+  // Build tools — anonClient carries the user JWT so auth.uid() works in views
+  const tools = {
+    get_on_hand_inventory: makeGetOnHandInventoryTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId
+    ),
+  };
+
+  // Call OpenAI — maxSteps allows the model to call a tool and then respond
   let assistantText: string;
   try {
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
       system: SYSTEM_PROMPT,
       messages: contextMessages,
+      tools,
+      stopWhen: stepCountIs(5),
     });
     assistantText = text;
   } catch (err) {

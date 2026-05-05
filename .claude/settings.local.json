@@ -37,7 +37,11 @@
       "Bash(echo \"PID: $!\")",
       "Bash(curl -s -X POST http://localhost:3001/api/agent/chat -H 'Content-Type: application/json' -d '{\"threadId\":\"test\",\"content\":\"hello\"}')",
       "Bash(python3 -m json.tool)",
-      "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\('TypeScript:', p.get\\('devDependencies',{}\\).get\\('typescript','not in devDeps'\\)\\); print\\('Next.js:', p.get\\('dependencies',{}\\).get\\('next'\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\('TypeScript:', p.get\\('devDependencies',{}\\).get\\('typescript','not in devDeps'\\)\\); print\\('Next.js:', p.get\\('dependencies',{}\\).get\\('next'\\)\\)\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\docs\\\\agent\\\\\" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(node --input-type=module)",
+      "Bash(curl -s -X POST http://localhost:3000/api/agent/chat -H 'Content-Type: application/json' -d '{\"threadId\":\"x\",\"content\":\"show inventory\"}')"
     ]
   }
 }
