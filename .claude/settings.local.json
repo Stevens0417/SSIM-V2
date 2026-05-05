@@ -27,7 +27,16 @@
       "Bash(awk '{print $9, $5}')",
       "Bash(git ls-files *)",
       "Bash(git rm *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\" -Recurse -Filter \"*.sql\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\api\\\\agent\\\\chat\" -Force)",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"done\")",
+      "Bash(npm run *)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(curl -s -X POST http://localhost:3001/api/agent/chat -H 'Content-Type: application/json' -d '{\"threadId\":\"test\",\"content\":\"hello\"}')",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }

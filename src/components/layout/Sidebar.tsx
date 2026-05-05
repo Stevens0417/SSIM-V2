@@ -32,6 +32,12 @@ const NAV_SECTIONS = [
       { href: "/customers", label: "Customers" },
     ],
   },
+  {
+    label: "Agent",
+    items: [
+      { href: "/agent", label: "Chat" },
+    ],
+  },
 ];
 
 export default function Sidebar() {
