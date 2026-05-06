@@ -46,7 +46,12 @@
       "mcp__claude_ai_Supabase__apply_migration",
       "mcp__claude_ai_Supabase__execute_sql",
       "Bash(curl -s -X POST http://localhost:3002/api/agent/chat -H 'Content-Type: application/json' -d '{\"threadId\":\"x\",\"content\":\"show orders for Smith Farms\"}')",
-      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\" -Recurse -Directory)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\" -Recurse -Directory)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\components\\\\\" -Recurse -Directory | Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\" -Directory | ForEach-Object { \"Directory: \" + $_.Name })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\\" -Recurse | Where-Object { $_.Name -match \"nav|layout|sidebar|drawer|menu|config\" } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\\" -Recurse | Where-Object { $_.Extension -match \"tsx|ts\" -and $_.Name -match \"layout|nav\" } | Select-Object FullName)",
+      "PowerShell(ls -Recurse \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\" | where { $_.Name -match \"layout\" })"
     ]
   }
 }

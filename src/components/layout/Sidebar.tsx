@@ -8,6 +8,12 @@ import styles from "./Sidebar.module.css";
 
 const NAV_SECTIONS = [
   {
+    label: "Agent",
+    items: [
+      { href: "/agent", label: "Chat" },
+    ],
+  },
+  {
     label: "Tools",
     items: [
       { href: "/", label: "Dashboard" },
@@ -30,12 +36,6 @@ const NAV_SECTIONS = [
     label: "Admin",
     items: [
       { href: "/customers", label: "Customers" },
-    ],
-  },
-  {
-    label: "Agent",
-    items: [
-      { href: "/agent", label: "Chat" },
     ],
   },
 ];
