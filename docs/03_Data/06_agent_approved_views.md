@@ -116,6 +116,37 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 ---
 
+### v_delivery_customer_order_status
+
+| Property | Value |
+|---|---|
+| **Table** | `v_delivery_customer_order_status` |
+| **Access type** | Read-only |
+| **User-scoped** | Yes — `auth.uid()` in all CTEs (delivered, returned, replanted) and orders join |
+
+**Safe use cases:**
+- "What is the delivery status for [customer]?"
+- "How many units have been delivered to [customer]?"
+- "What is still outstanding for [customer]?"
+- "Is [customer]'s order complete?"
+- "Show me open order lines for [customer]."
+
+**Allowed filters:** `customer_name`, `season_year`, `product_name`, `treatment_name`, `seed_size`, `package_type`
+
+**Columns safe for agent:** `season_year`, `customer_name`, `order_date`, `product_name`, `treatment_name`, `seed_size`, `package_type`, `ordered_units`, `delivered_units`, `returned_units`, `replanted_units`, `net_units`, `is_complete`
+
+**Columns to exclude:** `order_id`, `order_item_id`, `customer_id`, `product_id`, `treatment_id` (internal UUIDs)
+
+**Notes:**
+- View is at order_item grain. The agent tool aggregates to product+treatment+seed_size+package_type grain in TypeScript before returning to the model.
+- `net_units > 0` means outstanding delivery still needed. `net_units <= 0` means fully delivered or over-delivered.
+- Only deliveries/returns/replants with `order_item_id` are counted. Unlinked transactions do not affect this view.
+- Always filter by `season_year` — this view covers all seasons.
+
+**Agent tool using it:** `get_customer_order_fulfillment_status`
+
+---
+
 ### v_orders_this_season
 
 | Property | Value |
@@ -194,11 +225,45 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 ---
 
+### v_agent_customer_current_season_orders
+
+| Property | Value |
+|---|---|
+| **Table** | `v_agent_customer_current_season_orders` |
+| **Access type** | Read-only |
+| **User-scoped** | Yes — `auth.uid()` on both orders and order_items |
+
+**Safe use cases:**
+- "Show me the orders for Smith Farms."
+- "What did Adam Stevens order this season?"
+- "How many units did [customer] order?"
+- "Show me [customer]'s order lines for PONCHO."
+- "What early-pay orders does [customer] have?"
+- "What is the price per unit for [customer]'s order?"
+- "What is the profit on [customer]'s order?"
+
+**Allowed filters (all optional except customerName):** `customer_name` (partial OK), `season_year`, `product_name`, `treatment_name`, `early_pay`
+
+**Columns safe for agent:** `order_item_id`, `order_id`, `order_date`, `season_year`, `customer_name`, `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_ordered`, `early_pay`, `early_pay_pct`, `brand_grower_pct`, `retail_price_per_unit`, `brand_grower_discount_amount`, `tote_bulk_discount_amount`, `early_pay_discount_amount`, `line_total_after_all_discounts`, `break_even_price_per_unit`, `profit_per_unit`, `line_total_profit`
+
+**Columns to exclude from responses:** `user_id`, `customer_id`, `product_id`, `treatment_id`, `order_created_at` (internal UUIDs / timestamps — not useful in user-facing responses)
+
+**Notes:**
+- This view is NOT pre-filtered by season. The backend must always filter by `season_year`.
+- Customer name matching: exact match preferred; fall back to case-insensitive partial match.
+- If multiple customers match a partial name, include all results and let the assistant clarify.
+- Package type `'bag'` → display "Bag"; `'tote'` → display "Seedpak".
+- Pricing and profit fields are always present in the view but should only be surfaced in agent responses when the user explicitly asks (controlled by `includePricing` / `includeProfit` tool parameters).
+
+**Agent tool using it:** `get_customer_current_season_orders`
+
+---
+
 ## Agent Access Rules
 
 1. **Read-only access only.** The agent must never INSERT, UPDATE, or DELETE via tool calls unless a dedicated, reviewed write-tool exists and has explicit permission.
 
-2. **Always filter by `season_year` when the view spans multiple seasons.** (`v_year_end_adjustments`, `v_bayer_year_end_totals`, `v_delivery_customer_order_status`)
+2. **Always filter by `season_year` when the view spans multiple seasons.** (`v_year_end_adjustments`, `v_bayer_year_end_totals`, `v_delivery_customer_order_status`, `v_agent_customer_current_season_orders`) — all four views span multiple seasons and require an explicit `season_year` filter in every query.
 
 3. **Use display names, not UUIDs.** Agent responses should use `customer_name`, `product_name`, `treatment_name` — never raw UUIDs.
 

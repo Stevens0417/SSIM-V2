@@ -42,6 +42,8 @@ This view only counts deliveries/returns/replants where `order_item_id IS NOT NU
 
 **Filter:** `user_id = auth.uid()` applied in all CTEs (delivered, returned, replanted) and in the orders join.
 
+**Agent tool using it:** `get_customer_order_fulfillment_status` — aggregates from order_item grain to product+treatment+seed_size+package_type grain in TypeScript before returning results.
+
 **Where used in UI:**
 - Deliveries page — "Customer Order Status" table shown when a customer is selected.
 - Order allocation system (`orderMatching.service.ts`) queries this view to determine open quantity per order_item before allocating.

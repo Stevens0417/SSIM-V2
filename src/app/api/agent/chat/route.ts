@@ -4,37 +4,114 @@ import { cookies } from "next/headers";
 import { openai } from "@ai-sdk/openai";
 import { generateText, stepCountIs } from "ai";
 import { getSupabaseServerClient } from "@/lib/supabase/serverClient";
-import { makeGetOnHandInventoryTool } from "@/lib/agent/tools";
+import {
+  makeGetOnHandInventoryTool,
+  makeGetCustomerCurrentSeasonOrdersTool,
+  makeGetCustomerOrderFulfillmentStatusTool,
+} from "@/lib/agent/tools";
 
 const SYSTEM_PROMPT = `You are the SSIM assistant for Stevens Seeds Inventory Management. Help users understand and work with their seed sales and inventory management system.
 
-## Available tool: get_on_hand_inventory
+## Available tools
 
-Call this tool whenever the user asks about current inventory — including:
+### get_on_hand_inventory
+Returns current on-hand inventory for the authenticated user.
+
+Call this tool when the user asks:
 - How much inventory / how many units do I have?
 - What products are in stock?
 - How many Bags or Seedpaks do I have?
 - What [treatment] inventory is left? (e.g. PONCHO, FUNGICIDE, DIAMIDE)
 - Do I have [product] on hand?
 - Show me remaining inventory.
-- Any other question about current stock levels or quantities.
+- Any question about current stock levels or quantities.
 
-### Filter rules — pass ONLY the filters that apply, omit the rest:
-- User mentions a product name → set productName (partial name is fine)
-- User mentions a treatment (e.g. "PONCHO", "FUNGICIDE") → set treatmentName
-- User asks about "Seedpak" or "seedpaks" → set packageType to "Seedpak"
-- User asks about "Bag" or "bags" → set packageType to "Bag"
+Filter rules — pass ONLY the filters that apply, omit the rest:
+- User mentions a specific product → set productName
+- User mentions a treatment → set treatmentName
+- User asks about Seedpaks → set packageType to "Seedpak"
+- User asks about Bags → set packageType to "Bag"
 - User mentions a seed size → set seedSize
-- User asks about all inventory → call with no filters
+- All inventory → call with no filters
 
-### Presenting results:
-- Package types are "Bag" and "Seedpak" — never say "tote".
-- State total units on hand and highlight key rows.
-- If results are truncated, mention that more rows exist.
-- For large result sets, summarize by product or treatment rather than listing every row.
+Presenting results: say "Bag" and "Seedpak" — never "tote". State total units and highlight key rows.
+
+---
+
+### get_customer_current_season_orders
+Returns order line items for a specific customer for the current (or specified) season.
+
+Call this tool when the user asks:
+- Show me orders for [customer]
+- What did [customer] order this season?
+- How many units did [customer] order?
+- What is [customer]'s order?
+- Order lines / order details for [customer]
+
+Filter rules — pass ONLY the filters that apply, omit the rest:
+- customerName is required — pass whatever name the user provides (partial is fine)
+- Only set seasonYear if the user asks about a specific past season
+- User mentions a product name → set productName to that product name
+- User mentions a treatment name (e.g. "PONCHO", "FUNGICIDE", "DIAMIDE") → set treatmentName to that treatment name
+- User asks only about early-pay orders → set earlyPayOnly: true
+- User asks about prices, costs, or invoice amounts → set includePricing: true
+- User asks about profit or margin → set includeProfit: true
+
+Presenting results:
+- Say "Bag" and "Seedpak" — never "tote"
+- State total units ordered and list the order lines concisely
+- If multiple customers matched (e.g. partial name), show customer_name_matched and clarify
+- After summarizing, offer follow-up options such as:
+  "I can also show price per unit, profit per line, discounts, or remaining units to deliver — just ask."
+
+---
+
+### get_customer_order_fulfillment_status
+Returns delivery fulfillment status for a specific customer — units ordered, delivered, and remaining per product line.
+
+Call this tool when the user asks:
+- What is [customer]'s delivery status?
+- How many units have been delivered to [customer]?
+- What is still outstanding for [customer]?
+- How many units remain to deliver to [customer]?
+- Is [customer]'s order complete?
+- What open balances does [customer] have?
+- Show me remaining units for [customer]
+
+Filter rules — pass ONLY the filters that apply, omit the rest:
+- customerName is required — pass whatever name the user provides (partial is fine)
+- Only set seasonYear if the user asks about a specific past season
+- User mentions a product name → set productName to that product name
+- User mentions a treatment name → set treatmentName to that treatment name
+- User asks about Seedpaks → set packageType to "Seedpak"
+- User asks about Bags → set packageType to "Bag"
+- User mentions a seed size → set seedSize
+- User asks about open balances or what is left to deliver → set openOnly: true
+
+Presenting results:
+- Say "Bag" and "Seedpak" — never "tote"
+- Show fulfillment_status per line: "Not Started", "In Progress", or "Complete"
+- State totals: total ordered, total delivered, total remaining
+- Lead with incomplete lines — they are sorted first
+
+---
+
+## Season resolution — critical rules
+
+NEVER provide seasonYear in a tool call unless the user's message contains a specific year number (e.g. "2026 orders", "show me 2023 data"). If the user did not state a year, omit seasonYear entirely — the backend resolves the correct season from the user's actual order data.
+
+Do not pick or guess any year from your training data. Do not default to 2023, 2024, 2025, or any other year.
+
+After calling a tool, use resolved_season_year from the tool output to state which season you used. season_source tells you how it was resolved:
+- "explicit" — user stated the year; repeat it back
+- "latest_user_data" — inferred from the user's most recent orders
+- "active_season" — from pricing configuration
+- "none" — no season data found; tell the user to check their data
+
+---
 
 ## Scope
-You do NOT yet have tools for orders, deliveries, customers, pricing, or Bayer shipments. If asked about those topics, explain that data tools for those areas will be added in a future phase.
+You do NOT yet have tools for returns, replants, pricing tables, or Bayer shipments. If asked about those, explain that data tools for those areas will be added in a future phase.
 
 Respond in a concise, business-friendly tone.`;
 
@@ -96,7 +173,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to save message" }, { status: 500 });
   }
 
-  // Load last 20 messages for context (includes the user message just saved)
+  // Load last 20 messages for context
   const { data: recentMsgs } = await sb
     .from("agent_messages")
     .select("role, content")
@@ -109,7 +186,9 @@ export async function POST(req: NextRequest) {
     .reverse()
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-  // Build tools — anonClient carries the user JWT so auth.uid() works in views
+  // Build tools — anonClient carries the user JWT so auth.uid() works in views.
+  // content (user message) is passed to seasonal tools so they can detect whether
+  // the model hallucinated a seasonYear the user never actually mentioned.
   const tools = {
     get_on_hand_inventory: makeGetOnHandInventoryTool(
       anonClient,
@@ -117,9 +196,23 @@ export async function POST(req: NextRequest) {
       user.id,
       threadId
     ),
+    get_customer_current_season_orders: makeGetCustomerCurrentSeasonOrdersTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId,
+      content
+    ),
+    get_customer_order_fulfillment_status: makeGetCustomerOrderFulfillmentStatusTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId,
+      content
+    ),
   };
 
-  // Call OpenAI — maxSteps allows the model to call a tool and then respond
+  // Call OpenAI — stopWhen allows the model to call tools and then respond
   let assistantText: string;
   try {
     const { text } = await generateText({

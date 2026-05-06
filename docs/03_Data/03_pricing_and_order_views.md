@@ -240,3 +240,47 @@ Views that support pricing display and order management. Pricing views are globa
 **Business meaning:** `early_pay_bucket = 'UNKNOWN'` means the delivery or return had no `order_item_id` link — these cannot be attributed to either early-pay or non-early-pay.
 
 **Caution:** This view spans all seasons, filtered only by `user_id`. It is not restricted to the current season — the caller must pass `seasonYear` to filter results.
+
+---
+
+## v_agent_customer_current_season_orders
+
+**Purpose:** Agent-approved read-only view of order items with full pricing and profit detail. Created to power the `get_customer_current_season_orders` agent tool.
+
+**Source tables:** `order_items`, `orders`, `customers`, `products`, `treatments`
+
+**Grain:** One row per order_item.
+
+**Filter:** `o.user_id = auth.uid()` and `oi.user_id = auth.uid()`. NOT pre-filtered by season — the backend passes `season_year` as a filter.
+
+**Key columns:**
+
+| Column | Notes |
+|---|---|
+| `user_id` | From orders; matches auth.uid() |
+| `order_item_id` | PK of order_items |
+| `order_id` | |
+| `season_year` | From orders |
+| `order_date` | From orders |
+| `customer_id` / `customer_name` / `farm_name` | From customers join |
+| `product_id` / `product_name` / `crop` | From products join |
+| `treatment_id` / `treatment_name` | From treatments join |
+| `seed_size` / `package_type` | From order_items |
+| `units_ordered` | `order_items.units` |
+| `early_pay` | Boolean: `early_pay_pct > 0` |
+| `early_pay_pct` / `brand_grower_pct` | From orders |
+| `retail_price_per_unit` | From order_items |
+| `brand_grower_discount_amount` / `tote_bulk_discount_amount` / `early_pay_discount_amount` | From order_items |
+| `line_total_after_all_discounts` | From order_items |
+| `break_even_price_per_unit` / `profit_per_unit` / `line_total_profit` | From order_items |
+| `order_created_at` | `orders.created_at` — used for FIFO sort in allocation |
+
+**Agent tool using it:** `get_customer_current_season_orders`
+
+**Pages using it:** None (agent-only view).
+
+**Cautions:**
+- This view spans all seasons — always filter by `season_year` in the backend.
+- Do not add a `WHERE season_year = ...` inside the view; the multi-season design is intentional so the tool can answer historical queries.
+- `package_type = 'bag'` should display as "Bag"; `package_type = 'tote'` should display as "Seedpak". The tool handles this mapping.
+- If modifying this view, use `DROP VIEW ... CREATE VIEW` (not `CREATE OR REPLACE`) if column order changes — see schema change guidelines.

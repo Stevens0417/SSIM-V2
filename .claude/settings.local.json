@@ -41,7 +41,12 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\docs\\\\agent\\\\\" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)",
       "Bash(pkill -f \"next dev\")",
       "Bash(node --input-type=module)",
-      "Bash(curl -s -X POST http://localhost:3000/api/agent/chat -H 'Content-Type: application/json' -d '{\"threadId\":\"x\",\"content\":\"show inventory\"}')"
+      "Bash(curl -s -X POST http://localhost:3000/api/agent/chat -H 'Content-Type: application/json' -d '{\"threadId\":\"x\",\"content\":\"show inventory\"}')",
+      "Bash(python3 -c ' *)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(curl -s -X POST http://localhost:3002/api/agent/chat -H 'Content-Type: application/json' -d '{\"threadId\":\"x\",\"content\":\"show orders for Smith Farms\"}')",
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\" -Recurse -Directory)"
     ]
   }
 }

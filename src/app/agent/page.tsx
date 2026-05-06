@@ -26,9 +26,25 @@ export default function AgentPage() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isNewChat, setIsNewChat] = useState(false); // true = pending thread (no db row yet)
+  const [showMobileThreads, setShowMobileThreads] = useState(false);
 
+  const messageListRef = useRef<HTMLDivElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // When true the next non-empty messages render should snap instantly (thread switch / initial load)
+  const snapNextScrollRef = useRef(false);
+
+  // Scroll the message container — instant for thread switches, smooth for new messages
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const el = messageListRef.current;
+    if (!el) return;
+    // Use scrollTop assignment for "instant" (universal support); scrollTo for smooth
+    if (behavior === "smooth") {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, []);
 
   // Load threads on mount
   useEffect(() => {
@@ -45,22 +61,35 @@ export default function AgentPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Scroll to bottom when messages change
+  // Scroll when messages change.
+  // Use instant scroll for the first render after a thread switch (snapNextScrollRef),
+  // smooth scroll for incremental additions (new user/assistant messages).
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (messages.length === 0) return; // nothing to scroll to yet
+    const behavior: ScrollBehavior = snapNextScrollRef.current ? "instant" : "smooth";
+    snapNextScrollRef.current = false;
+    scrollToBottom(behavior);
+  }, [messages, scrollToBottom]);
+
+  // Scroll when the typing indicator ("…") appears or disappears so it stays visible
+  useEffect(() => {
+    scrollToBottom("smooth");
+  }, [isSending, scrollToBottom]);
 
   const selectThread = useCallback((threadId: string) => {
+    setShowMobileThreads(false); // close drawer on mobile after selection
     setActiveThreadId(threadId);
     setIsNewChat(false);
     setError(null);
     setMessages([]);
+    snapNextScrollRef.current = true; // snap to bottom on first render of loaded messages
     fetchMessages(threadId)
       .then(setMessages)
       .catch(() => setError("Failed to load messages."));
   }, []);
 
   const startNewChat = () => {
+    setShowMobileThreads(false); // close drawer on mobile
     setActiveThreadId(null);
     setMessages([]);
     setIsNewChat(true);
@@ -74,6 +103,16 @@ export default function AgentPage() {
 
     setInput("");
     setError(null);
+
+    // Show user message immediately (optimistic) before the API round-trip completes
+    const optimisticUserMsg: AgentMessage = {
+      id: "pending-user",
+      thread_id: activeThreadId ?? "",
+      role: "user",
+      content,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticUserMsg]);
     setIsSending(true);
 
     try {
@@ -90,7 +129,12 @@ export default function AgentPage() {
       }
 
       const { userMsg, assistantMsg } = await sendMessage(threadId, content);
-      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      // Replace optimistic user message with server-confirmed messages
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== "pending-user"),
+        userMsg,
+        assistantMsg,
+      ]);
 
       // Update thread updated_at in local list (float to top)
       setThreads((prev) => {
@@ -105,6 +149,8 @@ export default function AgentPage() {
         );
       });
     } catch (err) {
+      // Remove optimistic message so the user can retry without a duplicate
+      setMessages((prev) => prev.filter((m) => m.id !== "pending-user"));
       setError(err instanceof Error ? err.message : "Failed to send message.");
     } finally {
       setIsSending(false);
@@ -145,8 +191,18 @@ export default function AgentPage() {
 
   return (
     <div className={styles.root}>
+      {/* Mobile backdrop — tapping it closes the thread drawer */}
+      {showMobileThreads && (
+        <div
+          className={styles.mobileBackdrop}
+          onClick={() => setShowMobileThreads(false)}
+        />
+      )}
+
       {/* ---- Thread list ---- */}
-      <div className={styles.threadPane}>
+      <div
+        className={`${styles.threadPane} ${showMobileThreads ? styles.threadPaneOpen : ""}`}
+      >
         <div className={styles.threadPaneHeader}>
           <span className={styles.threadPaneTitle}>Conversations</span>
           <button className={styles.newChatBtn} onClick={startNewChat}>
@@ -183,10 +239,20 @@ export default function AgentPage() {
 
       {/* ---- Chat pane ---- */}
       <div className={styles.chatPane}>
-        <div className={styles.chatHeader}>{chatTitle}</div>
+        <div className={styles.chatHeader}>
+          {/* Hamburger toggle — visible only on mobile via CSS */}
+          <button
+            className={styles.mobileThreadToggle}
+            onClick={() => setShowMobileThreads((v) => !v)}
+            aria-label="Toggle conversations"
+          >
+            ☰
+          </button>
+          <span className={styles.chatHeaderTitle}>{chatTitle}</span>
+        </div>
 
         {/* Messages */}
-        <div className={styles.messageList}>
+        <div ref={messageListRef} className={styles.messageList}>
           {messages.length === 0 && !isSending ? (
             <div className={styles.emptyState}>
               <span className={styles.emptyStateTitle}>
@@ -218,7 +284,13 @@ export default function AgentPage() {
           {isSending && (
             <div className={`${styles.message} ${styles.messageAssistant}`}>
               <span className={styles.messageRole}>Agent</span>
-              <div className={styles.messageBubble}>…</div>
+              <div className={styles.messageBubble}>
+                <span className={styles.typingIndicator}>
+                  <span className={styles.typingDot} />
+                  <span className={styles.typingDot} />
+                  <span className={styles.typingDot} />
+                </span>
+              </div>
             </div>
           )}
           <div ref={messageEndRef} />
