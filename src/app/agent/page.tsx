@@ -10,6 +10,7 @@ import {
   type AgentThread,
   type AgentMessage,
 } from "@/services/agent.service";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 import styles from "./agent.module.css";
 
 const MAX_TITLE_LEN = 40;
@@ -32,6 +33,29 @@ export default function AgentPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // When true the next non-empty messages render should snap instantly (thread switch / initial load)
   const snapNextScrollRef = useRef(false);
+  // Captures the input value at the moment listening starts so interim results can be appended cleanly
+  const inputBeforeRecognitionRef = useRef("");
+
+  const { supported: speechSupported, listening, startListening, stopListening } = useSpeechToText({
+    onResult: useCallback((transcript: string, isFinal: boolean) => {
+      const base = inputBeforeRecognitionRef.current;
+      const joined = base ? base.trimEnd() + " " + transcript : transcript;
+      setInput(joined);
+      if (isFinal) {
+        // Commit so the next interim result appends to this phrase rather than replacing it
+        inputBeforeRecognitionRef.current = joined;
+      }
+    }, []),
+  });
+
+  const handleMicClick = () => {
+    if (listening) {
+      stopListening();
+    } else {
+      inputBeforeRecognitionRef.current = input;
+      startListening();
+    }
+  };
 
   // Scroll the message container — instant for thread switches, smooth for new messages
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
@@ -307,12 +331,41 @@ export default function AgentPage() {
             ref={textareaRef}
             className={styles.textInput}
             rows={1}
-            placeholder="Ask a question..."
+            placeholder={listening ? "Listening…" : "Ask a question..."}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              // If user edits manually while listening, anchor the base to current value
+              if (listening) inputBeforeRecognitionRef.current = e.target.value;
+            }}
             onKeyDown={handleKeyDown}
             disabled={isSending}
           />
+          {speechSupported && (
+            <button
+              className={`${styles.micBtn} ${listening ? styles.micBtnActive : ""}`}
+              onClick={handleMicClick}
+              disabled={isSending}
+              aria-label={listening ? "Stop listening" : "Start voice input"}
+              title={listening ? "Stop listening" : "Voice input"}
+              type="button"
+            >
+              {listening ? (
+                /* Stop / square icon when active */
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="4" y="4" width="16" height="16" rx="2" />
+                </svg>
+              ) : (
+                /* Microphone icon when idle */
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              )}
+            </button>
+          )}
           <button
             className={styles.sendBtn}
             onClick={handleSend}
