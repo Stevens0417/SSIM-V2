@@ -36,7 +36,7 @@ export default function AgentPage() {
   // Captures the input value at the moment listening starts so interim results can be appended cleanly
   const inputBeforeRecognitionRef = useRef("");
 
-  const { supported: speechSupported, listening, startListening, stopListening } = useSpeechToText({
+  const { supported: speechSupported, listening, startListening, stopListening, abortListening } = useSpeechToText({
     onResult: useCallback((transcript: string, isFinal: boolean) => {
       const base = inputBeforeRecognitionRef.current;
       const joined = base ? base.trimEnd() + " " + transcript : transcript;
@@ -121,7 +121,9 @@ export default function AgentPage() {
     const content = input.trim();
     if (!content || isSending) return;
 
-    if (listening) stopListening();
+    // abort (not stop) so no pending onresult callbacks fire after the input is cleared
+    if (listening) abortListening();
+    inputBeforeRecognitionRef.current = "";
 
     setInput("");
     setError(null);

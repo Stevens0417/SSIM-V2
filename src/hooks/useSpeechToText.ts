@@ -12,7 +12,10 @@ interface UseSpeechToTextReturn {
   supported: boolean;
   listening: boolean;
   startListening: () => void;
+  /** Graceful stop — finishes processing captured speech before ending. Use for the mic toggle button. */
   stopListening: () => void;
+  /** Immediate abort — discards pending speech and fires no further onresult events. Use before sending a message. */
+  abortListening: () => void;
   error: string | null;
 }
 
@@ -152,9 +155,15 @@ export function useSpeechToText({
   }, [lang]);
 
   const stopListening = useCallback(() => {
-    // stop() asks recognition to finish the current phrase then fire onend
+    // stop() asks recognition to finish the current phrase then fires onend
     recognitionRef.current?.stop();
   }, []);
 
-  return { supported, listening, startListening, stopListening, error };
+  const abortListening = useCallback(() => {
+    // abort() immediately discards any pending speech — no further onresult callbacks fire.
+    // onerror fires with "aborted" which is already ignored in the onerror handler.
+    recognitionRef.current?.abort();
+  }, []);
+
+  return { supported, listening, startListening, stopListening, abortListening, error };
 }
