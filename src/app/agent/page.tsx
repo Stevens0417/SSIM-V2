@@ -121,6 +121,8 @@ export default function AgentPage() {
     const content = input.trim();
     if (!content || isSending) return;
 
+    if (listening) stopListening();
+
     setInput("");
     setError(null);
 
