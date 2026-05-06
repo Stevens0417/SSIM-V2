@@ -5,7 +5,7 @@
   gap: 0;
   margin: -24px -32px; /* bleed to edge of the .main padding */
   overflow: hidden;
-  position: relative; /* stacking context for mobile overlay */
+  position: relative; /* stacking context */
 }
 
 /* ---- Thread list pane ---- */
@@ -149,30 +149,8 @@
   white-space: nowrap;
 }
 
-/* Toggle button — hidden on desktop, shown on mobile */
-.mobileThreadToggle {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  font-size: 20px;
-  line-height: 1;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-gray-600);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.mobileThreadToggle:active {
-  background: var(--color-gray-100);
-}
-
-/* Backdrop — hidden on desktop, shown on mobile when thread pane is open */
-.mobileBackdrop {
+/* ---- Mobile thread selector bar (hidden on desktop) ---- */
+.mobileThreadBar {
   display: none;
 }
 
@@ -356,73 +334,87 @@
 
 /* ---- Mobile (≤ 768px) ---- */
 @media (max-width: 768px) {
-  /* Root fills the screen, accounting for the app top nav bleed */
+  /*
+   * Lock the root to the visible viewport using position:fixed.
+   * This bypasses all parent padding/margin/overflow issues and ensures
+   * the chat fills exactly the screen area below the app top bar,
+   * with the input composer always anchored at the bottom.
+   */
   .root {
-    margin: -48px -12px 0;
-    flex-direction: column;
-    /* dvh accounts for iOS Safari dynamic address bar; vh is the fallback */
-    height: calc(100vh - 48px);
-    height: calc(100dvh - 48px);
-  }
-
-  /* Thread pane: slides in from the left as a full-height overlay */
-  .threadPane {
-    position: absolute;
-    top: 0;
+    position: fixed;
+    top: 48px; /* below the fixed mobile app bar */
     left: 0;
+    right: 0;
     bottom: 0;
-    width: 280px;
-    max-width: 82vw;
-    min-width: 0;
-    height: 100%;
-    z-index: 20;
-    border-right: 1px solid var(--color-gray-200);
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    box-shadow: none;
+    height: auto;
+    margin: 0;
+    flex-direction: column;
+    overflow: hidden;
   }
 
-  .threadPaneOpen {
-    transform: translateX(0);
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  /* Desktop thread sidebar hidden on mobile — thread selection via dropdown */
+  .threadPane {
+    display: none;
   }
 
-  /* Backdrop dims the chat when thread pane is open */
-  .mobileBackdrop {
-    display: block;
-    position: absolute;
-    inset: 0;
-    z-index: 19;
-    background: rgba(0, 0, 0, 0.35);
-  }
-
-  /* Chat pane fills the full root */
+  /* Chat pane fills the fixed root */
   .chatPane {
     flex: 1;
     min-height: 0;
   }
 
-  /* Chat header shows the toggle button on mobile */
-  .mobileThreadToggle {
+  /* Compact header to fit the thread selector */
+  .chatHeader {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  /* Desktop title hidden on mobile; dropdown serves as the title/selector */
+  .chatHeaderTitle {
+    display: none;
+  }
+
+  /* Thread selector bar: select + New button */
+  .mobileThreadBar {
     display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
   }
 
-  /* Delete button always visible on touch (no hover) */
-  .threadItemDelete {
-    opacity: 1;
+  .mobileThreadSelect {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    padding: 0 8px;
+    font-size: 15px;
+    font-family: inherit;
+    border: 1px solid var(--color-gray-200);
+    border-radius: 6px;
+    background: var(--color-gray-50);
+    color: var(--color-primary-800);
   }
 
-  /* Tap targets */
-  .threadItem {
-    padding: 12px 14px;
-    min-height: 48px;
-  }
-
-  .newChatBtn {
-    padding: 8px 14px;
+  .mobileNewChatBtn {
+    flex-shrink: 0;
+    height: 38px;
+    padding: 0 14px;
     font-size: 13px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    background: var(--color-accent-500);
+    color: var(--color-white);
+    cursor: pointer;
+    white-space: nowrap;
   }
 
+  .mobileNewChatBtn:active {
+    background: var(--color-accent-400);
+  }
+
+  /* Scrollable message list */
   .messageList {
     padding: 14px 12px;
   }
@@ -431,11 +423,17 @@
     max-width: 92%;
   }
 
-  /* Prevent iOS auto-zoom when focusing textarea (requires ≥ 16px) */
+  /* Delete button always visible on touch (no hover state) */
+  .threadItemDelete {
+    opacity: 1;
+  }
+
+  /* Prevent iOS auto-zoom when focusing textarea (font-size must be ≥ 16px) */
   .textInput {
     font-size: 16px;
   }
 
+  /* Input composer: safe-area padding keeps Send above iPhone home indicator */
   .inputArea {
     padding: 10px 12px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));

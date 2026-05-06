@@ -25,8 +25,7 @@ export default function AgentPage() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isNewChat, setIsNewChat] = useState(false); // true = pending thread (no db row yet)
-  const [showMobileThreads, setShowMobileThreads] = useState(false);
+  const [isNewChat, setIsNewChat] = useState(false);
 
   const messageListRef = useRef<HTMLDivElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
@@ -38,7 +37,6 @@ export default function AgentPage() {
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = messageListRef.current;
     if (!el) return;
-    // Use scrollTop assignment for "instant" (universal support); scrollTo for smooth
     if (behavior === "smooth") {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     } else {
@@ -65,31 +63,29 @@ export default function AgentPage() {
   // Use instant scroll for the first render after a thread switch (snapNextScrollRef),
   // smooth scroll for incremental additions (new user/assistant messages).
   useEffect(() => {
-    if (messages.length === 0) return; // nothing to scroll to yet
+    if (messages.length === 0) return;
     const behavior: ScrollBehavior = snapNextScrollRef.current ? "instant" : "smooth";
     snapNextScrollRef.current = false;
     scrollToBottom(behavior);
   }, [messages, scrollToBottom]);
 
-  // Scroll when the typing indicator ("…") appears or disappears so it stays visible
+  // Scroll when the typing indicator appears or disappears so it stays visible
   useEffect(() => {
     scrollToBottom("smooth");
   }, [isSending, scrollToBottom]);
 
   const selectThread = useCallback((threadId: string) => {
-    setShowMobileThreads(false); // close drawer on mobile after selection
     setActiveThreadId(threadId);
     setIsNewChat(false);
     setError(null);
     setMessages([]);
-    snapNextScrollRef.current = true; // snap to bottom on first render of loaded messages
+    snapNextScrollRef.current = true;
     fetchMessages(threadId)
       .then(setMessages)
       .catch(() => setError("Failed to load messages."));
   }, []);
 
   const startNewChat = () => {
-    setShowMobileThreads(false); // close drawer on mobile
     setActiveThreadId(null);
     setMessages([]);
     setIsNewChat(true);
@@ -165,10 +161,7 @@ export default function AgentPage() {
     }
   };
 
-  const handleDelete = async (
-    e: React.MouseEvent,
-    threadId: string
-  ) => {
+  const handleDelete = async (e: React.MouseEvent, threadId: string) => {
     e.stopPropagation();
     if (!window.confirm("Delete this conversation?")) return;
     try {
@@ -185,24 +178,12 @@ export default function AgentPage() {
   };
 
   const activeThread = threads.find((t) => t.id === activeThreadId);
-  const chatTitle = isNewChat
-    ? "New Chat"
-    : activeThread?.title ?? "New Chat";
+  const chatTitle = isNewChat ? "New Chat" : activeThread?.title ?? "New Chat";
 
   return (
     <div className={styles.root}>
-      {/* Mobile backdrop — tapping it closes the thread drawer */}
-      {showMobileThreads && (
-        <div
-          className={styles.mobileBackdrop}
-          onClick={() => setShowMobileThreads(false)}
-        />
-      )}
-
-      {/* ---- Thread list ---- */}
-      <div
-        className={`${styles.threadPane} ${showMobileThreads ? styles.threadPaneOpen : ""}`}
-      >
+      {/* ---- Thread list (desktop only — hidden on mobile via CSS) ---- */}
+      <div className={styles.threadPane}>
         <div className={styles.threadPaneHeader}>
           <span className={styles.threadPaneTitle}>Conversations</span>
           <button className={styles.newChatBtn} onClick={startNewChat}>
@@ -240,14 +221,35 @@ export default function AgentPage() {
       {/* ---- Chat pane ---- */}
       <div className={styles.chatPane}>
         <div className={styles.chatHeader}>
-          {/* Hamburger toggle — visible only on mobile via CSS */}
-          <button
-            className={styles.mobileThreadToggle}
-            onClick={() => setShowMobileThreads((v) => !v)}
-            aria-label="Toggle conversations"
-          >
-            ☰
-          </button>
+          {/* Mobile thread selector — hidden on desktop via CSS */}
+          <div className={styles.mobileThreadBar}>
+            <select
+              className={styles.mobileThreadSelect}
+              value={activeThreadId ?? "__new__"}
+              onChange={(e) => {
+                if (e.target.value === "__new__") {
+                  startNewChat();
+                } else {
+                  selectThread(e.target.value);
+                }
+              }}
+            >
+              <option value="__new__">New Chat</option>
+              {threads.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {truncate(t.title ?? "New Chat", 30)}
+                </option>
+              ))}
+            </select>
+            <button
+              className={styles.mobileNewChatBtn}
+              onClick={startNewChat}
+              aria-label="Start new chat"
+            >
+              + New
+            </button>
+          </div>
+          {/* Desktop title — hidden on mobile via CSS */}
           <span className={styles.chatHeaderTitle}>{chatTitle}</span>
         </div>
 
@@ -299,7 +301,7 @@ export default function AgentPage() {
         {/* Error */}
         {error && <div className={styles.error}>{error}</div>}
 
-        {/* Input */}
+        {/* Input composer */}
         <div className={styles.inputArea}>
           <textarea
             ref={textareaRef}
