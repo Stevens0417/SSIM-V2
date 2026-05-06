@@ -157,6 +157,7 @@
 /* ---- Messages ---- */
 .messageList {
   flex: 1;
+  min-height: 0; /* required: lets flex constrain height so overflow-y scroll activates */
   overflow-y: auto;
   padding: 20px;
   display: flex;

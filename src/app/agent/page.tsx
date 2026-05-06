@@ -307,7 +307,7 @@ export default function AgentPage() {
             ref={textareaRef}
             className={styles.textInput}
             rows={1}
-            placeholder="Ask a question… (Enter to send, Shift+Enter for new line)"
+            placeholder="Ask a question..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
