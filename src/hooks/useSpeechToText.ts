@@ -16,12 +16,49 @@ interface UseSpeechToTextReturn {
   error: string | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyWindow = Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any };
+// Minimal Web Speech API types (not included in all TypeScript DOM lib versions)
+interface SpeechRecognitionAlternative { readonly transcript: string }
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionResultEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
 
-function getSpeechRecognitionClass() {
+// Window augmented with the webkit-prefixed variant present in Safari/iOS
+type SpeechWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionCtor;
+  webkitSpeechRecognition?: SpeechRecognitionCtor;
+};
+
+function getSR(): SpeechRecognitionCtor | null {
   if (typeof window === "undefined") return null;
-  const w = window as AnyWindow;
+  const w = window as unknown as SpeechWindow;
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
@@ -33,39 +70,48 @@ export function useSpeechToText({
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Keep a stable ref to the latest callback so recognition handlers don't go stale
+  // Stable ref to the latest callback — avoids stale closures in recognition handlers
   const onResultRef = useRef(onResult);
   useEffect(() => {
     onResultRef.current = onResult;
   });
 
-  // Active recognition instance — recreated on each startListening() call
-  const recognitionRef = useRef<InstanceType<NonNullable<ReturnType<typeof getSpeechRecognitionClass>>> | null>(null);
+  // Ref-tracked listening state so startListening/stopListening don't need it in deps
+  const listeningRef = useRef(false);
+  const setListeningSync = (val: boolean) => {
+    listeningRef.current = val;
+    setListening(val);
+  };
+
+  // Active recognition instance
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
-    setSupported(!!getSpeechRecognitionClass());
+    setSupported(!!getSR());
     return () => {
       recognitionRef.current?.abort();
     };
   }, []);
 
   const startListening = useCallback(() => {
-    const SR = getSpeechRecognitionClass();
-    if (!SR || listening) return;
+    if (listeningRef.current) return;
+    const SR = getSR();
+    if (!SR) return;
 
-    // Always create a fresh instance — the spec doesn't allow restarting ended sessions
-    const recognition = new SR();
-    recognition.lang = lang;
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.maxAlternatives = 1;
+    // Always create a fresh instance — the spec doesn't support restarting ended sessions
+    const rec = new SR();
+    rec.lang = lang;
+    rec.interimResults = true;
+    // continuous: true keeps the session alive until stop() is called explicitly,
+    // preventing the immediate auto-shutoff that occurs with continuous: false.
+    rec.continuous = true;
+    rec.maxAlternatives = 1;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onresult = (event: any) => {
+    rec.onresult = (event: SpeechRecognitionResultEvent) => {
       let interim = "";
       let final = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const text: string = event.results[i][0].transcript;
+        const text = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           final += text;
         } else {
@@ -79,37 +125,35 @@ export function useSpeechToText({
       }
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onerror = (event: any) => {
-      if (event.error === "aborted") return; // intentional stop, not an error
+    rec.onerror = (event: SpeechRecognitionErrorEvent) => {
+      // "aborted" fires when stop/abort is called intentionally — not an error
+      if (event.error === "aborted") return;
       if (event.error === "not-allowed") {
         setError("Microphone access denied.");
-      } else if (event.error === "no-speech") {
-        // Benign — user didn't say anything
-      } else {
+      } else if (event.error !== "no-speech") {
         setError("Speech recognition error.");
       }
-      setListening(false);
+      setListeningSync(false);
     };
 
-    recognition.onend = () => {
-      setListening(false);
+    rec.onend = () => {
+      setListeningSync(false);
     };
 
-    recognitionRef.current = recognition;
+    recognitionRef.current = rec;
     setError(null);
-    setListening(true);
+    setListeningSync(true);
 
     try {
-      recognition.start();
+      rec.start();
     } catch {
-      setListening(false);
+      setListeningSync(false);
     }
-  }, [lang, listening]);
+  }, [lang]);
 
   const stopListening = useCallback(() => {
+    // stop() asks recognition to finish the current phrase then fire onend
     recognitionRef.current?.stop();
-    // onend will fire and setListening(false)
   }, []);
 
   return { supported, listening, startListening, stopListening, error };
