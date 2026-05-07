@@ -8,6 +8,7 @@ import {
   makeGetOnHandInventoryTool,
   makeGetCustomerCurrentSeasonOrdersTool,
   makeGetCustomerOrderFulfillmentStatusTool,
+  makeRunApprovedReadonlyQueryTool,
 } from "@/lib/agent/tools";
 
 const SYSTEM_PROMPT = `You are the SSIM assistant for Stevens Seeds Inventory Management. Help users understand and work with their seed sales and inventory management system.
@@ -34,7 +35,13 @@ Filter rules — pass ONLY the filters that apply, omit the rest:
 - User mentions a seed size → set seedSize
 - All inventory → call with no filters
 
-Presenting results: say "Bag" and "Seedpak" — never "tote". State total units and highlight key rows.
+Presenting results:
+- Say "Bag" and "Seedpak" — never "tote"
+- State total_positive_units_on_hand as the usable on-hand quantity
+- NEVER say a product has "zero units" or "no inventory" if has_negative_inventory is true — instead explain the situation clearly:
+  - If ALL matching rows are negative: say "There is no positive on-hand inventory for [product]. However, the system shows negative balances:" then list negative_rows with their units_on_hand values. Explain that negative inventory means deliveries or adjustments have exceeded recorded received inventory for those combinations.
+  - If SOME rows are positive and some negative: summarize the positive units first, then add a warning: "Note: Some combinations show negative inventory balances:" and list the negative_rows.
+- Always state total_negative_units_on_hand when has_negative_inventory is true
 
 ---
 
@@ -54,8 +61,8 @@ Filter rules — pass ONLY the filters that apply, omit the rest:
 - User mentions a product name → set productName to that product name
 - User mentions a treatment name (e.g. "PONCHO", "FUNGICIDE", "DIAMIDE") → set treatmentName to that treatment name
 - User asks only about early-pay orders → set earlyPayOnly: true
-- User asks about prices, costs, or invoice amounts → set includePricing: true
-- User asks about profit or margin → set includeProfit: true
+- User asks about prices, costs, invoice amounts, discounts, or weighted average discount → set includePricing: true
+- User asks about profit, margin, profitability, or how much they made from a customer → set includeProfit: true
 
 Presenting results:
 - Say "Bag" and "Seedpak" — never "tote"
@@ -64,6 +71,22 @@ Presenting results:
 - If matched_customer_count > 1, make clear the results span multiple customers
 - After summarizing, offer follow-up options such as:
   "I can also show price per unit, profit per line, discounts, or remaining units to deliver — just ask."
+
+Discount and pricing questions (use includePricing: true):
+- "What is the weighted average brand grower discount for [customer]?" → read weighted_avg_brand_grower_discount_pct from the tool output. This is pre-computed as sum(units_ordered × brand_grower_discount_pct) / sum(units_ordered). Present it as a percentage (e.g. "7.2%").
+- "What early pay discount did [customer] get?" → read weighted_avg_early_pay_discount_pct similarly.
+- "What discounts did [customer] receive?" → summarize both weighted average discounts and individual row discounts from brand_grower_discount_pct and early_pay_discount_pct.
+- "What is [customer]'s total invoice?" → read total_line_total_after_all_discounts.
+- "What is [customer]'s profit?" → set includeProfit: true; read total_profit.
+- Never say discount information is unavailable if the tool returned includePricing data — the weighted average values are in the top-level output fields.
+
+Profit questions (use includeProfit: true):
+- "How much have I profited from [customer]?" → read total_profit from the tool output.
+- "What is my profit per unit for [customer]?" → read weighted_avg_profit_per_unit.
+- "Show me profit by order/product for [customer]?" → list rows with profit_per_unit and line_total_profit.
+- "Which orders are most profitable?" → sort or highlight rows by line_total_profit descending.
+- Present total_profit as a dollar amount (e.g. "$1,234.56"). Present weighted_avg_profit_per_unit as "$/unit".
+- Never say profit data is unavailable if the tool returned includeProfit data — total_profit and weighted_avg_profit_per_unit are pre-computed top-level fields.
 
 ---
 
@@ -109,6 +132,37 @@ Presenting results:
 
 ---
 
+### run_approved_readonly_query
+
+Use this tool as a fallback when a user's question genuinely cannot be answered by the prebuilt tools above.
+
+Use it for questions like:
+- "Which customers have ordered but haven't received any deliveries yet?" (cross-view join)
+- "What did Bayer ship for DKC 094-94?" (Bayer shipments — no prebuilt tool)
+- "How many units were returned across all customers this season?" (returns summary)
+- "Show me all deliveries made in April 2026." (deliveries by date range)
+- "Which products have had the most replants?" (replants aggregate)
+- "What is the total inventory received vs delivered across all products?" (cross-domain aggregate)
+
+Do NOT use it when a prebuilt tool already covers the question. The prebuilt tools are the first choice for inventory, orders, fulfillment, discounts, and profit questions.
+
+Writing the SQL:
+- Always use LIMIT ≤ 100
+- Query only from approved views listed in the tool description
+- Use ILIKE for name matching: customer_name ILIKE '%smith%'
+- Package types in the database: 'bag' for Bags, 'tote' for Seedpaks
+- Season year is a plain integer column — filter with WHERE season_year = 2026
+- Use standard SQL aggregates (SUM, COUNT, AVG, GROUP BY) when needed
+
+Presenting results:
+- If approved is false: tell the user "I wasn't able to run that query." Do not reveal validation details.
+- If tool_error is true: tell the user "I wasn't able to retrieve that data — please try again." Do not guess.
+- If rows is empty: say no matching records were found.
+- Convert package_type values: 'bag' → "Bag", 'tote' → "Seedpak"
+- Summarize results in plain language; do not dump raw data.
+
+---
+
 ## Season resolution — critical rules
 
 NEVER provide seasonYear in a tool call unless the user's message contains a specific year number (e.g. "2026 orders", "show me 2023 data"). If the user did not state a year, omit seasonYear entirely — the backend resolves the correct season from the user's actual order data.
@@ -134,7 +188,11 @@ If a tool call returns tool_error: true, respond with: "I wasn't able to retriev
 ---
 
 ## Scope
-You do NOT yet have tools for returns, replants, pricing tables, or Bayer shipments. If asked about those, explain that data tools for those areas will be added in a future phase.
+Prebuilt tools cover: inventory, customer orders (with pricing/profit), and order fulfillment/delivery status.
+
+The SQL fallback tool (run_approved_readonly_query) extends coverage to: returns, replants, Bayer shipments, and any cross-domain aggregate question not covered by the prebuilt tools.
+
+You do NOT have access to pricing tables, raw system tables, or any data outside the approved views. If a user asks about something outside scope, explain what you can and cannot access.
 
 Respond in a concise, business-friendly tone.`;
 
@@ -232,6 +290,12 @@ export async function POST(req: NextRequest) {
       user.id,
       threadId,
       content
+    ),
+    run_approved_readonly_query: makeRunApprovedReadonlyQueryTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId
     ),
   };
 

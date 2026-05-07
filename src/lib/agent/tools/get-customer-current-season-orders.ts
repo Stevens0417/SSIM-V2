@@ -61,6 +61,13 @@ interface ToolOutput {
   requested_season_year: number | null;
   user_explicitly_requested_season: boolean;
   truncated?: boolean;
+  // Computed when includePricing: true — weighted by units_ordered
+  total_line_total_after_all_discounts?: number | null;
+  weighted_avg_brand_grower_discount_pct?: number | null;
+  weighted_avg_early_pay_discount_pct?: number | null;
+  // Computed when includeProfit: true
+  total_profit?: number | null;
+  weighted_avg_profit_per_unit?: number | null;
 }
 
 const SELECT_COLS = [
@@ -139,7 +146,7 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Returns order line items for a specific customer or farm/business for the current (or specified) season. Searches by customer/contact name first, then by farm/business name. If a farm name matches multiple customers, all their orders are returned together. Use this tool whenever the user asks about customer orders, what a customer ordered, how many units a customer ordered, or order-level details for a specific customer or farm.",
+      "Returns order line items for a specific customer or farm/business for the current (or specified) season. Searches by customer/contact name first, then by farm/business name. If a farm name matches multiple customers, all their orders are returned together. Use this tool whenever the user asks about customer orders, what a customer ordered, how many units a customer ordered, order-level details, pricing, discounts (brand grower discount, early pay discount), profit, or margin for a specific customer or farm. Set includePricing: true for any discount or pricing question. Set includeProfit: true for any profit or margin question.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
@@ -171,12 +178,12 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
         includePricing: {
           type: "boolean",
           description:
-            "Set to true to include retail price, discounts, and line totals in each row. Use when the user asks about prices, costs, or invoice amounts.",
+            "Set to true to include retail price, discounts (brand grower discount, early pay discount), and line totals in each row, and to compute weighted average discount percentages and total invoice amounts in the output. Use when the user asks about prices, costs, invoice amounts, discounts, or weighted average discount.",
         },
         includeProfit: {
           type: "boolean",
           description:
-            "Set to true to include profit per unit and total profit per line. Use when the user asks about profit or margin.",
+            "Set to true to include profit_per_unit and line_total_profit in each row, and to compute total_profit and weighted_avg_profit_per_unit in the output. Use when the user asks about profit, margin, profitability, or how much has been made from a customer.",
         },
       },
       required: ["customerName"],
@@ -278,6 +285,51 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
       const truncated = rawRows.length > LIMIT;
       const sliced = truncated ? rawRows.slice(0, LIMIT) : rawRows;
 
+      // Compute pricing/discount aggregates from raw data (always fetched in SELECT_COLS).
+      // Done before row mapping so we use raw column names (brand_grower_pct, early_pay_pct).
+      let total_line_total_after_all_discounts: number | null = null;
+      let weighted_avg_brand_grower_discount_pct: number | null = null;
+      let weighted_avg_early_pay_discount_pct: number | null = null;
+      let total_profit: number | null = null;
+
+      if (includePricing) {
+        let bgWeightedSum = 0, bgTotalUnits = 0;
+        let epWeightedSum = 0, epTotalUnits = 0;
+        let lineTotal = 0;
+        for (const r of sliced) {
+          const units = (r.units_ordered as number) ?? 0;
+          const bgPct = r.brand_grower_pct as number | null;
+          const epPct = r.early_pay_pct as number | null;
+          const lt = r.line_total_after_all_discounts as number | null;
+          if (bgPct !== null) { bgWeightedSum += units * bgPct; bgTotalUnits += units; }
+          if (epPct !== null) { epWeightedSum += units * epPct; epTotalUnits += units; }
+          if (lt !== null) lineTotal += lt;
+        }
+        weighted_avg_brand_grower_discount_pct =
+          bgTotalUnits > 0 ? bgWeightedSum / bgTotalUnits : null;
+        weighted_avg_early_pay_discount_pct =
+          epTotalUnits > 0 ? epWeightedSum / epTotalUnits : null;
+        total_line_total_after_all_discounts = lineTotal;
+      }
+
+      let weighted_avg_profit_per_unit: number | null = null;
+
+      if (includeProfit) {
+        let profit = 0;
+        let profitWeightedSum = 0;
+        let profitTotalUnits = 0;
+        for (const r of sliced) {
+          const lp = r.line_total_profit as number | null;
+          const ppu = r.profit_per_unit as number | null;
+          const units = (r.units_ordered as number) ?? 0;
+          if (lp !== null) profit += lp;
+          if (ppu !== null) { profitWeightedSum += units * ppu; profitTotalUnits += units; }
+        }
+        total_profit = profit;
+        weighted_avg_profit_per_unit =
+          profitTotalUnits > 0 ? profitWeightedSum / profitTotalUnits : null;
+      }
+
       const rows: OrderRow[] = sliced.map((r) => {
         const base: OrderRow = {
           order_item_id: r.order_item_id as string,
@@ -332,6 +384,14 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
         requested_season_year: requestedSeasonYear,
         user_explicitly_requested_season: userExplicitlyRequestedSeason,
         ...(truncated ? { truncated: true } : {}),
+        ...(includePricing
+          ? {
+              total_line_total_after_all_discounts,
+              weighted_avg_brand_grower_discount_pct,
+              weighted_avg_early_pay_discount_pct,
+            }
+          : {}),
+        ...(includeProfit ? { total_profit, weighted_avg_profit_per_unit } : {}),
       };
 
       await serviceClient.from("agent_tool_calls").insert({

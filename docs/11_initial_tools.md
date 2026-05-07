@@ -20,7 +20,14 @@ All tools query approved views only (never raw tables). All tools are user-scope
 
 **Inputs (all optional):** `productName`, `treatmentName`, `packageType` (Bag/Seedpak), `seedSize`, `minUnitsOnHand`
 
-**Output:** `rows[]`, `total_units_on_hand`, `row_count`, optional `truncated`
+**Output:** `rows[]`, `total_units_on_hand`, `total_positive_units_on_hand`, `total_negative_units_on_hand`, `has_negative_inventory`, `negative_rows[]`, `row_count`, optional `truncated`
+
+**Negative inventory handling:**
+- `v_on_hand_inventory` can return negative `units_on_hand` values when deliveries or adjustments exceed recorded received inventory for a product+treatment+seed_size+package_type combination.
+- The tool always returns negative rows — it does not filter them out.
+- `has_negative_inventory: true` signals the assistant to explicitly surface the negative balances.
+- The assistant must never say "zero units on hand" when `has_negative_inventory` is true — it must explain the negative balances.
+- Negative inventory is a data integrity signal, not an error. It typically means a receipt was not recorded or a delivery was entered against inventory that wasn't received yet.
 
 **Security:** View uses `auth.uid()` in WHERE clauses; queried via user-session client.
 
@@ -38,12 +45,20 @@ All tools query approved views only (never raw tables). All tools are user-scope
 - "What did Adam Stevens order this season?"
 - "How many units did [customer or farm] order?"
 - "Show me [customer]'s PONCHO order lines."
+- "What is the weighted average brand grower discount for [customer]?" (set `includePricing: true`)
+- "What discounts did [customer] receive?" (set `includePricing: true`)
 - "What is the price per unit for [customer]'s order?" (set `includePricing: true`)
 - "What is the profit on [customer]'s order?" (set `includeProfit: true`)
 
 **Inputs:** `customerName` (required), `seasonYear`, `productName`, `treatmentName`, `earlyPayOnly`, `includePricing`, `includeProfit`
 
 **Output:** `rows[]`, `total_units_ordered`, `row_count`, `customer_name_matched`, `matched_by`, `matched_customer_count`, `resolved_season_year`, `season_source`, `requested_season_year`, `user_explicitly_requested_season`, optional `truncated`
+
+**Pricing/discount aggregates (when `includePricing: true`):** `weighted_avg_brand_grower_discount_pct`, `weighted_avg_early_pay_discount_pct`, `total_line_total_after_all_discounts` — pre-computed in the tool from row-level data so the model doesn't need to do arithmetic.
+
+**Profit aggregates (when `includeProfit: true`):** `total_profit` (sum of `line_total_profit`), `weighted_avg_profit_per_unit` (sum(units × profit_per_unit) / sum(units)) — pre-computed so the model doesn't need to do arithmetic.
+
+**Weighted average formulas:** All weighted averages use `units_ordered` as the weight. Only rows where the target field is non-null are included. Formula: `sum(units × field) / sum(units)`.
 
 **Customer matching (three-step):**
 1. Exact case-insensitive match on `customer_name` — most specific

@@ -35,6 +35,10 @@ interface InventoryRow {
 interface ToolOutput {
   rows: InventoryRow[];
   total_units_on_hand: number;
+  total_positive_units_on_hand: number;
+  total_negative_units_on_hand: number;
+  has_negative_inventory: boolean;
+  negative_rows: InventoryRow[];
   row_count: number;
   truncated?: boolean;
 }
@@ -47,7 +51,7 @@ export function makeGetOnHandInventoryTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Returns current on-hand inventory for the authenticated user. Call this tool for any question about inventory levels, units on hand, products in stock, treatments available, Bag or Seedpak quantities, or seed sizes. Omit filter fields that are not relevant to the user's question.",
+      "Returns current on-hand inventory for the authenticated user. Call this tool for any question about inventory levels, units on hand, products in stock, treatments available, Bag or Seedpak quantities, or seed sizes. Omit filter fields that are not relevant to the user's question. Negative units_on_hand values are possible and must be surfaced to the user — do not mask them as zero.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
@@ -134,14 +138,26 @@ export function makeGetOnHandInventoryTool(
         })
       );
 
-      const total_units_on_hand = rows.reduce(
-        (sum, r) => sum + (r.units_on_hand ?? 0),
+      const negative_rows = rows.filter((r) => r.units_on_hand < 0);
+      const positive_rows = rows.filter((r) => r.units_on_hand > 0);
+
+      const total_units_on_hand = rows.reduce((sum, r) => sum + r.units_on_hand, 0);
+      const total_positive_units_on_hand = positive_rows.reduce(
+        (sum, r) => sum + r.units_on_hand,
+        0
+      );
+      const total_negative_units_on_hand = negative_rows.reduce(
+        (sum, r) => sum + r.units_on_hand,
         0
       );
 
       const output: ToolOutput = {
         rows,
         total_units_on_hand,
+        total_positive_units_on_hand,
+        total_negative_units_on_hand,
+        has_negative_inventory: negative_rows.length > 0,
+        negative_rows,
         row_count: rows.length,
         ...(truncated ? { truncated: true } : {}),
       };
