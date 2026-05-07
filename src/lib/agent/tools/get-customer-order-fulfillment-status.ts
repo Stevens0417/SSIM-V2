@@ -83,6 +83,9 @@ interface ToolOutput {
   requested_season_year: number | null;
   user_explicitly_requested_season: boolean;
   truncated?: boolean;
+  // Structured error signal — model must not guess when this is true
+  tool_error?: boolean;
+  tool_error_message?: string;
 }
 
 async function queryFulfillment(
@@ -257,7 +260,7 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Returns order fulfillment status for a specific customer or farm/business — how many units were ordered, how many have been delivered, and how many remain to be delivered. Searches by customer/contact name first, then by farm/business name. If a farm name matches multiple customers, fulfillment status is aggregated across all of them. Use this tool when the user asks about delivery status, outstanding balances, remaining units to deliver, or whether a customer's order is complete.",
+      "Returns order fulfillment status for a specific customer or farm/business — how many units were ordered, how many have been delivered, and how many remain to be delivered. Searches by customer/contact name first (partial names like 'Scott' are accepted), then by farm/business name. If a farm name matches multiple customers, fulfillment status is aggregated across all of them. ALWAYS use this tool when the user asks anything about: left to deliver, still to deliver, remaining units, what's left, open order balance, outstanding delivery, delivered vs ordered, delivery status, fulfillment status, whether an order is complete, or how many units remain. Never answer fulfillment questions from prior chat context — always call this tool.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
@@ -383,17 +386,36 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Query failed";
+        const errorOutput: ToolOutput = {
+          tool_error: true,
+          tool_error_message: message,
+          rows: [],
+          total_units_ordered: 0,
+          total_units_delivered: 0,
+          total_units_remaining: 0,
+          row_count: 0,
+          customer_name_matched: "",
+          matched_by: "none",
+          matched_customer_count: 0,
+          matched_customers: [],
+          resolved_season_year: resolvedSeasonYear,
+          season_source: seasonSource,
+          requested_season_year: requestedSeasonYear,
+          user_explicitly_requested_season: userExplicitlyRequestedSeason,
+        };
         await serviceClient.from("agent_tool_calls").insert({
           thread_id: threadId,
           message_id: null,
           user_id: userId,
           tool_name: "get_customer_order_fulfillment_status",
           input_json: input,
-          output_json: null,
+          output_json: errorOutput,
           status: "error",
           error_message: message,
         });
-        throw new Error(`Fulfillment query failed: ${message}`);
+        // Return structured error — do NOT throw. Throwing lets the model fall back to
+        // prior context to "helpfully" answer, which is wrong for business data.
+        return errorOutput;
       }
 
       const { rows: aggregated, matchedCustomers } = aggregateRows(
