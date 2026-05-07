@@ -51,7 +51,8 @@
       "PowerShell(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\" -Directory | ForEach-Object { \"Directory: \" + $_.Name })",
       "PowerShell(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\\" -Recurse | Where-Object { $_.Name -match \"nav|layout|sidebar|drawer|menu|config\" } | Select-Object FullName)",
       "PowerShell(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\\" -Recurse | Where-Object { $_.Extension -match \"tsx|ts\" -and $_.Name -match \"layout|nav\" } | Select-Object FullName)",
-      "PowerShell(ls -Recurse \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\" | where { $_.Name -match \"layout\" })"
+      "PowerShell(ls -Recurse \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\" | where { $_.Name -match \"layout\" })",
+      "Bash(Get-Content \"c:\\\\Projects\\\\SSIMV2\\\\supabase\\\\migrations\\\\0019_v_customer_order_status_add_replants.sql\" -Raw)"
     ]
   }
 }

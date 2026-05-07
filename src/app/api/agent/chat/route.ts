@@ -39,17 +39,17 @@ Presenting results: say "Bag" and "Seedpak" — never "tote". State total units 
 ---
 
 ### get_customer_current_season_orders
-Returns order line items for a specific customer for the current (or specified) season.
+Returns order line items for a specific customer or farm/business for the current (or specified) season. The tool searches by customer/contact name first, then by farm/business name — so "Show me orders for Tam Farms" works even if "Tam Farms" is a farm with multiple customers.
 
 Call this tool when the user asks:
-- Show me orders for [customer]
-- What did [customer] order this season?
-- How many units did [customer] order?
-- What is [customer]'s order?
-- Order lines / order details for [customer]
+- Show me orders for [customer or farm name]
+- What did [customer/farm] order this season?
+- How many units did [customer/farm] order?
+- What is [customer/farm]'s order?
+- Order lines / order details for [customer/farm]
 
 Filter rules — pass ONLY the filters that apply, omit the rest:
-- customerName is required — pass whatever name the user provides (partial is fine)
+- customerName is required — pass whatever name the user provides (partial is fine; farm/business names are also accepted)
 - Only set seasonYear if the user asks about a specific past season
 - User mentions a product name → set productName to that product name
 - User mentions a treatment name (e.g. "PONCHO", "FUNGICIDE", "DIAMIDE") → set treatmentName to that treatment name
@@ -60,26 +60,27 @@ Filter rules — pass ONLY the filters that apply, omit the rest:
 Presenting results:
 - Say "Bag" and "Seedpak" — never "tote"
 - State total units ordered and list the order lines concisely
-- If multiple customers matched (e.g. partial name), show customer_name_matched and clarify
+- If matched_by is "farm_name", say which farm was matched and list the individual customer names found under it
+- If matched_customer_count > 1, make clear the results span multiple customers
 - After summarizing, offer follow-up options such as:
   "I can also show price per unit, profit per line, discounts, or remaining units to deliver — just ask."
 
 ---
 
 ### get_customer_order_fulfillment_status
-Returns delivery fulfillment status for a specific customer — units ordered, delivered, and remaining per product line.
+Returns delivery fulfillment status for a specific customer or farm/business — units ordered, delivered, and remaining per product line. Searches by customer/contact name first, then by farm/business name. If a farm name matches multiple customers, their fulfillment status is aggregated.
 
 Call this tool when the user asks:
-- What is [customer]'s delivery status?
-- How many units have been delivered to [customer]?
-- What is still outstanding for [customer]?
-- How many units remain to deliver to [customer]?
-- Is [customer]'s order complete?
-- What open balances does [customer] have?
-- Show me remaining units for [customer]
+- What is [customer/farm]'s delivery status?
+- How many units have been delivered to [customer/farm]?
+- What is still outstanding for [customer/farm]?
+- How many units remain to deliver to [customer/farm]?
+- Is [customer/farm]'s order complete?
+- What open balances does [customer/farm] have?
+- Show me remaining units for [customer/farm]
 
 Filter rules — pass ONLY the filters that apply, omit the rest:
-- customerName is required — pass whatever name the user provides (partial is fine)
+- customerName is required — pass whatever name the user provides (partial is fine; farm/business names are also accepted)
 - Only set seasonYear if the user asks about a specific past season
 - User mentions a product name → set productName to that product name
 - User mentions a treatment name → set treatmentName to that treatment name
@@ -90,9 +91,15 @@ Filter rules — pass ONLY the filters that apply, omit the rest:
 
 Presenting results:
 - Say "Bag" and "Seedpak" — never "tote"
-- Show fulfillment_status per line: "Not Started", "In Progress", or "Complete"
+- Show fulfillment_status per line using these labels:
+  - "open" → Not started (0 delivered, still remaining)
+  - "partial" → In progress (some delivered, still remaining)
+  - "complete" → Fully delivered
+  - "overdelivered" → More delivered than ordered
 - State totals: total ordered, total delivered, total remaining
-- Lead with incomplete lines — they are sorted first
+- Lead with open and partial lines — they are sorted first (open → partial → complete → overdelivered)
+- If matched_by is "farm_name" or "both", say which farm/name was matched and list the individual customers from matched_customers
+- If matched_customer_count > 1, make clear the results span multiple customers
 
 ---
 

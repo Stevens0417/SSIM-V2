@@ -34,18 +34,23 @@ All tools query approved views only (never raw tables). All tools are user-scope
 **Status:** Live
 
 **Use cases:**
-- "Show me the orders for Smith Farms."
+- "Show me the orders for Smith Farms." (farm/business name lookup)
 - "What did Adam Stevens order this season?"
-- "How many units did [customer] order?"
+- "How many units did [customer or farm] order?"
 - "Show me [customer]'s PONCHO order lines."
 - "What is the price per unit for [customer]'s order?" (set `includePricing: true`)
 - "What is the profit on [customer]'s order?" (set `includeProfit: true`)
 
 **Inputs:** `customerName` (required), `seasonYear`, `productName`, `treatmentName`, `earlyPayOnly`, `includePricing`, `includeProfit`
 
-**Output:** `rows[]`, `total_units_ordered`, `row_count`, `customer_name_matched`, `resolved_season_year`, `season_source`, `requested_season_year`, `user_explicitly_requested_season`, optional `truncated`
+**Output:** `rows[]`, `total_units_ordered`, `row_count`, `customer_name_matched`, `matched_by`, `matched_customer_count`, `resolved_season_year`, `season_source`, `requested_season_year`, `user_explicitly_requested_season`, optional `truncated`
 
-**Customer matching:** Exact match first (case-insensitive), then partial. Multiple matched customers are all returned; `customer_name_matched` lists all unique names so the assistant can clarify.
+**Customer matching (three-step):**
+1. Exact case-insensitive match on `customer_name` — most specific
+2. Exact case-insensitive match on `farm_name` — returns all customers under that farm/business
+3. Partial match on `customer_name` OR `farm_name` — broadest fallback
+
+`matched_by` reports which strategy succeeded (`"customer_name"`, `"farm_name"`, or `"partial"`). `matched_customer_count` is the number of distinct customers in the result. `customer_name_matched` lists all unique customer names.
 
 **Pricing/profit:** Always queried from the view but only surfaced in the response when `includePricing` / `includeProfit` is true.
 
@@ -76,20 +81,29 @@ All tools query approved views only (never raw tables). All tools are user-scope
 
 **Inputs:** `customerName` (required), `seasonYear`, `productName`, `treatmentName`, `packageType`, `seedSize`, `openOnly`
 
-**Output:** `rows[]`, `total_units_ordered`, `total_units_delivered`, `total_units_remaining`, `row_count`, `customer_name_matched`, `resolved_season_year`, `season_source`, `requested_season_year`, `user_explicitly_requested_season`, optional `truncated`
+**Output:** `rows[]`, `total_units_ordered`, `total_units_delivered`, `total_units_remaining`, `row_count`, `customer_name_matched`, `matched_by`, `matched_customer_count`, `matched_customers[]`, `resolved_season_year`, `season_source`, `requested_season_year`, `user_explicitly_requested_season`, optional `truncated`
 
 **Season resolution:** Same two-layer defense as `get_customer_current_season_orders` — see Season resolution section below.
 
-**Fulfillment status derivation:**
-- `"Not Started"` — no units delivered, units remaining > 0
-- `"In Progress"` — some units delivered, units remaining > 0
-- `"Complete"` — units remaining ≤ 0
+**Fulfillment status values:**
+- `"open"` — 0 delivered, remaining > 0 (not started)
+- `"partial"` — some delivered, remaining > 0 (in progress)
+- `"complete"` — remaining = 0 (fully delivered)
+- `"overdelivered"` — remaining < 0 (more delivered than ordered)
 
-**Aggregation:** View is at order_item grain. Tool aggregates to product+treatment+seed_size+package_type grain in TypeScript. `openOnly` filter is applied after aggregation (not at query level) so partial-completion scenarios are handled correctly.
+**`units_remaining`** — can be negative for overdelivered lines (not clamped to 0). Mirrors view formula: `ordered - delivered - replanted + returned`.
 
-**Sort:** Incomplete lines first (Not Started → In Progress → Complete), then alphabetical by product_name.
+**`matched_customers`** — array of `{customer_id, customer_name, farm_name}` for every distinct customer in the result. Allows the assistant to name which customers were included when a farm name matched multiple contacts.
 
-**Customer matching:** Exact match first, then partial (same pattern as `get_customer_current_season_orders`).
+**`matched_by`** — `"customer_name"` | `"farm_name"` | `"both"` | `"none"`. `"both"` = partial match across both fields (broadest fallback). `"none"` = no results found.
+
+**Aggregation:** View is at order_item grain. Tool aggregates to customer+product+treatment+seed_size+package_type grain in TypeScript. `openOnly` filter is applied after aggregation (not at query level) so partial-completion scenarios are handled correctly.
+
+**Sort:** open → partial → complete → overdelivered, then by customer_name, then by product_name.
+
+**Customer matching (three-step):** exact `customer_name` → exact `farm_name` → partial OR both fields. `farm_name` is included in each `FulfillmentRow` and carried through aggregation.
+
+**Migration:** `0025_v_customer_order_status_add_farm_name.sql` adds `farm_name` to `v_delivery_customer_order_status`.
 
 **Security:** View uses `auth.uid()` in all CTEs; queried via user-session client.
 

@@ -12,6 +12,8 @@ Views that track order fulfillment status, delivery history, and season-end reco
 
 **Grain:** One row per order_item.
 
+**Migration history:** `0025_v_customer_order_status_add_farm_name.sql` added `farm_name` (from `customers` join) — required a DROP + CREATE because the column list changed.
+
 **Key columns:**
 
 | Column | Notes |
@@ -20,6 +22,7 @@ Views that track order fulfillment status, delivery history, and season-end reco
 | `order_id` | |
 | `order_item_id` | |
 | `customer_id` / `customer_name` | |
+| `farm_name` | From customers join (added migration 0025) |
 | `order_date` | From orders |
 | `product_id` / `product_name` | |
 | `crop` | From products join |
@@ -42,7 +45,7 @@ This view only counts deliveries/returns/replants where `order_item_id IS NOT NU
 
 **Filter:** `user_id = auth.uid()` applied in all CTEs (delivered, returned, replanted) and in the orders join.
 
-**Agent tool using it:** `get_customer_order_fulfillment_status` — aggregates from order_item grain to product+treatment+seed_size+package_type grain in TypeScript before returning results.
+**Agent tool using it:** `get_customer_order_fulfillment_status` — aggregates from order_item grain to customer+product+treatment+seed_size+package_type grain in TypeScript. Exposes `matched_customers[]` with `customer_id`, `customer_name`, `farm_name`. Fulfillment status values: `"open" | "partial" | "complete" | "overdelivered"`. `units_remaining` can be negative (overdelivered — not clamped).
 
 **Where used in UI:**
 - Deliveries page — "Customer Order Status" table shown when a customer is selected.

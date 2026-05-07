@@ -21,13 +21,25 @@ function toDisplayPackageType(dbValue: string | null): string | null {
   return dbValue;
 }
 
+type FulfillmentStatus = "open" | "partial" | "complete" | "overdelivered";
+
 function deriveFulfillmentStatus(
   unitsDelivered: number,
   unitsRemaining: number
-): string {
-  if (unitsRemaining <= 0) return "Complete";
-  if (unitsDelivered > 0) return "In Progress";
-  return "Not Started";
+): FulfillmentStatus {
+  if (unitsRemaining < 0) return "overdelivered";
+  if (unitsRemaining === 0) return "complete";
+  if (unitsDelivered > 0) return "partial";
+  return "open";
+}
+
+// How the customer search term was matched against the database
+type MatchedBy = "customer_name" | "farm_name" | "both" | "none";
+
+interface MatchedCustomer {
+  customer_id: string;
+  customer_name: string;
+  farm_name: string | null;
 }
 
 interface ToolInput {
@@ -42,6 +54,7 @@ interface ToolInput {
 
 interface FulfillmentRow {
   customer_name: string;
+  farm_name: string | null;
   season_year: number;
   product_name: string;
   treatment_name: string | null;
@@ -49,10 +62,10 @@ interface FulfillmentRow {
   package_type: string | null;
   units_ordered: number;
   units_delivered: number;
-  units_returned: number;
-  units_replanted: number;
+  units_returned: number | null;
+  units_replanted: number | null;
   units_remaining: number;
-  fulfillment_status: string;
+  fulfillment_status: FulfillmentStatus;
 }
 
 interface ToolOutput {
@@ -62,6 +75,9 @@ interface ToolOutput {
   total_units_remaining: number;
   row_count: number;
   customer_name_matched: string;
+  matched_by: MatchedBy;
+  matched_customer_count: number;
+  matched_customers: MatchedCustomer[];
   resolved_season_year: number | null;
   season_source: SeasonSource;
   requested_season_year: number | null;
@@ -72,17 +88,27 @@ interface ToolOutput {
 async function queryFulfillment(
   userClient: SupabaseClient,
   seasonYear: number,
-  customerPattern: string,
-  input: ToolInput,
-  exact: boolean
+  pattern: string,
+  matchedBy: "customer_name" | "farm_name" | "both",
+  input: ToolInput
 ): Promise<Record<string, unknown>[]> {
   let query = userClient
     .from("v_delivery_customer_order_status")
     .select(
-      "customer_name, season_year, product_name, treatment_name, seed_size, package_type, ordered_units, delivered_units, returned_units, replanted_units, net_units"
+      "customer_id, customer_name, farm_name, season_year, product_name, treatment_name, seed_size, package_type, ordered_units, delivered_units, returned_units, replanted_units, net_units"
     )
-    .eq("season_year", seasonYear)
-    .ilike("customer_name", exact ? customerPattern : `%${customerPattern}%`);
+    .eq("season_year", seasonYear);
+
+  if (matchedBy === "customer_name") {
+    query = query.ilike("customer_name", pattern);
+  } else if (matchedBy === "farm_name") {
+    query = query.ilike("farm_name", pattern);
+  } else {
+    // "both" — partial match on either field
+    query = query.or(
+      `customer_name.ilike.%${pattern}%,farm_name.ilike.%${pattern}%`
+    );
+  }
 
   if (input.productName) {
     query = query.ilike("product_name", `%${input.productName}%`);
@@ -102,14 +128,20 @@ async function queryFulfillment(
   return (data ?? []) as unknown as Record<string, unknown>[];
 }
 
+interface AggregateResult {
+  rows: FulfillmentRow[];
+  matchedCustomers: MatchedCustomer[];
+}
+
 function aggregateRows(
   rawRows: Record<string, unknown>[],
   openOnly: boolean
-): FulfillmentRow[] {
+): AggregateResult {
   const groups = new Map<
     string,
     {
       customer_name: string;
+      farm_name: string | null;
       season_year: number;
       product_name: string;
       treatment_name: string | null;
@@ -122,7 +154,20 @@ function aggregateRows(
     }
   >();
 
+  // Track unique customers seen (keyed by customer_id)
+  const customerMap = new Map<string, MatchedCustomer>();
+
   for (const r of rawRows) {
+    // Collect matched customer metadata
+    const customerId = r.customer_id as string;
+    if (!customerMap.has(customerId)) {
+      customerMap.set(customerId, {
+        customer_id: customerId,
+        customer_name: r.customer_name as string,
+        farm_name: (r.farm_name as string | null) ?? null,
+      });
+    }
+
     const key = [
       r.customer_name,
       r.season_year,
@@ -135,6 +180,7 @@ function aggregateRows(
     if (!groups.has(key)) {
       groups.set(key, {
         customer_name: r.customer_name as string,
+        farm_name: (r.farm_name as string | null) ?? null,
         season_year: r.season_year as number,
         product_name: r.product_name as string,
         treatment_name: (r.treatment_name as string | null) ?? null,
@@ -156,14 +202,18 @@ function aggregateRows(
 
   const rows: FulfillmentRow[] = [];
   for (const g of groups.values()) {
+    // net = ordered - delivered - replanted + returned (mirrors view formula)
     const net =
       g.units_ordered - g.units_delivered - g.units_replanted + g.units_returned;
-    const units_remaining = Math.max(0, net);
+
+    // Do not clamp — negative net means overdelivered
+    const units_remaining = net;
 
     if (openOnly && units_remaining <= 0) continue;
 
     rows.push({
       customer_name: g.customer_name,
+      farm_name: g.farm_name,
       season_year: g.season_year,
       product_name: g.product_name,
       treatment_name: g.treatment_name,
@@ -171,22 +221,31 @@ function aggregateRows(
       package_type: toDisplayPackageType(g.package_type),
       units_ordered: g.units_ordered,
       units_delivered: g.units_delivered,
-      units_returned: g.units_returned,
-      units_replanted: g.units_replanted,
+      units_returned: g.units_returned > 0 ? g.units_returned : null,
+      units_replanted: g.units_replanted > 0 ? g.units_replanted : null,
       units_remaining,
       fulfillment_status: deriveFulfillmentStatus(g.units_delivered, units_remaining),
     });
   }
 
+  // Sort: open → partial → complete → overdelivered, then by product name
+  const statusOrder: Record<FulfillmentStatus, number> = {
+    open: 0,
+    partial: 1,
+    complete: 2,
+    overdelivered: 3,
+  };
   rows.sort((a, b) => {
-    const order = { "Not Started": 0, "In Progress": 1, Complete: 2 };
-    const sa = order[a.fulfillment_status as keyof typeof order] ?? 3;
-    const sb = order[b.fulfillment_status as keyof typeof order] ?? 3;
+    const sa = statusOrder[a.fulfillment_status] ?? 99;
+    const sb = statusOrder[b.fulfillment_status] ?? 99;
     if (sa !== sb) return sa - sb;
+    if (a.customer_name !== b.customer_name) {
+      return a.customer_name.localeCompare(b.customer_name);
+    }
     return a.product_name.localeCompare(b.product_name);
   });
 
-  return rows;
+  return { rows, matchedCustomers: [...customerMap.values()] };
 }
 
 export function makeGetCustomerOrderFulfillmentStatusTool(
@@ -198,14 +257,14 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Returns order fulfillment status for a specific customer — how many units were ordered, how many have been delivered, and how many remain to be delivered. Use this tool when the user asks about delivery status, outstanding balances, remaining units to deliver, or whether a customer's order is complete.",
+      "Returns order fulfillment status for a specific customer or farm/business — how many units were ordered, how many have been delivered, and how many remain to be delivered. Searches by customer/contact name first, then by farm/business name. If a farm name matches multiple customers, fulfillment status is aggregated across all of them. Use this tool when the user asks about delivery status, outstanding balances, remaining units to deliver, or whether a customer's order is complete.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
         customerName: {
           type: "string",
           description:
-            "Customer name to look up. Partial name is fine — exact match is tried first. Required.",
+            "Customer/contact name or farm/business name to look up. The tool searches customer names first (exact, then partial), then farm/business names. Partial names are accepted. Required.",
         },
         seasonYear: {
           type: "number",
@@ -273,6 +332,9 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
           total_units_remaining: 0,
           row_count: 0,
           customer_name_matched: "",
+          matched_by: "none",
+          matched_customer_count: 0,
+          matched_customers: [],
           resolved_season_year: null,
           season_source: "none",
           requested_season_year: requestedSeasonYear,
@@ -291,26 +353,33 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
         return emptyOutput;
       }
 
+      // Search strategy:
+      // 1. Exact match on customer_name (most specific — avoids collateral matches)
+      // 2. Exact match on farm_name (catches "Tam Farms" → all customers under that farm)
+      // 3. Partial match on customer_name OR farm_name ("both") — broadest fallback
       let rawRows: Record<string, unknown>[] = [];
-      let matchedExact = false;
+      let matchedBy: MatchedBy = "none";
+
       try {
         rawRows = await queryFulfillment(
-          userClient,
-          resolvedSeasonYear,
-          customerName,
-          input,
-          true
+          userClient, resolvedSeasonYear, customerName, "customer_name", input
         );
         if (rawRows.length > 0) {
-          matchedExact = true;
+          matchedBy = "customer_name";
         } else {
           rawRows = await queryFulfillment(
-            userClient,
-            resolvedSeasonYear,
-            customerName,
-            input,
-            false
+            userClient, resolvedSeasonYear, customerName, "farm_name", input
           );
+          if (rawRows.length > 0) {
+            matchedBy = "farm_name";
+          } else {
+            rawRows = await queryFulfillment(
+              userClient, resolvedSeasonYear, customerName, "both", input
+            );
+            if (rawRows.length > 0) {
+              matchedBy = "both";
+            }
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Query failed";
@@ -327,7 +396,10 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
         throw new Error(`Fulfillment query failed: ${message}`);
       }
 
-      const aggregated = aggregateRows(rawRows, openOnly ?? false);
+      const { rows: aggregated, matchedCustomers } = aggregateRows(
+        rawRows,
+        openOnly ?? false
+      );
 
       const truncated = aggregated.length > LIMIT;
       const rows = truncated ? aggregated.slice(0, LIMIT) : aggregated;
@@ -336,8 +408,8 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
       const total_units_delivered = rows.reduce((s, r) => s + r.units_delivered, 0);
       const total_units_remaining = rows.reduce((s, r) => s + r.units_remaining, 0);
 
-      const uniqueCustomers = [...new Set(rows.map((r) => r.customer_name))];
-      const customer_name_matched = uniqueCustomers.join(", ");
+      const uniqueCustomerNames = [...new Set(rows.map((r) => r.customer_name))];
+      const customer_name_matched = uniqueCustomerNames.join(", ");
 
       const output: ToolOutput = {
         rows,
@@ -346,6 +418,9 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
         total_units_remaining,
         row_count: rows.length,
         customer_name_matched,
+        matched_by: matchedBy,
+        matched_customer_count: matchedCustomers.length,
+        matched_customers: matchedCustomers,
         resolved_season_year: resolvedSeasonYear,
         season_source: seasonSource,
         requested_season_year: requestedSeasonYear,
@@ -360,7 +435,8 @@ export function makeGetCustomerOrderFulfillmentStatusTool(
         tool_name: "get_customer_order_fulfillment_status",
         input_json: {
           ...input,
-          _matched_exact: matchedExact,
+          _matched_by: matchedBy,
+          _matched_customer_count: matchedCustomers.length,
           _resolved_season: resolvedSeasonYear,
           _season_source: seasonSource,
           _user_explicit: userExplicitlyRequestedSeason,

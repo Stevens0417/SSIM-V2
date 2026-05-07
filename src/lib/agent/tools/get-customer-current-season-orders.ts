@@ -14,6 +14,9 @@ function toDisplayPackageType(dbValue: string | null): string | null {
   return dbValue;
 }
 
+// How the customer search term was matched against the database
+type MatchedBy = "customer_name" | "farm_name" | "partial" | "";
+
 interface ToolInput {
   customerName: string;
   seasonYear?: number;
@@ -30,6 +33,7 @@ interface OrderRow {
   order_date: string;
   season_year: number;
   customer_name: string;
+  farm_name: string | null;
   product_name: string;
   treatment_name: string | null;
   seed_size: string | null;
@@ -50,6 +54,8 @@ interface ToolOutput {
   total_units_ordered: number;
   row_count: number;
   customer_name_matched: string;
+  matched_by: MatchedBy;
+  matched_customer_count: number;
   resolved_season_year: number | null;
   season_source: SeasonSource;
   requested_season_year: number | null;
@@ -57,44 +63,57 @@ interface ToolOutput {
   truncated?: boolean;
 }
 
+const SELECT_COLS = [
+  "order_item_id",
+  "order_id",
+  "order_date",
+  "season_year",
+  "customer_name",
+  "farm_name",
+  "product_name",
+  "treatment_name",
+  "seed_size",
+  "package_type",
+  "units_ordered",
+  "early_pay",
+  // always fetch pricing/profit columns — filter in JS so we don't need two queries
+  "retail_price_per_unit",
+  "brand_grower_pct",
+  "early_pay_pct",
+  "line_total_after_all_discounts",
+  "break_even_price_per_unit",
+  "profit_per_unit",
+  "line_total_profit",
+].join(", ");
+
 async function queryOrders(
   userClient: SupabaseClient,
   seasonYear: number,
-  customerPattern: string,
-  input: ToolInput,
-  exact: boolean
+  pattern: string,
+  matchedBy: "customer_name" | "farm_name" | "partial",
+  input: ToolInput
 ): Promise<Record<string, unknown>[]> {
-  const selectCols = [
-    "order_item_id",
-    "order_id",
-    "order_date",
-    "season_year",
-    "customer_name",
-    "product_name",
-    "treatment_name",
-    "seed_size",
-    "package_type",
-    "units_ordered",
-    "early_pay",
-    // always fetch pricing/profit columns — filter in JS so we don't need two queries
-    "retail_price_per_unit",
-    "brand_grower_pct",
-    "early_pay_pct",
-    "line_total_after_all_discounts",
-    "break_even_price_per_unit",
-    "profit_per_unit",
-    "line_total_profit",
-  ].join(", ");
-
   let query = userClient
     .from("v_agent_customer_current_season_orders")
-    .select(selectCols)
+    .select(SELECT_COLS)
     .eq("season_year", seasonYear)
-    .ilike("customer_name", exact ? customerPattern : `%${customerPattern}%`)
     .order("order_date")
     .order("customer_name")
     .order("product_name")
     .limit(LIMIT + 1);
+
+  if (matchedBy === "customer_name") {
+    // Exact case-insensitive match on customer_name
+    query = query.ilike("customer_name", pattern);
+  } else if (matchedBy === "farm_name") {
+    // Exact case-insensitive match on farm_name — returns all customers under that farm
+    query = query.ilike("farm_name", pattern);
+  } else {
+    // Partial match on customer_name OR farm_name
+    query = query.or(
+      `customer_name.ilike.%${pattern}%,farm_name.ilike.%${pattern}%`
+    );
+  }
 
   if (input.productName) {
     query = query.ilike("product_name", `%${input.productName}%`);
@@ -120,14 +139,14 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Returns order line items for a specific customer for the current (or specified) season. Use this tool whenever the user asks about customer orders, what a customer ordered, how many units a customer ordered, or order-level details for a specific customer.",
+      "Returns order line items for a specific customer or farm/business for the current (or specified) season. Searches by customer/contact name first, then by farm/business name. If a farm name matches multiple customers, all their orders are returned together. Use this tool whenever the user asks about customer orders, what a customer ordered, how many units a customer ordered, or order-level details for a specific customer or farm.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
         customerName: {
           type: "string",
           description:
-            "Customer name to look up. Partial name is fine — the tool tries an exact match first, then a partial match. Required.",
+            "Customer/contact name or farm/business name to look up. The tool searches customer names first (exact, then partial), then farm/business names. Partial names are accepted. Required.",
         },
         seasonYear: {
           type: "number",
@@ -193,6 +212,8 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
           total_units_ordered: 0,
           row_count: 0,
           customer_name_matched: "",
+          matched_by: "",
+          matched_customer_count: 0,
           resolved_season_year: null,
           season_source: "none",
           requested_season_year: requestedSeasonYear,
@@ -211,15 +232,33 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
         return emptyOutput;
       }
 
-      // Try exact match first, fall back to partial
+      // Search strategy:
+      // 1. Exact match on customer_name (most specific — avoids collateral matches)
+      // 2. Exact match on farm_name (catches "Tam Farms" → all customers under that farm)
+      // 3. Partial match on customer_name OR farm_name (broadest fallback)
       let rawRows: Record<string, unknown>[] = [];
-      let matchedExact = false;
+      let matchedBy: MatchedBy = "";
+
       try {
-        rawRows = await queryOrders(userClient, resolvedSeasonYear, customerName, input, true);
+        rawRows = await queryOrders(
+          userClient, resolvedSeasonYear, customerName, "customer_name", input
+        );
         if (rawRows.length > 0) {
-          matchedExact = true;
+          matchedBy = "customer_name";
         } else {
-          rawRows = await queryOrders(userClient, resolvedSeasonYear, customerName, input, false);
+          rawRows = await queryOrders(
+            userClient, resolvedSeasonYear, customerName, "farm_name", input
+          );
+          if (rawRows.length > 0) {
+            matchedBy = "farm_name";
+          } else {
+            rawRows = await queryOrders(
+              userClient, resolvedSeasonYear, customerName, "partial", input
+            );
+            if (rawRows.length > 0) {
+              matchedBy = "partial";
+            }
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Query failed";
@@ -246,6 +285,7 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
           order_date: r.order_date as string,
           season_year: r.season_year as number,
           customer_name: r.customer_name as string,
+          farm_name: (r.farm_name as string | null) ?? null,
           product_name: r.product_name as string,
           treatment_name: (r.treatment_name as string | null) ?? null,
           seed_size: (r.seed_size as string | null) ?? null,
@@ -285,6 +325,8 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
         total_units_ordered,
         row_count: rows.length,
         customer_name_matched,
+        matched_by: matchedBy,
+        matched_customer_count: uniqueCustomers.length,
         resolved_season_year: resolvedSeasonYear,
         season_source: seasonSource,
         requested_season_year: requestedSeasonYear,
@@ -299,7 +341,8 @@ export function makeGetCustomerCurrentSeasonOrdersTool(
         tool_name: "get_customer_current_season_orders",
         input_json: {
           ...input,
-          _matched_exact: matchedExact,
+          _matched_by: matchedBy,
+          _matched_customer_count: uniqueCustomers.length,
           _resolved_season: resolvedSeasonYear,
           _season_source: seasonSource,
           _user_explicit: userExplicitlyRequestedSeason,
