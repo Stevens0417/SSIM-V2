@@ -23,13 +23,14 @@ const TOOL_DESCRIPTION = `Run a read-only SQL SELECT against approved agent view
 Approved views:
 - v_agent_customer_orders: order_item_id, order_id, order_date, season_year, customer_id, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_ordered, early_pay, brand_grower_pct, early_pay_pct, retail_price_per_unit, line_total_after_all_discounts, break_even_price_per_unit, profit_per_unit, line_total_profit
 - v_agent_order_fulfillment: season_year, customer_id, customer_name, farm_name, order_id, order_date, order_item_id, product_name, treatment_name, seed_size, package_type, ordered_units, delivered_units, returned_units, replanted_units, net_units, is_complete
-- v_agent_inventory: product_name, treatment_name, seed_size, package_type, units_on_hand
+- v_agent_inventory: product_name, treatment_name, seed_size, package_type, units_on_hand, units_staged, available_units — units_on_hand is physical (received−delivered+returned); units_staged is reserved in staged deliveries; available_units = units_on_hand − units_staged
 - v_agent_customer_deliveries: delivery_id, delivery_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_delivered, order_id, order_item_id, notes
 - v_agent_customer_returns: return_id, return_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_returned, order_id, order_item_id, notes
 - v_agent_customer_replants: replant_id, replant_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_replanted, order_id, order_item_id, notes
 - v_agent_bayer_shipments: shipment_id, shipment_date, season_year, shipment_number, shipment_item_id, product_name, treatment_name, units_received, is_verified
+- v_agent_staged_deliveries: staged_delivery_id, customer_name, farm_name, season_year, staged_date, notes, product_name, treatment_name, seed_size, package_type, units_staged, created_at — in_progress staged deliveries only
 
-Query rules: SELECT only, LIMIT ≤ 100 required, only approved views in FROM/JOIN. Package types in DB: 'bag' (Bags) and 'tote' (Seedpaks). Use ILIKE for case-insensitive name matching.`;
+Query rules: SELECT only, LIMIT ≤ 100 required, only approved views in FROM/JOIN. Package types in DB: 'bag' (Bags) and 'tote' (Seedpaks). Use ILIKE for case-insensitive name matching. Use available_units from v_agent_inventory for "how many do we have" questions.`;
 
 export function makeRunApprovedReadonlyQueryTool(
   userClient: SupabaseClient,

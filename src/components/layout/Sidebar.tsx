@@ -26,6 +26,7 @@ const NAV_SECTIONS = [
     label: "Forms",
     items: [
       { href: "/orders", label: "Orders" },
+      { href: "/staged-deliveries", label: "Staged Deliveries" },
       { href: "/deliveries", label: "Deliveries" },
       { href: "/returns", label: "Returns" },
       { href: "/replants", label: "Replants" },

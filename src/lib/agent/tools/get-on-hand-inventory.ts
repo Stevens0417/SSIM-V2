@@ -21,7 +21,7 @@ interface ToolInput {
   treatmentName?: string;
   packageType?: string;
   seedSize?: string;
-  minUnitsOnHand?: number;
+  minAvailableUnits?: number;
 }
 
 interface InventoryRow {
@@ -30,15 +30,26 @@ interface InventoryRow {
   seed_size: string | null;
   package_type: string | null;
   units_on_hand: number;
+  units_staged: number;
+  available_units: number;
 }
 
 interface ToolOutput {
   rows: InventoryRow[];
+  // Physical on hand
   total_units_on_hand: number;
   total_positive_units_on_hand: number;
   total_negative_units_on_hand: number;
   has_negative_inventory: boolean;
   negative_rows: InventoryRow[];
+  // Staged
+  total_units_staged: number;
+  has_staged_inventory: boolean;
+  // Available (physical minus staged)
+  total_available_units: number;
+  has_negative_available: boolean;
+  negative_available_rows: InventoryRow[];
+  // Meta
   row_count: number;
   truncated?: boolean;
 }
@@ -51,7 +62,7 @@ export function makeGetOnHandInventoryTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Returns current on-hand inventory for the authenticated user. Call this tool for any question about inventory levels, units on hand, products in stock, treatments available, Bag or Seedpak quantities, or seed sizes. Omit filter fields that are not relevant to the user's question. Negative units_on_hand values are possible and must be surfaced to the user — do not mask them as zero.",
+      "Returns current inventory for the authenticated user including physical units on hand, staged units (reserved for customers in staged deliveries), and available units (physical minus staged). Call this for any question about inventory levels, stock quantities, Bag or Seedpak quantities, seed sizes, or staged/reserved units. Negative available_units means more has been staged or delivered than is physically on hand — always surface this to the user.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
@@ -75,22 +86,24 @@ export function makeGetOnHandInventoryTool(
           description:
             "Exact seed size to filter by. Only set when the user specifies a seed size.",
         },
-        minUnitsOnHand: {
+        minAvailableUnits: {
           type: "number",
           description:
-            "Only include rows with at least this many units on hand. Omit unless the user specifies a minimum quantity.",
+            "Only include rows with at least this many available units. Omit unless the user specifies a minimum quantity.",
         },
       },
       additionalProperties: false,
     }),
     execute: async (input: ToolInput): Promise<ToolOutput> => {
-      const { productName, treatmentName, packageType, seedSize, minUnitsOnHand } =
+      const { productName, treatmentName, packageType, seedSize, minAvailableUnits } =
         input;
 
       // userClient carries the user's JWT so auth.uid() resolves correctly in the view
       let query = userClient
         .from("v_on_hand_inventory")
-        .select("product_name, treatment_name, seed_size, package_type, units_on_hand")
+        .select(
+          "product_name, treatment_name, seed_size, package_type, units_on_hand, units_staged, available_units"
+        )
         .order("product_name")
         .order("treatment_name")
         .limit(LIMIT + 1); // fetch one extra to detect truncation
@@ -107,8 +120,8 @@ export function makeGetOnHandInventoryTool(
       if (seedSize) {
         query = query.eq("seed_size", seedSize);
       }
-      if (minUnitsOnHand !== undefined) {
-        query = query.gte("units_on_hand", minUnitsOnHand);
+      if (minAvailableUnits !== undefined) {
+        query = query.gte("available_units", minAvailableUnits);
       }
 
       const { data, error } = await query;
@@ -135,11 +148,14 @@ export function makeGetOnHandInventoryTool(
           seed_size: row.seed_size as string | null,
           package_type: toDisplayPackageType(row.package_type as string | null),
           units_on_hand: row.units_on_hand as number,
+          units_staged: row.units_staged as number,
+          available_units: row.available_units as number,
         })
       );
 
       const negative_rows = rows.filter((r) => r.units_on_hand < 0);
       const positive_rows = rows.filter((r) => r.units_on_hand > 0);
+      const negative_available_rows = rows.filter((r) => r.available_units < 0);
 
       const total_units_on_hand = rows.reduce((sum, r) => sum + r.units_on_hand, 0);
       const total_positive_units_on_hand = positive_rows.reduce(
@@ -150,6 +166,8 @@ export function makeGetOnHandInventoryTool(
         (sum, r) => sum + r.units_on_hand,
         0
       );
+      const total_units_staged = rows.reduce((sum, r) => sum + r.units_staged, 0);
+      const total_available_units = rows.reduce((sum, r) => sum + r.available_units, 0);
 
       const output: ToolOutput = {
         rows,
@@ -158,6 +176,11 @@ export function makeGetOnHandInventoryTool(
         total_negative_units_on_hand,
         has_negative_inventory: negative_rows.length > 0,
         negative_rows,
+        total_units_staged,
+        has_staged_inventory: total_units_staged > 0,
+        total_available_units,
+        has_negative_available: negative_available_rows.length > 0,
+        negative_available_rows,
         row_count: rows.length,
         ...(truncated ? { truncated: true } : {}),
       };

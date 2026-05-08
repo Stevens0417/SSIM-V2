@@ -234,6 +234,61 @@ This index allows the same product + treatment to appear twice on the same shipm
 
 ---
 
+## staged_deliveries
+
+**Purpose:** Header record for a staged delivery — product physically set aside for a customer but not yet recorded as an actual delivery. A staged delivery reserves inventory until it is converted to a real delivery or cancelled.
+
+**Grain:** One row per staged delivery event. Line items are in `staged_delivery_items`.
+
+**User-scoped:** Yes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_id` | uuid | RLS-enforced. Default `auth.uid()`. |
+| `customer_id` | uuid FK → customers | `ON DELETE RESTRICT` |
+| `season_year` | integer | |
+| `staged_date` | date | Date the product was physically set aside |
+| `notes` | text \| null | Optional memo |
+| `status` | text | `'in_progress'`, `'converted'`, or `'cancelled'` |
+| `converted_at` | timestamptz \| null | Set when status changes to `'converted'` |
+| `created_at` / `updated_at` | timestamptz | `updated_at` managed by trigger |
+
+**Status lifecycle:**
+- `'in_progress'` — active staged delivery; its items reduce `available_units` in inventory views
+- `'converted'` — converted to one or more actual deliveries; no longer affects inventory
+- `'cancelled'` — cancelled; no longer affects inventory
+
+**How rows are created:** Via the Staged Deliveries page. The service creates the header and all items together.
+
+**Effect on inventory:** Items in `in_progress` staged deliveries reduce `available_units` but do NOT reduce `units_on_hand`. Physical inventory is unchanged; only the "committable" quantity is reduced.
+
+---
+
+## staged_delivery_items
+
+**Purpose:** Line items within a staged delivery. Each row is one product + treatment + seed_size + package_type combination staged for delivery. Mirrors the grain of the `deliveries` table.
+
+**Grain:** One row per product + treatment + seed_size + package_type per staged delivery.
+
+**User-scoped:** Yes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `staged_delivery_id` | uuid FK → staged_deliveries | `ON DELETE CASCADE` |
+| `user_id` | uuid | RLS-enforced. Default `auth.uid()`. |
+| `product_id` | uuid FK → products | `ON DELETE RESTRICT` |
+| `treatment_id` | uuid FK → treatments | `ON DELETE RESTRICT` |
+| `seed_size` | text \| null | Corn only; NULL for soybean/packaging |
+| `package_type` | text | `'bag'` or `'tote'` |
+| `units_staged` | integer | Must be > 0 (enforced by CHECK constraint) |
+| `created_at` / `updated_at` | timestamptz | `updated_at` managed by trigger |
+
+**Effect on inventory:** When the parent `staged_delivery.status = 'in_progress'`, these units are included in the `staged_units` CTE in `v_on_hand_inventory`, reducing `available_units`. No effect on `units_on_hand`.
+
+---
+
 ## bayer_year_end_verifications
 
 **Purpose:** Tracks whether a user has verified each product+treatment+seed_size+package_type combination total for a season's Bayer shipments.

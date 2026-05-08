@@ -68,10 +68,11 @@ export default function OnHandInventoryPage() {
   const kpiRows = view === "detail" ? filteredDetailRows : detailRows;
 
   const kpis = useMemo(() => {
-    const totalOnHand = kpiRows.reduce((sum, r) => sum + r.units_on_hand, 0);
-    const negativeCount = kpiRows.filter((r) => r.units_on_hand < 0).length;
-    const zeroCount = kpiRows.filter((r) => r.units_on_hand === 0).length;
-    return { totalOnHand, negativeCount, zeroCount };
+    const totalPhysical = kpiRows.reduce((sum, r) => sum + r.units_on_hand, 0);
+    const totalStaged = kpiRows.reduce((sum, r) => sum + r.units_staged, 0);
+    const totalAvailable = kpiRows.reduce((sum, r) => sum + r.available_units, 0);
+    const negativeAvailable = kpiRows.filter((r) => r.available_units < 0).length;
+    return { totalPhysical, totalStaged, totalAvailable, negativeAvailable };
   }, [kpiRows]);
 
   const handleFilteredChange = useCallback((rows: InventoryDetailRow[]) => {
@@ -104,7 +105,7 @@ export default function OnHandInventoryPage() {
         <div className={styles.headerText}>
           <div className={styles.headerTitle}>On-Hand Inventory</div>
           <div className={styles.headerSub}>
-            Shipments &minus; Deliveries + Returns
+            Physical On Hand &minus; Staged = Available
           </div>
         </div>
       </div>
@@ -148,16 +149,20 @@ export default function OnHandInventoryPage() {
       {detailRows.length > 0 && (
         <div className={styles.kpiRow}>
           <div className={styles.kpiCard}>
-            <div className={styles.kpiValue}>{kpis.totalOnHand.toLocaleString()}</div>
-            <div className={styles.kpiLabel}>Total Units On Hand</div>
-          </div>
-          <div className={`${styles.kpiCard} ${kpis.negativeCount > 0 ? styles.kpiNegative : ""}`}>
-            <div className={styles.kpiValue}>{kpis.negativeCount}</div>
-            <div className={styles.kpiLabel}>Negative On-Hand</div>
+            <div className={styles.kpiValue}>{kpis.totalPhysical.toLocaleString()}</div>
+            <div className={styles.kpiLabel}>Total Physical On Hand</div>
           </div>
           <div className={styles.kpiCard}>
-            <div className={styles.kpiValue}>{kpis.zeroCount}</div>
-            <div className={styles.kpiLabel}>Zero On-Hand</div>
+            <div className={styles.kpiValue}>{kpis.totalStaged.toLocaleString()}</div>
+            <div className={styles.kpiLabel}>Total Staged</div>
+          </div>
+          <div className={styles.kpiCard}>
+            <div className={styles.kpiValue}>{kpis.totalAvailable.toLocaleString()}</div>
+            <div className={styles.kpiLabel}>Total Available</div>
+          </div>
+          <div className={`${styles.kpiCard} ${kpis.negativeAvailable > 0 ? styles.kpiNegative : ""}`}>
+            <div className={styles.kpiValue}>{kpis.negativeAvailable}</div>
+            <div className={styles.kpiLabel}>Negative Available</div>
           </div>
         </div>
       )}

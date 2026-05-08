@@ -52,13 +52,15 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 **Allowed filters:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_on_hand`
 
-**Columns safe for agent:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_received`, `units_delivered`, `units_returned`, `units_on_hand`
+**Columns safe for agent:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_received`, `units_delivered`, `units_returned`, `units_on_hand`, `units_staged`, `available_units`
 
 **Columns to exclude:** `product_id`, `treatment_id` (internal UUIDs)
 
 **Notes:**
 - Use `package_type = 'bag'` for Bags and `package_type = 'tote'` for Seedpaks in filter values. Display as "Bag" / "Seedpak" in responses.
-- A negative `units_on_hand` is valid — it means more has been delivered than received, which may indicate a recording gap.
+- `units_on_hand` is physical inventory (received − delivered + returned). A negative value means more has been delivered than received, which may indicate a recording gap.
+- `units_staged` is the quantity reserved in in_progress staged deliveries. `available_units = units_on_hand - units_staged`.
+- Prefer `available_units` for operational questions ("how much do we have to sell?"). Use `units_on_hand` for physical stock questions.
 - This view has separate rows for Bag and Seedpak — if you want a combined total, sum across package_type.
 
 ---
@@ -81,8 +83,9 @@ All views in this document are user-scoped — they automatically filter by `aut
 **Columns safe for agent:** `product_name`, all treatment columns (DIAMIDE, Fung/Insect, Fung/Insect/Ilevo, Fung/Insect/Opt, FUNGICIDE, FUNGICIDE OPTIMIZE, PONCHO, Poncho/i-374)
 
 **Notes:**
-- This view aggregates Bag and Seedpak together into a single total. Do not use it for package-type-specific questions — use `v_on_hand_inventory` instead.
-- NULL values in treatment columns mean no inventory for that combination (not zero).
+- Treatment columns show `available_units` (physical on hand minus staged) as of migration 0027 — the operationally meaningful committable quantity.
+- This view aggregates Bag and Seedpak together. Do not use it for package-type-specific questions — use `v_on_hand_inventory` instead.
+- NULL values in treatment columns mean no available inventory for that combination (not zero).
 - Excludes NO_TREATMENT (packaging) rows.
 
 ---
@@ -231,6 +234,34 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 ---
 
+### v_agent_staged_deliveries
+
+| Property | Value |
+|---|---|
+| **Table** | `v_agent_staged_deliveries` |
+| **Access type** | Read-only |
+| **User-scoped** | Yes (inherits from `v_staged_deliveries`) |
+
+**Safe use cases:**
+- "What product has been staged for [customer]?"
+- "How many units of [product] are currently staged?"
+- "Which customers have staged deliveries this season?"
+- "Show me all staged deliveries for [customer or farm]."
+
+**Allowed filters:** `customer_name`, `farm_name`, `season_year`, `product_name`, `treatment_name`, `seed_size`, `package_type`
+
+**Columns safe for agent:** `staged_delivery_id`, `customer_name`, `farm_name`, `season_year`, `staged_date`, `notes`, `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_staged`, `created_at`
+
+**Columns to exclude:** `staged_delivery_item_id`, `customer_id`, `product_id`, `treatment_id` (internal UUIDs)
+
+**Notes:**
+- This view is pre-filtered to `status = 'in_progress'` staged deliveries only. Converted and cancelled staged deliveries are not included.
+- Package type `'bag'` → display "Bag"; `'tote'` → display "Seedpak".
+- Use ILIKE for customer/farm name matching: `customer_name ILIKE '%smith%'`.
+- Filter by `season_year` explicitly when asking about a specific season.
+
+---
+
 ## Agent Access Rules
 
 1. **Read-only access only.** The agent must never INSERT, UPDATE, or DELETE via tool calls unless a dedicated, reviewed write-tool exists and has explicit permission.
@@ -245,4 +276,6 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 6. **Pricing views are global.** `v_pricing_options`, `v_pricing_sheet_wide`, `v_pricing_break_even_wide` do not need user authentication but should only be read within an authenticated session for consistency.
 
-7. **Do not query raw `orders`, `deliveries`, `returns`, `replants`, or `bayer_shipment_items` tables directly.** Use the views above.
+7. **Do not query raw `orders`, `deliveries`, `returns`, `replants`, `bayer_shipment_items`, `staged_deliveries`, or `staged_delivery_items` tables directly.** Use the views above.
+
+8. **SQL fallback approved views** (for `run_approved_readonly_query` tool): `v_agent_customer_orders`, `v_agent_order_fulfillment`, `v_agent_inventory`, `v_agent_customer_deliveries`, `v_agent_customer_returns`, `v_agent_customer_replants`, `v_agent_bayer_shipments`, `v_agent_staged_deliveries`. `v_agent_inventory` now includes `units_staged` and `available_units` (added migration 0027). `v_agent_staged_deliveries` lists all in_progress staged deliveries. Adding a new view to the SQL fallback requires updating both the `TOOL_DESCRIPTION` in `run-approved-readonly-query.ts` and the `APPROVED_VIEWS` set in `validate-approved-query.ts`.

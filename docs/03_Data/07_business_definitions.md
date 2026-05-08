@@ -134,15 +134,60 @@ Negative `units_received` values are valid — they represent corrections or ret
 
 ---
 
-## On-Hand Inventory
+## On-Hand Inventory (Physical)
 
-**On-hand inventory** is the computed quantity of seed in stock at any point in time.
+**On-hand inventory** (also called **physical on hand**) is the computed quantity of seed physically in stock at any point in time.
 
 Formula: `units_on_hand = units_received - units_delivered + units_returned`
 
-This is always computed in real time from the underlying tables — it is not a stored value. The views `v_on_hand_inventory`, `v_on_hand_inventory_wide`, and `v_inventory_print_sheet` all derive from this formula.
+This is always computed in real time from the underlying tables — it is not a stored value. The `units_on_hand` column in `v_on_hand_inventory` and `v_inventory_print_sheet` uses this formula.
 
-Replanted units do not affect on-hand inventory.
+Replanted units do not affect on-hand inventory. Staged deliveries do not affect physical on-hand inventory (see Available Units below).
+
+**In the UI:** The On-Hand Inventory detail view shows Physical On Hand, Staged, and Available columns. KPI cards report Total Physical On Hand, Total Staged, Total Available, and Negative Available count. The wide view pivots Available Units (not physical) — it answers "how much can still be committed?" The print sheet shows all three columns with Total Available in the header.
+
+---
+
+## Staged Delivery
+
+A **staged delivery** is product physically set aside for a specific customer but not yet recorded as an actual delivery. It represents the dealer's intent to deliver — product has been pulled from the shelf, but paperwork has not been finalized.
+
+A staged delivery consists of:
+- A header (`staged_deliveries` table) with a customer, season, date, and status
+- One or more item lines (`staged_delivery_items` table) at the same grain as deliveries: product + treatment + seed_size + package_type + units
+
+**Status lifecycle:**
+- `in_progress` — actively reserved; reduces `available_units` in inventory
+- `converted` — promoted to actual delivery records; no longer reserves inventory
+- `cancelled` — abandoned; no longer reserves inventory
+
+Staged deliveries are distinct from deliveries: they do not reduce physical on-hand inventory and are not counted in order fulfillment status until converted.
+
+---
+
+## Staged/Reserved Units
+
+**Staged units** (also called **reserved units**) is the total quantity of a product+treatment+seed_size+package_type combination reserved in all `in_progress` staged deliveries for the current user.
+
+Formula: `units_staged = SUM(staged_delivery_items.units_staged) WHERE staged_delivery.status = 'in_progress'`
+
+Computed in the `staged` CTE of `v_on_hand_inventory`. Exposed as the `units_staged` column.
+
+---
+
+## Available Units
+
+**Available units** is the quantity of a product that can still be committed to a new customer — physical on-hand minus what has been staged (reserved).
+
+Formula: `available_units = units_on_hand - units_staged`
+
+This is the operationally meaningful inventory quantity for selling decisions. `v_on_hand_inventory_wide` and `v_inventory_print_sheet` both surface `available_units` for this reason.
+
+A negative `available_units` means more has been staged (or delivered) than what is physically on hand, indicating a recording gap or over-commitment.
+
+**Agent behavior:** When the agent answers "how many do we have?", it leads with `available_units`. If staging is present it explains both the physical quantity and the staged quantity. See `docs/agent/inventory-tool.md` for full response patterns.
+
+---
 
 ---
 

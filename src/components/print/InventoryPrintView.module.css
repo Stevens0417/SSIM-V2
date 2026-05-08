@@ -70,11 +70,13 @@
   -webkit-print-color-adjust: exact;
 }
 
-.colProduct   { width: 33%; }
-.colTreatment { width: 27%; }
-.colSize      { width: 11%; text-align: center !important; }
-.colPkg       { width: 15%; text-align: center !important; }
-.colUnits     { width: 14%; text-align: right !important; }
+.colProduct   { width: 25%; }
+.colTreatment { width: 20%; }
+.colSize      { width: 7%; text-align: center !important; }
+.colPkg       { width: 8%; text-align: center !important; }
+.colPhysical  { width: 14%; text-align: right !important; }
+.colStaged    { width: 13%; text-align: right !important; }
+.colAvailable { width: 13%; text-align: right !important; }
 
 .table tbody td {
   padding: 1.5mm 3mm;

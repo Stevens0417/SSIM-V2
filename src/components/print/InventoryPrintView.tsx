@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function InventoryPrintView({ rows, printDate }: Props) {
-  const totalUnits = rows.reduce((sum, r) => sum + r.units_on_hand, 0);
+  const totalAvailable = rows.reduce((sum, r) => sum + r.available_units, 0);
 
   // Split into corn and other (beans/soybean/packaging excluded by view)
   const cornRows = rows.filter((r) => r.crop?.toLowerCase() === "corn");
@@ -22,6 +22,8 @@ export default function InventoryPrintView({ rows, printDate }: Props) {
         <td className={styles.center}>{row.seed_size || "—"}</td>
         <td className={styles.center}>{fmtPackageType(row.package_type)}</td>
         <td className={styles.right}>{row.units_on_hand.toLocaleString()}</td>
+        <td className={styles.right}>{row.units_staged.toLocaleString()}</td>
+        <td className={styles.right}>{row.available_units.toLocaleString()}</td>
       </tr>
     ));
 
@@ -32,7 +34,7 @@ export default function InventoryPrintView({ rows, printDate }: Props) {
         <div className={styles.headerMeta}>
           <span>Printed: {printDate}</span>
           <span className={styles.headerTotal}>
-            Total Units On Hand: {totalUnits.toLocaleString()}
+            Total Available: {totalAvailable.toLocaleString()}
           </span>
         </div>
       </div>
@@ -43,7 +45,9 @@ export default function InventoryPrintView({ rows, printDate }: Props) {
           <col className={styles.colTreatment} />
           <col className={styles.colSize} />
           <col className={styles.colPkg} />
-          <col className={styles.colUnits} />
+          <col className={styles.colPhysical} />
+          <col className={styles.colStaged} />
+          <col className={styles.colAvailable} />
         </colgroup>
         <thead>
           <tr>
@@ -51,19 +55,21 @@ export default function InventoryPrintView({ rows, printDate }: Props) {
             <th>Treatment</th>
             <th className={styles.center}>Size</th>
             <th className={styles.center}>Pkg</th>
-            <th className={styles.right}>Units On Hand</th>
+            <th className={styles.right}>Physical</th>
+            <th className={styles.right}>Staged</th>
+            <th className={styles.right}>Available</th>
           </tr>
         </thead>
         <tbody>
           {cornRows.length > 0 && (
             <tr className={styles.cropDivider}>
-              <td colSpan={5}>Corn</td>
+              <td colSpan={7}>Corn</td>
             </tr>
           )}
           {renderRows(cornRows)}
           {beanRows.length > 0 && (
             <tr className={styles.cropDivider}>
-              <td colSpan={5}>Soybean</td>
+              <td colSpan={7}>Soybean</td>
             </tr>
           )}
           {renderRows(beanRows)}

@@ -53,7 +53,11 @@
       "PowerShell(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\\" -Recurse | Where-Object { $_.Extension -match \"tsx|ts\" -and $_.Name -match \"layout|nav\" } | Select-Object FullName)",
       "PowerShell(ls -Recurse \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\" | where { $_.Name -match \"layout\" })",
       "Bash(Get-Content \"c:\\\\Projects\\\\SSIMV2\\\\supabase\\\\migrations\\\\0019_v_customer_order_status_add_replants.sql\" -Raw)",
-      "mcp__claude_ai_Supabase__list_projects"
+      "mcp__claude_ai_Supabase__list_projects",
+      "Bash(not exist *)",
+      "PowerShell(New-Item -ItemType Directory -Path \"c:\\\\Projects\\\\SSIMV2\\\\docs\\\\02_Product\" -Force)",
+      "Bash(Get-ChildItem -Path src\\\\app\\\\inventory -Recurse -Include \"page.tsx\")",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

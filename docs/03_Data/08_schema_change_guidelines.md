@@ -42,17 +42,22 @@ Many views in this codebase have dependencies (views that read from other views)
 v_on_hand_inventory
   ↳ v_on_hand_inventory_wide
   ↳ v_inventory_print_sheet
+  ↳ v_agent_inventory        (SELECT * wrapper — must be dropped before v_on_hand_inventory)
 ```
 
 **Drop order (reverse dependency):**
-1. `DROP VIEW IF EXISTS public.v_inventory_print_sheet`
-2. `DROP VIEW IF EXISTS public.v_on_hand_inventory_wide`
-3. `DROP VIEW IF EXISTS public.v_on_hand_inventory`
+1. `DROP VIEW IF EXISTS public.v_agent_inventory`
+2. `DROP VIEW IF EXISTS public.v_inventory_print_sheet`
+3. `DROP VIEW IF EXISTS public.v_on_hand_inventory_wide`
+4. `DROP VIEW IF EXISTS public.v_on_hand_inventory`
 
 **Recreate order (forward dependency):**
 1. `CREATE VIEW public.v_on_hand_inventory AS ...`
 2. `CREATE VIEW public.v_on_hand_inventory_wide AS ...`
 3. `CREATE VIEW public.v_inventory_print_sheet AS ...`
+4. `CREATE OR REPLACE VIEW public.v_agent_inventory AS SELECT * FROM public.v_on_hand_inventory;`
+
+**Why `v_agent_inventory` must be included:** PostgreSQL resolves `SELECT *` column lists at view creation time, not at query time. When `v_on_hand_inventory` is dropped and recreated with new columns, `v_agent_inventory`'s internal column list becomes stale. It must be dropped and recreated to pick up the new columns.
 
 Always check for dependent views in the database before dropping: run `\d+ <view_name>` in psql or query `information_schema.view_table_usage`.
 

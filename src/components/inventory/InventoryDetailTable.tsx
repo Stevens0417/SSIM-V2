@@ -38,7 +38,7 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
     }
 
     if (negativeOnly) {
-      result = result.filter((r) => r.units_on_hand < 0);
+      result = result.filter((r) => r.available_units < 0);
     }
 
     return result;
@@ -85,7 +85,7 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
             checked={negativeOnly}
             onChange={(e) => setNegativeOnly(e.target.checked)}
           />
-          Negative on-hand only
+          Negative available only
         </label>
       </div>
 
@@ -105,10 +105,12 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
                 <th>Treatment</th>
                 <th className={styles.center}>Size</th>
                 <th className={styles.center}>Pkg</th>
-                <th className={styles.right}>Units Received</th>
-                <th className={styles.right}>Units Delivered</th>
-                <th className={styles.right}>Units Returned</th>
-                <th className={styles.right}>Units On Hand</th>
+                <th className={styles.right}>Received</th>
+                <th className={styles.right}>Delivered</th>
+                <th className={styles.right}>Returned</th>
+                <th className={styles.right}>Physical On Hand</th>
+                <th className={styles.right}>Staged</th>
+                <th className={styles.right}>Available</th>
               </tr>
             </thead>
             <tbody>
@@ -121,10 +123,12 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
                   <td className={styles.mono}>{r.units_received}</td>
                   <td className={styles.mono}>{r.units_delivered}</td>
                   <td className={styles.mono}>{r.units_returned}</td>
+                  <td className={styles.mono}>{r.units_on_hand}</td>
+                  <td className={styles.mono}>{r.units_staged}</td>
                   <td
-                    className={`${styles.mono} ${r.units_on_hand < 0 ? styles.negative : ""}`}
+                    className={`${styles.mono} ${r.available_units < 0 ? styles.negative : ""}`}
                   >
-                    {r.units_on_hand}
+                    {r.available_units}
                   </td>
                 </tr>
               ))}

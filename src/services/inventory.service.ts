@@ -13,6 +13,8 @@ export interface InventoryDetailRow {
   units_delivered: number;
   units_returned: number;
   units_on_hand: number;
+  units_staged: number;
+  available_units: number;
 }
 
 export async function fetchInventoryWide(): Promise<InventoryWideRow[]> {
@@ -34,6 +36,8 @@ export interface InventoryPrintRow {
   seed_size: string | null;
   package_type: string;
   units_on_hand: number;
+  units_staged: number;
+  available_units: number;
 }
 
 export async function fetchInventoryPrintData(): Promise<InventoryPrintRow[]> {
