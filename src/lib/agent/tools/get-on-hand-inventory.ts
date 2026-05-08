@@ -21,7 +21,6 @@ interface ToolInput {
   treatmentName?: string;
   packageType?: string;
   seedSize?: string;
-  minAvailableUnits?: number;
 }
 
 interface InventoryRow {
@@ -29,25 +28,25 @@ interface InventoryRow {
   treatment_name: string | null;
   seed_size: string | null;
   package_type: string | null;
-  units_on_hand: number;
-  units_staged: number;
+  // physical_units_on_hand = received − delivered + returned (warehouse stock)
+  physical_units_on_hand: number;
+  // staged_units = reserved in in_progress staged deliveries (set aside, not yet delivered)
+  staged_units: number;
+  // available_units = physical_units_on_hand − staged_units (what can still be committed)
   available_units: number;
 }
 
 interface ToolOutput {
   rows: InventoryRow[];
-  // Physical on hand
-  total_units_on_hand: number;
-  total_positive_units_on_hand: number;
-  total_negative_units_on_hand: number;
-  has_negative_inventory: boolean;
-  negative_rows: InventoryRow[];
-  // Staged
-  total_units_staged: number;
+  // Physical stock totals (warehouse counts — NOT the answer to "how many do I have?")
+  total_physical_units_on_hand: number;
+  has_negative_physical_inventory: boolean;
+  // Staged totals
+  total_staged_units: number;
   has_staged_inventory: boolean;
-  // Available (physical minus staged)
+  // Available totals — ALWAYS lead with these when answering "how many do I have?"
   total_available_units: number;
-  has_negative_available: boolean;
+  has_negative_available_inventory: boolean;
   negative_available_rows: InventoryRow[];
   // Meta
   row_count: number;
@@ -62,7 +61,16 @@ export function makeGetOnHandInventoryTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Returns current inventory for the authenticated user including physical units on hand, staged units (reserved for customers in staged deliveries), and available units (physical minus staged). Call this for any question about inventory levels, stock quantities, Bag or Seedpak quantities, seed sizes, or staged/reserved units. Negative available_units means more has been staged or delivered than is physically on hand — always surface this to the user.",
+      "Returns current inventory for the authenticated user. " +
+      "IMPORTANT — multi-row aggregation: a product filter can return MULTIPLE rows (different seed sizes, package types, or staged-only combinations). " +
+      "The pre-computed `total_*` fields aggregate ALL matching rows including rows where physical_units_on_hand = 0 but staged_units > 0. " +
+      "Always use `total_available_units` as the headline answer — never an individual row's `available_units`. " +
+      "Each row includes: `physical_units_on_hand` (warehouse stock = received − delivered + returned), " +
+      "`staged_units` (reserved in active staged deliveries, set aside for customers but not yet delivered), and " +
+      "`available_units` (physical_units_on_hand − staged_units — what can still be committed). " +
+      "Rows where physical_units_on_hand = 0 AND staged_units > 0 are included and MUST contribute to the totals — they represent product set aside for delivery that was never formally received into inventory at that seed size. " +
+      "Negative `available_units` means more has been staged or delivered than is physically on hand — surface this as a warning. " +
+      "Call this tool for any question about inventory levels, stock quantities, Bag or Seedpak quantities, seed sizes, or staged/reserved units.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
@@ -86,17 +94,11 @@ export function makeGetOnHandInventoryTool(
           description:
             "Exact seed size to filter by. Only set when the user specifies a seed size.",
         },
-        minAvailableUnits: {
-          type: "number",
-          description:
-            "Only include rows with at least this many available units. Omit unless the user specifies a minimum quantity.",
-        },
       },
       additionalProperties: false,
     }),
     execute: async (input: ToolInput): Promise<ToolOutput> => {
-      const { productName, treatmentName, packageType, seedSize, minAvailableUnits } =
-        input;
+      const { productName, treatmentName, packageType, seedSize } = input;
 
       // userClient carries the user's JWT so auth.uid() resolves correctly in the view
       let query = userClient
@@ -120,9 +122,9 @@ export function makeGetOnHandInventoryTool(
       if (seedSize) {
         query = query.eq("seed_size", seedSize);
       }
-      if (minAvailableUnits !== undefined) {
-        query = query.gte("available_units", minAvailableUnits);
-      }
+      // No available_units filter at query level — staged-only rows with negative
+      // available_units (physical=0, staged>0) must always be included so the
+      // totals are correct. Filtering them out causes the tool to over-report availability.
 
       const { data, error } = await query;
 
@@ -147,39 +149,31 @@ export function makeGetOnHandInventoryTool(
           treatment_name: row.treatment_name as string | null,
           seed_size: row.seed_size as string | null,
           package_type: toDisplayPackageType(row.package_type as string | null),
-          units_on_hand: row.units_on_hand as number,
-          units_staged: row.units_staged as number,
+          // Map DB column names → output field names that are unambiguous for the LLM
+          physical_units_on_hand: row.units_on_hand as number,
+          staged_units: row.units_staged as number,
           available_units: row.available_units as number,
         })
       );
 
-      const negative_rows = rows.filter((r) => r.units_on_hand < 0);
-      const positive_rows = rows.filter((r) => r.units_on_hand > 0);
+      const negative_physical_rows = rows.filter((r) => r.physical_units_on_hand < 0);
       const negative_available_rows = rows.filter((r) => r.available_units < 0);
 
-      const total_units_on_hand = rows.reduce((sum, r) => sum + r.units_on_hand, 0);
-      const total_positive_units_on_hand = positive_rows.reduce(
-        (sum, r) => sum + r.units_on_hand,
+      const total_physical_units_on_hand = rows.reduce(
+        (sum, r) => sum + r.physical_units_on_hand,
         0
       );
-      const total_negative_units_on_hand = negative_rows.reduce(
-        (sum, r) => sum + r.units_on_hand,
-        0
-      );
-      const total_units_staged = rows.reduce((sum, r) => sum + r.units_staged, 0);
+      const total_staged_units = rows.reduce((sum, r) => sum + r.staged_units, 0);
       const total_available_units = rows.reduce((sum, r) => sum + r.available_units, 0);
 
       const output: ToolOutput = {
         rows,
-        total_units_on_hand,
-        total_positive_units_on_hand,
-        total_negative_units_on_hand,
-        has_negative_inventory: negative_rows.length > 0,
-        negative_rows,
-        total_units_staged,
-        has_staged_inventory: total_units_staged > 0,
+        total_physical_units_on_hand,
+        has_negative_physical_inventory: negative_physical_rows.length > 0,
+        total_staged_units,
+        has_staged_inventory: total_staged_units > 0,
         total_available_units,
-        has_negative_available: negative_available_rows.length > 0,
+        has_negative_available_inventory: negative_available_rows.length > 0,
         negative_available_rows,
         row_count: rows.length,
         ...(truncated ? { truncated: true } : {}),

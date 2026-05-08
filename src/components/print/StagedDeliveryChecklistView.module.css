@@ -1,0 +1,195 @@
+@page {
+  margin: 12mm 10mm;
+}
+
+.checklist {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10.5pt;
+  color: #000;
+  max-width: 190mm;
+  margin: 0 auto;
+}
+
+/* ---- Header ---- */
+
+.header {
+  border-bottom: 2px solid #000;
+  padding-bottom: 8px;
+  margin-bottom: 18px;
+}
+
+.headerTitle {
+  font-size: 15pt;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.headerSub {
+  font-size: 10pt;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.headerMeta {
+  display: flex;
+  gap: 24px;
+  font-size: 9.5pt;
+  color: #222;
+  flex-wrap: wrap;
+}
+
+/* ---- Customer group ---- */
+
+.customerGroup {
+  margin-bottom: 18px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.customerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  background: #e8e8e8;
+  padding: 4px 8px;
+  border: 1px solid #888;
+  border-bottom: none;
+}
+
+.customerName {
+  font-weight: 700;
+  font-size: 10.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.customerSubtotal {
+  font-size: 9.5pt;
+  color: #333;
+}
+
+/* ---- Items table ---- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+
+.table th,
+.table td {
+  border: 1px solid #999;
+  padding: 3px 5px;
+  vertical-align: middle;
+}
+
+.table thead tr {
+  background: #d8d8d8;
+  font-weight: 700;
+}
+
+.table tbody tr:nth-child(even) {
+  background: #f6f6f6;
+}
+
+/* Column widths */
+.colCheck {
+  width: 22px;
+  text-align: center;
+}
+
+.colDate {
+  width: 64px;
+  white-space: nowrap;
+}
+
+.colProduct {
+  /* flex — takes remaining space */
+}
+
+.colTreatment {
+  width: 90px;
+}
+
+.colSize {
+  width: 34px;
+  text-align: center;
+}
+
+.colPkg {
+  width: 54px;
+  text-align: center;
+}
+
+.colUnits {
+  width: 42px;
+  text-align: right;
+}
+
+.colNotes {
+  width: 90px;
+  font-size: 8.5pt;
+  color: #444;
+}
+
+/* Inline checkbox square */
+.checkbox {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid #444;
+  vertical-align: middle;
+}
+
+/* Subtotal row */
+.subtotalRow td {
+  font-weight: 600;
+  background: #ededed;
+  border-top: 1.5px solid #666;
+}
+
+.subtotalLabel {
+  text-align: right;
+  padding-right: 8px;
+}
+
+/* ---- Grand total footer ---- */
+
+.grandTotal {
+  margin-top: 12px;
+  padding: 6px 10px;
+  border-top: 2px solid #000;
+  font-size: 10.5pt;
+}
+
+/* ---- Print media ---- */
+
+@media print {
+  .checklist {
+    max-width: 100%;
+  }
+
+  .customerHeader {
+    background: #e8e8e8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .table thead tr {
+    background: #d8d8d8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .table tbody tr:nth-child(even) {
+    background: #f6f6f6 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .subtotalRow td {
+    background: #ededed !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -18,16 +18,27 @@ All tools query approved views only (never raw tables). All tools are user-scope
 - "How many Seedpaks do I have?"
 - "Do I have any PONCHO treated seed left?"
 
-**Inputs (all optional):** `productName`, `treatmentName`, `packageType` (Bag/Seedpak), `seedSize`, `minUnitsOnHand`
+**Inputs (all optional):** `productName`, `treatmentName`, `packageType` (Bag/Seedpak), `seedSize`
 
-**Output:** `rows[]`, `total_units_on_hand`, `total_positive_units_on_hand`, `total_negative_units_on_hand`, `has_negative_inventory`, `negative_rows[]`, `row_count`, optional `truncated`
+**Note:** `minAvailableUnits` was removed. Filtering by available_units at query level excluded staged-only rows (physical=0, staged>0, available<0) which caused incorrect totals. All rows are always returned.
+
+**Output:** `rows[]`, `total_physical_units_on_hand`, `total_staged_units`, `total_available_units`, `has_staged_inventory`, `has_negative_physical_inventory`, `has_negative_available_inventory`, `negative_available_rows[]`, `row_count`, optional `truncated`
+
+**Multi-row aggregation:**
+- A product filter can return multiple rows (different seed sizes, package types, or staged-only combinations that exist in staged deliveries but not in received shipments).
+- The `total_*` fields aggregate ALL matching rows including rows where `physical_units_on_hand = 0` and `staged_units > 0`.
+- The agent must use `total_available_units` as the headline answer — never an individual row's `available_units` field.
+- When `row_count > 1` for a single product, the agent shows the breakdown after the headline total.
+
+**Staged-only rows:**
+- `v_on_hand_inventory` includes rows where `physical_units_on_hand = 0` and `staged_units > 0`. These are product/treatment/seed_size combinations that exist in staged deliveries but have no corresponding Bayer shipment receipt.
+- These rows have negative `available_units` and MUST contribute to `total_available_units`. They must never be filtered out.
+- If `has_staged_inventory: true`, the agent must mention staged units and must NOT say "no units are currently staged."
 
 **Negative inventory handling:**
-- `v_on_hand_inventory` can return negative `units_on_hand` values when deliveries or adjustments exceed recorded received inventory for a product+treatment+seed_size+package_type combination.
-- The tool always returns negative rows — it does not filter them out.
-- `has_negative_inventory: true` signals the assistant to explicitly surface the negative balances.
-- The assistant must never say "zero units on hand" when `has_negative_inventory` is true — it must explain the negative balances.
-- Negative inventory is a data integrity signal, not an error. It typically means a receipt was not recorded or a delivery was entered against inventory that wasn't received yet.
+- `has_negative_available_inventory: true` — available_units is negative for at least one row (staged or delivered more than received). The agent warns about each row in `negative_available_rows`.
+- `has_negative_physical_inventory: true` — physical on-hand is negative (deliveries/adjustments exceed received). Separate warning.
+- The agent must never say "zero units" or "no inventory" when either negative flag is true.
 
 **Security:** View uses `auth.uid()` in WHERE clauses; queried via user-session client.
 
@@ -121,6 +132,40 @@ All tools query approved views only (never raw tables). All tools are user-scope
 **Migration:** `0025_v_customer_order_status_add_farm_name.sql` adds `farm_name` to `v_delivery_customer_order_status`.
 
 **Security:** View uses `auth.uid()` in all CTEs; queried via user-session client.
+
+---
+
+### get_staged_deliveries ✅
+
+**View:** `v_agent_staged_deliveries`
+**File:** `src/lib/agent/tools/get-staged-deliveries.ts`
+**Status:** Live
+
+**Use cases:**
+- "What staged deliveries do I have for Scott?"
+- "Show me staged deliveries for Scott Glasgow."
+- "What deliveries are currently staged?"
+- "How many units are staged for DKC 103-93?"
+- "Which customers have staged deliveries?"
+- "What products are staged but not yet delivered?"
+
+**Inputs (all optional):** `customerName`, `productName`, `treatmentName`, `packageType` (Bag/Seedpak), `seedSize`, `seasonYear`
+
+**Output:** `resolved_season_year`, `season_source`, `rows[]`, `total_units_staged`, `staged_delivery_count` (unique staged_delivery_ids), `row_count`, `matched_customers[]`, `matched_by`
+
+**Row fields:** `staged_delivery_id`, `staged_delivery_item_id`, `staged_date`, `customer_name`, `farm_name`, `product_name`, `treatment_name`, `seed_size`, `package_type` (Bag/Seedpak), `units_staged`, `notes`, `status` (always "in_progress")
+
+**View pre-filter:** `v_agent_staged_deliveries` is pre-filtered to `status = 'in_progress'`. Converted and cancelled staged deliveries are not returned.
+
+**Customer matching (three-step):** Same pattern as fulfillment tool — exact `customer_name` → exact `farm_name` → partial match on either field. `customerName` is optional; omit it to return all staged deliveries for the season.
+
+**Season resolution:** Same two-layer defense as other seasonal tools. Season year is used to filter — staged deliveries are tagged with `season_year` from when they were created.
+
+**`matched_customers`:** Array of `{customer_name, farm_name}` for every distinct customer in the result.
+
+**`matched_by`:** `"customer_name"` | `"farm_name"` | `"both"` | `"none"` | `""` (empty when no customerName filter was applied).
+
+**Security:** View uses `auth.uid()` (inherited from `v_staged_deliveries`); queried via user-session client.
 
 ---
 

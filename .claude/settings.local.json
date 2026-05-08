@@ -57,7 +57,8 @@
       "Bash(not exist *)",
       "PowerShell(New-Item -ItemType Directory -Path \"c:\\\\Projects\\\\SSIMV2\\\\docs\\\\02_Product\" -Force)",
       "Bash(Get-ChildItem -Path src\\\\app\\\\inventory -Recurse -Include \"page.tsx\")",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\docs\" -Directory)"
     ]
   }
 }

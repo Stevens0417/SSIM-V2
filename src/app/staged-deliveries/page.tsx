@@ -38,6 +38,7 @@ import type {
   StagedDeliveryPrintItem,
   StagedDeliveryPrintCustomer,
 } from "@/components/print/StagedDeliveryPrintView";
+import type { ChecklistData } from "@/components/print/StagedDeliveryChecklistView";
 import styles from "./staged-deliveries.module.css";
 
 function todayISO(): string {
@@ -355,45 +356,52 @@ export default function StagedDeliveriesPage() {
   const handlePrintAll = () => {
     if (stagedRows.length === 0) return;
 
-    // Group rows by staged_delivery_id preserving original order
-    const order: string[] = [];
-    const groups = new Map<string, StagedDeliveryRow[]>();
-    for (const row of stagedRows) {
-      if (!groups.has(row.staged_delivery_id)) {
-        order.push(row.staged_delivery_id);
-        groups.set(row.staged_delivery_id, []);
-      }
-      groups.get(row.staged_delivery_id)!.push(row);
-    }
+    const uniqueIds = new Set(stagedRows.map((r) => r.staged_delivery_id));
+    const totalUnits = stagedRows.reduce((s, r) => s + r.units_staged, 0);
 
-    const printAll = order.map((id) => {
-      const groupRows = groups.get(id)!;
-      const first = groupRows[0];
-      const customer = customers.find((c) => c.id === first.customer_id);
-      return {
-        deliveryDate: first.staged_date,
-        customer: {
-          name: customer?.customer_name ?? first.customer_name,
-          farmName: customer?.farm_name ?? "",
-          tsaNumber: customer?.tsa_number ?? "",
-          phone: customer?.phone_number ?? "",
-          address: customer?.address ?? "",
-          city: customer?.city ?? "",
-          province: customer?.province ?? "",
-          postalCode: customer?.postal_code ?? "",
-        } satisfies StagedDeliveryPrintCustomer,
-        items: groupRows.map((r) => ({
-          product: r.product_name,
-          treatment: r.treatment_name,
-          units: r.units_staged,
-        })) satisfies StagedDeliveryPrintItem[],
-        notes: first.notes ?? "",
-      };
-    });
+    // Sort: customer name → staged date → product → treatment → seed size → package type
+    const cmp = (a: string | null, b: string | null) =>
+      (a ?? "").localeCompare(b ?? "");
+    const sorted = [...stagedRows].sort(
+      (a, b) =>
+        cmp(a.customer_name, b.customer_name) ||
+        cmp(a.staged_date, b.staged_date) ||
+        cmp(a.product_name, b.product_name) ||
+        cmp(a.treatment_name, b.treatment_name) ||
+        cmp(a.seed_size, b.seed_size) ||
+        cmp(a.package_type, b.package_type)
+    );
+
+    const today = new Date();
+    const printDate = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    const checklistData: ChecklistData = {
+      printDate,
+      seasonYear,
+      totalDeliveries: uniqueIds.size,
+      totalUnits,
+      rows: sorted.map((r) => ({
+        customerId: r.customer_id,
+        customerName: r.customer_name,
+        farmName: r.farm_name ?? "",
+        stagedDeliveryId: r.staged_delivery_id,
+        stagedDate: r.staged_date,
+        product: r.product_name,
+        treatment: r.treatment_name,
+        seedSize: r.seed_size,
+        packageType: r.package_type,
+        unitsStaged: r.units_staged,
+        notes: r.notes ?? "",
+      })),
+    };
 
     sessionStorage.setItem(
       "ssim-staged-delivery-print-all-data",
-      JSON.stringify(printAll)
+      JSON.stringify(checklistData)
     );
     window.open("/staged-deliveries/print-all", "_blank");
   };

@@ -8,6 +8,7 @@ import {
   makeGetOnHandInventoryTool,
   makeGetCustomerCurrentSeasonOrdersTool,
   makeGetCustomerOrderFulfillmentStatusTool,
+  makeGetStagedDeliveriesTool,
   makeRunApprovedReadonlyQueryTool,
 } from "@/lib/agent/tools";
 
@@ -16,10 +17,19 @@ const SYSTEM_PROMPT = `You are the SSIM assistant for Stevens Seeds Inventory Ma
 ## Available tools
 
 ### get_on_hand_inventory
-Returns current inventory for the authenticated user. Each row includes three quantities:
-- units_on_hand — physical inventory (received − delivered + returned)
-- units_staged — reserved in active staged deliveries (set aside for customers, not yet delivered)
-- available_units — what can still be committed (units_on_hand − units_staged)
+Returns current inventory for the authenticated user. Each row includes three distinct quantities — read them carefully:
+- physical_units_on_hand — warehouse stock (received − delivered + returned). This is NOT what to report for "how many do I have?" unless the user specifically asks about physical/warehouse stock.
+- staged_units — reserved in active staged deliveries (set aside for a customer, not yet formally delivered)
+- available_units — what can still be committed to another customer (physical_units_on_hand − staged_units). THIS IS THE PRIMARY ANSWER to "how many do I have?"
+
+CRITICAL RULE — "how many do I have?" always means total_available_units:
+When users ask "how many units do I have?", "how many on hand?", "how much inventory?", "what's left?", "how many can I sell?" — the answer is ALWAYS total_available_units. This is a pre-computed aggregate that sums ALL matching rows returned by the tool. Never read an individual row's available_units field as the product total — it will be wrong when multiple rows exist.
+
+Multi-row products: a product filter returns multiple rows when the same product exists across different seed sizes, package types, or staged-only combinations. For example, DKC 103-93 FUNGICIDE may have one row for Bag (seed_size=null, physical=100, staged=0) and another for a specific seed size that is staged-only (physical=0, staged=75, available=-75). The correct total available is 25 — not 100. The pre-computed total_available_units field already sums all rows including the negative ones. Always use it.
+
+Staged-only rows: v_on_hand_inventory includes rows where physical_units_on_hand = 0 and staged_units > 0. These rows have negative available_units and MUST contribute to the totals. If has_staged_inventory is true, always mention staged units — do NOT say "no units are currently staged."
+
+Never report total_physical_units_on_hand as the answer to "how many do I have?" questions.
 
 Call this tool when the user asks:
 - How much inventory / how many units do I have?
@@ -38,18 +48,19 @@ Filter rules — pass ONLY the filters that apply, omit the rest:
 - User asks about Bags → set packageType to "Bag"
 - User mentions a seed size → set seedSize
 - All inventory → call with no filters
+- Do NOT set any other parameters. The tool aggregates all matching rows and returns pre-computed totals.
 
 Presenting results:
 - Say "Bag" and "Seedpak" — never "tote"
-- Lead with available_units — this is the primary operational quantity ("how much can we still commit?")
-- State total_available_units as the headline answer to "how many do we have?"
-- If has_staged_inventory is true (total_units_staged > 0): explain the staged context. Example: "You have 80 available units. There are 100 units physically on hand, with 20 currently staged (set aside) for customers."
-- If the user specifically asks about physical on hand, use total_units_on_hand / units_on_hand.
-- If the user specifically asks about staged/reserved units, use total_units_staged / units_staged.
-- Negative available (has_negative_available is true): warn clearly. For each row in negative_available_rows, explain that available inventory is negative — more has been staged or delivered than is physically on hand. Say: "Warning: [product/treatment/size/pkg] has [N] available units — more has been staged or delivered than is physically on hand."
-- Negative physical (has_negative_inventory is true): separately warn that units_on_hand is negative for those rows — deliveries or adjustments exceeded recorded received units. List negative_rows with their units_on_hand values.
-- NEVER say a product has "zero units" or "no inventory" if has_negative_inventory or has_negative_available is true — explain the situation clearly instead.
-- Always state total_negative_units_on_hand when has_negative_inventory is true.
+- ALWAYS lead with total_available_units as the headline number. Example: "You have 25 available units of DKC 103-93."
+- If has_staged_inventory is true (total_staged_units > 0): immediately follow with the staged breakdown. Example: "There are 100 physical units on hand, but 75 are currently staged for delivery, leaving 25 available." Do NOT say "no units are currently staged" when has_staged_inventory is true.
+- If has_staged_inventory is false (total_staged_units = 0): available equals physical — no staged explanation needed. Example: "You have 100 available units of DKC 103-93. No units are currently staged."
+- When row_count > 1 for a single product: briefly show the row breakdown after the headline so the user understands the components (e.g., "Breakdown: FUNGICIDE/Bag: 100 physical, 0 staged; FUNGICIDE/AF2/Bag: 0 physical, 75 staged, -75 available").
+- If the user specifically asks about physical/warehouse stock only, use total_physical_units_on_hand.
+- If the user specifically asks about staged/reserved units only, use total_staged_units.
+- Negative available (has_negative_available_inventory is true): warn clearly for each row in negative_available_rows. Say: "Warning: [product/treatment/size/pkg] has [N] available units — more has been staged or delivered than is physically on hand."
+- Negative physical (has_negative_physical_inventory is true): separately warn that physical stock is negative — deliveries or adjustments exceeded recorded received units.
+- NEVER say a product has "zero units" or "no inventory" if has_negative_available_inventory or has_negative_physical_inventory is true — explain the situation clearly instead.
 
 ---
 
@@ -140,11 +151,54 @@ Presenting results:
 
 ---
 
+### get_staged_deliveries
+Returns all in-progress staged deliveries for the authenticated user. A staged delivery is product physically set aside for a customer but not yet formally entered as an actual delivery. Staged units reduce available inventory but are not yet a delivery record.
+
+Call this tool when the user asks ANY of the following:
+- What staged deliveries do I have (for [customer])?
+- Show me staged deliveries for [customer or farm name]
+- What deliveries are currently staged / prepared / set aside / reserved?
+- How many units are staged for [product]?
+- Which customers have staged deliveries?
+- What products are staged but not yet delivered?
+- Is there anything staged for [customer]?
+- What's been prepared but not delivered?
+
+Filter rules — pass ONLY the filters that apply, omit the rest:
+- User mentions a customer or farm name → set customerName (partial names like "Scott" are fine)
+- No customer mentioned → omit customerName entirely (returns all staged deliveries for the season)
+- User mentions a product → set productName
+- User mentions a treatment → set treatmentName
+- User asks about Seedpaks → set packageType to "Seedpak"
+- User asks about Bags → set packageType to "Bag"
+- User mentions a seed size → set seedSize
+- Only set seasonYear if the user explicitly states a specific year
+
+Presenting results:
+- Say "Bag" and "Seedpak" — never "tote"
+- Lead with total_units_staged as the headline: "You have X units staged [for customer]."
+- List rows grouped by customer when multiple customers appear
+- For each row, show: product, treatment, seed size (if corn), package type, units staged, staged date, and notes (if any)
+- If matched_by is "farm_name", say which farm was matched and list customers found under it
+- If matched_customers has multiple entries AND the user gave a partial name, ask which customer they meant before detailing — do NOT combine unrelated customers
+- If rows is empty: say no in-progress staged deliveries were found matching the criteria
+- If tool_error is true: tell the user "I wasn't able to retrieve the staged delivery data right now — please try again." Do not estimate or guess.
+
+Example response for "what staged deliveries do I have for Scott?":
+"You have 75 units staged for Scott Glasgow:
+- DKC 103-93 / FUNGICIDE / AR2 / Bag: 75 units staged on May 8, 2026."
+
+---
+
 ### run_approved_readonly_query
 
-Use this tool as a fallback when a user's question genuinely cannot be answered by the prebuilt tools above.
+**Tool selection priority — follow this order for every business data question:**
+1. Use the most specific prebuilt tool if one covers the question (get_on_hand_inventory, get_customer_current_season_orders, get_customer_order_fulfillment_status, get_staged_deliveries).
+2. If no prebuilt tool covers it, use run_approved_readonly_query against approved agent views.
+3. If a tool or query fails (tool_error: true or approved: false), report the failure — do not invent numbers or estimate from prior messages.
+4. Never answer data questions from chat history — prior messages are context only, not a data source.
 
-Use it for questions like:
+Use this tool for questions like:
 - "Which customers have ordered but haven't received any deliveries yet?" (cross-view join)
 - "What did Bayer ship for DKC 094-94?" (Bayer shipments — no prebuilt tool)
 - "How many units were returned across all customers this season?" (returns summary)
@@ -152,9 +206,8 @@ Use it for questions like:
 - "Which products have had the most replants?" (replants aggregate)
 - "What is the total inventory received vs delivered across all products?" (cross-domain aggregate)
 - "Which products are unavailable because they are fully staged?" (use v_agent_inventory WHERE available_units <= 0 AND units_staged > 0)
-- "What is staged for [customer]?" (use v_agent_staged_deliveries WHERE customer_name ILIKE '%name%')
 
-Do NOT use it when a prebuilt tool already covers the question. The prebuilt tools are the first choice for inventory, orders, fulfillment, discounts, and profit questions.
+Do NOT use it when a prebuilt tool already covers the question.
 
 Writing the SQL:
 - Always use LIMIT ≤ 100
@@ -170,6 +223,7 @@ Presenting results:
 - If rows is empty: say no matching records were found.
 - Convert package_type values: 'bag' → "Bag", 'tote' → "Seedpak"
 - Summarize results in plain language; do not dump raw data.
+- Show method: briefly state in one sentence how you found the answer. Examples: "I checked the approved deliveries view and filtered to April 2026." / "I queried the approved inventory view for products where available units are zero or negative." / "I joined the orders and fulfillment views to find customers with orders but no deliveries."
 
 ---
 
@@ -295,6 +349,13 @@ export async function POST(req: NextRequest) {
       content
     ),
     get_customer_order_fulfillment_status: makeGetCustomerOrderFulfillmentStatusTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId,
+      content
+    ),
+    get_staged_deliveries: makeGetStagedDeliveriesTool(
       anonClient,
       sb,
       user.id,

@@ -10,11 +10,11 @@ Inventory has three distinct quantities, all returned by the tool:
 
 | Field | Definition | Use case |
 |---|---|---|
-| `units_on_hand` | `received − delivered + returned` | Physical stock question |
-| `units_staged` | Sum of in_progress staged delivery items | Staged/reserved question |
-| `available_units` | `units_on_hand − units_staged` | **Primary operational question** |
+| `physical_units_on_hand` | `received − delivered + returned` — warehouse stock | Physical stock questions only |
+| `staged_units` | Sum of in_progress staged delivery items | Staged/reserved questions |
+| `available_units` | `physical_units_on_hand − staged_units` | **Primary answer to "how many do I have?"** |
 
-**Available units** is the answer to "how many can we still commit to another customer?" and is the headline quantity in agent responses.
+**Available units** is the answer to "how many do I have?" / "how many can I sell?" / "how many are left?". Never report `physical_units_on_hand` for these questions.
 
 ---
 
@@ -37,57 +37,73 @@ Inventory has three distinct quantities, all returned by the tool:
 | Field | Description |
 |---|---|
 | `rows` | Per-combination detail rows (product/treatment/size/pkg) |
-| `rows[].units_on_hand` | Physical on hand |
-| `rows[].units_staged` | Staged/reserved |
-| `rows[].available_units` | Available (operational) |
-| `total_units_on_hand` | Sum of physical on hand |
-| `total_units_staged` | Sum of staged units |
-| `total_available_units` | Sum of available units |
-| `has_staged_inventory` | true if any units are staged |
-| `has_negative_inventory` | true if any units_on_hand < 0 |
-| `has_negative_available` | true if any available_units < 0 |
-| `negative_rows` | Rows with units_on_hand < 0 |
+| `rows[].physical_units_on_hand` | Warehouse stock (received − delivered + returned) |
+| `rows[].staged_units` | Reserved in in_progress staged deliveries |
+| `rows[].available_units` | What can still be committed (physical − staged) |
+| `total_physical_units_on_hand` | Sum of physical warehouse stock |
+| `total_staged_units` | Sum of staged/reserved units |
+| `total_available_units` | Sum of available units — **primary answer to "how many do I have?"** |
+| `has_staged_inventory` | true if any staged_units > 0 |
+| `has_negative_physical_inventory` | true if any physical_units_on_hand < 0 |
+| `has_negative_available_inventory` | true if any available_units < 0 |
 | `negative_available_rows` | Rows with available_units < 0 |
+
+**View column → output field mapping:**
+
+| DB view column (`v_on_hand_inventory`) | Tool output field |
+|---|---|
+| `units_on_hand` | `physical_units_on_hand` |
+| `units_staged` | `staged_units` |
+| `available_units` | `available_units` |
 
 ---
 
 ## Response patterns
 
 ### Standard inventory question
-> "How many units do I have for 099-59?"
+> "How many units do I have for 103-93?"
 
 Lead with `total_available_units`. If staged, explain the breakdown:
-> "You have 80 available units. There are 100 physical units on hand, with 20 currently staged for customers."
+> "You have 25 available units of DKC 103-93. There are 100 physical units on hand, but 75 are currently staged for delivery."
+
+If not staged:
+> "You have 100 available units of DKC 103-93. No units are currently staged."
 
 ### Physical-only question
-> "How much physical inventory do I have for 099-59?"
+> "How much physical inventory do I have for 103-93?"
 
-Use `total_units_on_hand` / `units_on_hand`.
+Use `total_physical_units_on_hand` / `physical_units_on_hand`.
 
 ### Staged-only question
 > "How many units are staged?"
 
-Use `total_units_staged` / `units_staged`.
+Use `total_staged_units` / `staged_units`.
 
 ### Negative available (staged exceeds physical)
-> has_negative_available = true
+> has_negative_available_inventory = true
 
-Warn: "Warning: [product] has [N] available units — more has been staged or delivered than is physically on hand."
+Warn: "Warning: [product/treatment/size/pkg] has [N] available units — more has been staged or delivered than is physically on hand."
 
 Do NOT say "no inventory" or "zero units" — explain the situation.
 
 ### Negative physical (deliveries exceeded shipments)
-> has_negative_inventory = true
+> has_negative_physical_inventory = true
 
 Warn separately: "The system shows negative physical inventory for [product] — deliveries or adjustments have exceeded recorded received units."
 
 ---
 
+## Staged Delivery Questions — use `get_staged_deliveries` tool
+
+For questions about specific staged deliveries ("what staged deliveries do I have for Scott?", "which customers have staged deliveries?", "how many units are staged for DKC 103-93?"), use the dedicated `get_staged_deliveries` tool rather than the SQL fallback. It handles three-step customer name matching and returns structured output.
+
 ## SQL Fallback — staged delivery queries
 
 `v_agent_staged_deliveries` is an approved view for `run_approved_readonly_query`. Use it when:
-- User asks what is staged for a specific customer
-- User asks which products are unavailable because they are fully staged
+- User asks which products are unavailable because they are fully staged (cross-view join with inventory)
+- User asks cross-domain aggregate questions involving staged deliveries
+
+The `v_agent_inventory` view exposes the DB columns directly: `units_on_hand`, `units_staged`, `available_units`.
 
 Example queries:
 ```sql

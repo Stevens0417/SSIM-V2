@@ -46,11 +46,11 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 **Safe use cases:**
 - "How many units of DKC 45-50 FUNGICIDE Bag do we have on hand?"
-- "Show me all products where units_on_hand is negative."
+- "Show me all products where available_units is negative."
 - "What is the current inventory for soybean products?"
 - "How many Seedpak units of [product] do we have?"
 
-**Allowed filters:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_on_hand`
+**Allowed filters:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `available_units`
 
 **Columns safe for agent:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_received`, `units_delivered`, `units_returned`, `units_on_hand`, `units_staged`, `available_units`
 
@@ -58,10 +58,12 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 **Notes:**
 - Use `package_type = 'bag'` for Bags and `package_type = 'tote'` for Seedpaks in filter values. Display as "Bag" / "Seedpak" in responses.
-- `units_on_hand` is physical inventory (received − delivered + returned). A negative value means more has been delivered than received, which may indicate a recording gap.
-- `units_staged` is the quantity reserved in in_progress staged deliveries. `available_units = units_on_hand - units_staged`.
-- Prefer `available_units` for operational questions ("how much do we have to sell?"). Use `units_on_hand` for physical stock questions.
+- `units_on_hand` is **physical** inventory (received − delivered + returned) — the warehouse count. The tool exposes this as `physical_units_on_hand`.
+- `units_staged` is the quantity reserved in in_progress staged deliveries. The tool exposes this as `staged_units`.
+- `available_units = units_on_hand − units_staged` — this is the primary operational quantity. The `get_on_hand_inventory` tool always leads responses with `total_available_units`.
 - This view has separate rows for Bag and Seedpak — if you want a combined total, sum across package_type.
+- **Staged-only rows:** The view includes rows where `units_on_hand = 0` and `units_staged > 0` (i.e., product staged for delivery at a seed_size or package_type that has no received inventory). These rows have `available_units < 0` and must NOT be filtered out — they reduce total available inventory. The `get_on_hand_inventory` tool always returns all rows so the pre-computed `total_available_units` is correct. Do not apply `WHERE available_units >= 0` in SQL fallback queries — use `total_available_units` from the tool instead.
+- **Agent aggregation rule:** When the tool returns multiple rows for the same product (different seed sizes), the agent uses `total_available_units` (the pre-computed sum of all rows) as the headline — never an individual row's `available_units` value.
 
 ---
 
@@ -259,6 +261,7 @@ All views in this document are user-scoped — they automatically filter by `aut
 - Package type `'bag'` → display "Bag"; `'tote'` → display "Seedpak".
 - Use ILIKE for customer/farm name matching: `customer_name ILIKE '%smith%'`.
 - Filter by `season_year` explicitly when asking about a specific season.
+- **Primary agent tool:** `get_staged_deliveries` uses this view directly with three-step customer name matching. The SQL fallback (`run_approved_readonly_query`) can also query this view for cross-domain or aggregation questions.
 
 ---
 
@@ -278,4 +281,4 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 7. **Do not query raw `orders`, `deliveries`, `returns`, `replants`, `bayer_shipment_items`, `staged_deliveries`, or `staged_delivery_items` tables directly.** Use the views above.
 
-8. **SQL fallback approved views** (for `run_approved_readonly_query` tool): `v_agent_customer_orders`, `v_agent_order_fulfillment`, `v_agent_inventory`, `v_agent_customer_deliveries`, `v_agent_customer_returns`, `v_agent_customer_replants`, `v_agent_bayer_shipments`, `v_agent_staged_deliveries`. `v_agent_inventory` now includes `units_staged` and `available_units` (added migration 0027). `v_agent_staged_deliveries` lists all in_progress staged deliveries. Adding a new view to the SQL fallback requires updating both the `TOOL_DESCRIPTION` in `run-approved-readonly-query.ts` and the `APPROVED_VIEWS` set in `validate-approved-query.ts`.
+8. **SQL fallback approved views** (for `run_approved_readonly_query` tool): `v_agent_customer_orders`, `v_agent_order_fulfillment`, `v_agent_inventory`, `v_agent_customer_deliveries`, `v_agent_customer_returns`, `v_agent_customer_replants`, `v_agent_bayer_shipments`, `v_agent_staged_deliveries`. `v_agent_inventory` includes `units_on_hand` (physical), `units_staged`, and `available_units` (added migration 0027). Note: in SQL queries use the DB column names (`units_on_hand`, `units_staged`); the `get_on_hand_inventory` tool renames these to `physical_units_on_hand` and `staged_units` in its output to avoid LLM confusion. `v_agent_staged_deliveries` lists all in_progress staged deliveries. Adding a new view to the SQL fallback requires updating both the `TOOL_DESCRIPTION` in `run-approved-readonly-query.ts` and the `APPROVED_VIEWS` set in `validate-approved-query.ts`.
