@@ -46,7 +46,7 @@ export default function StagedDeliveryPrintView({
           alt="DEKALB"
         />
         <div className={styles.headerText}>
-          <div className={styles.headerLine1}>Prepared Delivery Form</div>
+          <div className={styles.headerLine1}>Seed Delivery Form</div>
           <div className={styles.headerLine2}>Travis Stevens</div>
           <div className={styles.headerLine3}>Stevens Seeds</div>
           <div className={styles.headerLine4}>
@@ -66,7 +66,7 @@ export default function StagedDeliveryPrintView({
               <span className={styles.infoValue}>{customer.name}</span>
             </div>
             <div className={styles.infoRow}>
-              <span className={styles.infoLabel}>Staged Date:</span>
+              <span className={styles.infoLabel}>Delivery Date:</span>
               <span className={styles.infoValue}>{stagedDate}</span>
             </div>
             <div className={styles.infoRow}>
@@ -99,13 +99,13 @@ export default function StagedDeliveryPrintView({
 
       {/* ---- Staged Items ---- */}
       <div className={`${styles.section} ${styles.sectionItems}`}>
-        <div className={styles.sectionTitle}>Prepared Items</div>
+        <div className={styles.sectionTitle}>Delivery Items</div>
         <table className={styles.itemsTable}>
           <thead>
             <tr>
               <th className={styles.colProduct}>Product</th>
               <th className={styles.colTreatment}>Treatment</th>
-              <th className={styles.colUnits}>Units Staged</th>
+              <th className={styles.colUnits}>Units Delivered</th>
             </tr>
           </thead>
           <tbody>
