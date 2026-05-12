@@ -28,6 +28,7 @@ export default function AdjustmentsTable({
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [earlyPayFilter, setEarlyPayFilter] = useState<EarlyPayFilter>("ALL");
   const [needsAdjustmentOnly, setNeedsAdjustmentOnly] = useState(false);
+  const [incompleteOnly, setIncompleteOnly] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
 
@@ -58,8 +59,12 @@ export default function AdjustmentsTable({
       result = result.filter((r) => r.net_units !== 0);
     }
 
+    if (incompleteOnly) {
+      result = result.filter((r) => !r.is_completed);
+    }
+
     return result;
-  }, [rows, selectedCustomerId, earlyPayFilter, needsAdjustmentOnly]);
+  }, [rows, selectedCustomerId, earlyPayFilter, needsAdjustmentOnly, incompleteOnly]);
 
   const handleToggle = useCallback(
     async (row: AdjustmentRow) => {
@@ -152,6 +157,15 @@ export default function AdjustmentsTable({
             onChange={(e) => setNeedsAdjustmentOnly(e.target.checked)}
           />
           <span>Needs Adjustment Only</span>
+        </label>
+
+        <label className={styles.toggleLabel}>
+          <input
+            type="checkbox"
+            checked={incompleteOnly}
+            onChange={(e) => setIncompleteOnly(e.target.checked)}
+          />
+          <span>Incomplete Only</span>
         </label>
 
         <span className={styles.resultCount}>

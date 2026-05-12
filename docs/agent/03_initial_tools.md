@@ -1,0 +1,156 @@
+# Agent — Prebuilt Tools Reference
+
+Documents the four prebuilt agent tools: when to use them, what they return, and how they relate to the SQL fallback.
+
+---
+
+## Tool selection hierarchy
+
+Every business data question follows this order:
+
+1. **Use a prebuilt tool** if it covers the question.
+2. **Use `run_approved_readonly_query`** (SQL fallback) if no prebuilt tool fits.
+3. **Explain why it cannot be answered** only if neither option can retrieve the data safely.
+
+The agent must never say "I cannot retrieve this" without first attempting a query.
+
+---
+
+## Prebuilt tool 1 — `get_on_hand_inventory`
+
+**Source view:** `v_on_hand_inventory`
+
+**Use for:**
+- "How many units of [product] do I have?"
+- "What inventory is available for [treatment]?"
+- "How many Bags/Seedpaks do I have?"
+- "Which products are fully staged?"
+- Any question about current stock levels
+
+**Does NOT cover:** delivery history, returns, replants, Bayer shipments, cross-customer aggregates.
+
+**Key output fields:**
+- `total_available_units` — primary answer to "how many do I have?" (physical minus staged)
+- `total_physical_units_on_hand` — warehouse count only
+- `total_staged_units` — reserved in active staged deliveries
+- `rows[]` — per (product/treatment/seed_size/package_type) detail
+
+**See also:** [inventory-tool.md](inventory-tool.md) for full response patterns.
+
+---
+
+## Prebuilt tool 2 — `get_customer_current_season_orders`
+
+**Source view:** `v_agent_customer_current_season_orders`
+
+**Use for:**
+- "What did [customer/farm] order this season?"
+- "Show me [customer]'s order lines."
+- "What is [customer]'s total invoice?"
+- "What is the profit on [customer]'s order?"
+- Questions about order quantities, pricing, discounts, or profit per customer
+
+**Does NOT cover:** fulfillment status, how many units have been delivered, returns, inventory.
+
+**Key output fields:**
+- `rows[]` — one row per order line item
+- `total_units_ordered`, `total_line_total_after_all_discounts`, `total_profit`
+- `weighted_avg_brand_grower_discount_pct`, `weighted_avg_early_pay_discount_pct`
+- `matched_customers[]`, `matched_by` — customer resolution metadata
+
+**Tool parameters:**
+- `customerName` — required; partial names and farm names accepted
+- `seasonYear` — optional; omit to use the current season
+- `productName`, `treatmentName`, `earlyPayOnly` — optional filters
+- `includePricing: true` — required for price/discount questions
+- `includeProfit: true` — required for profit/margin questions
+
+---
+
+## Prebuilt tool 3 — `get_customer_order_fulfillment_status`
+
+**Source view:** `v_delivery_customer_order_status`
+
+**Use for:**
+- "What does [customer] still have left to deliver?"
+- "What is [customer]'s outstanding balance?"
+- "Is [customer]'s order complete?"
+- "How many units have been delivered to [customer]?"
+- Any question about open/remaining/delivered units per customer
+
+**Does NOT cover:** full delivery history, returns history, inventory levels.
+
+**Key output fields:**
+- `rows[]` — one row per (customer/product/treatment/size/pkg) aggregated from order lines
+- `fulfillment_status` per row: `"open"` | `"partial"` | `"complete"` | `"overdelivered"`
+- `total_units_ordered`, `total_units_delivered`, `total_units_remaining`
+- `matched_customers[]`, `matched_by`
+
+**Tool parameters:**
+- `customerName` — required; partial names and farm names accepted
+- `seasonYear`, `productName`, `treatmentName`, `packageType`, `seedSize` — optional
+- `openOnly: true` — show only incomplete lines
+
+---
+
+## Prebuilt tool 4 — `get_staged_deliveries`
+
+**Source view:** `v_agent_staged_deliveries`
+
+**Use for:**
+- "What staged deliveries do I have for [customer]?"
+- "How many units are staged for [product]?"
+- "Which customers have staged deliveries?"
+- "What's been prepared but not delivered?"
+
+**Does NOT cover:** cross-customer aggregates/rankings, converted/cancelled staged deliveries.
+
+**Key output fields:**
+- `rows[]` — one row per staged delivery line item
+- `total_units_staged`
+- `matched_customers[]`, `matched_by`
+
+**Tool parameters:**
+- `customerName` — optional; omit for all staged deliveries
+- `productName`, `treatmentName`, `packageType`, `seedSize`, `seasonYear` — optional
+
+---
+
+## When the SQL fallback is needed instead
+
+Use `run_approved_readonly_query` when a prebuilt tool cannot answer:
+
+| Question | Why SQL fallback |
+|---|---|
+| "Which customers have the most staged units?" | Prebuilt tool returns detail rows, not rankings |
+| "Which products have negative available inventory?" | No prebuilt tool surfaces this cross-product view |
+| "Which products have I delivered the most of?" | No prebuilt tool covers delivery history aggregates |
+| "What did Bayer ship for DKC 094-94?" | No prebuilt tool covers Bayer shipments |
+| "How many returns did I have this season?" | No prebuilt tool covers returns |
+| "Which customers received product X this season?" | Requires delivery history — not in fulfillment tool |
+| "What is our total profit this season?" | Requires aggregating all order lines |
+
+See [06_sql_fallback_model.md](06_sql_fallback_model.md) for full SQL fallback documentation.
+
+---
+
+## Logging
+
+All prebuilt tool calls are logged to `agent_tool_calls` with:
+- `tool_name` — tool identifier
+- `input_json` — full input parameters
+- `output_json` — full tool output (including error fields if any)
+- `status` — `"success"` | `"error"` | `"not_found"` depending on tool
+
+---
+
+## File locations
+
+| File | Purpose |
+|---|---|
+| `src/lib/agent/tools/get-on-hand-inventory.ts` | Inventory tool factory |
+| `src/lib/agent/tools/get-customer-current-season-orders.ts` | Orders tool factory |
+| `src/lib/agent/tools/get-customer-order-fulfillment-status.ts` | Fulfillment tool factory |
+| `src/lib/agent/tools/get-staged-deliveries.ts` | Staged deliveries tool factory |
+| `src/lib/agent/tools/index.ts` | Tool exports |
+| `src/app/api/agent/chat/route.ts` | Tool registration and system prompt |

@@ -44,6 +44,7 @@ const FORBIDDEN_KEYWORDS = [
   "SAVEPOINT",
   "LOCK",
   "EXPLAIN",
+  "CALL",
 ];
 
 export interface ValidationResult {

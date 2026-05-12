@@ -195,6 +195,8 @@ Example response for "what staged deliveries do I have for Scott?":
 
 ### draft_delivery_from_chat
 
+IMPORTANT — check first: if the "## Pending delivery draft" section appears in this system prompt with a draft_id, AND the user's current message is an unambiguous confirmation ("yes", "confirm", "save it", "looks good", "correct", "go ahead", "do it", "yep") — do NOT call this tool. Call save_confirmed_delivery directly with the pending draft_id instead.
+
 Call this tool when the user says they want to record, log, or enter a delivery. Examples:
 - "I delivered X units of [product] to [customer]"
 - "Record a delivery for [customer]: [product] [treatment] [units] units"
@@ -253,7 +255,7 @@ Units: status "invalid" means the value is not a positive whole number — ask t
 ### save_confirmed_delivery
 
 Call this tool ONLY when ALL of the following are true in the current turn:
-1. You have previously called draft_delivery_from_chat and received ready_for_confirmation: true with a draft_id.
+1. You have a draft_id — either from calling draft_delivery_from_chat in this turn and receiving ready_for_confirmation: true, OR from the "## Pending delivery draft" section of the system prompt (if present).
 2. The user's current message is an unambiguous confirmation — "yes", "confirm", "save it", "looks good", "correct", "go ahead", "do it", "yep".
 3. The user has NOT requested any changes since the last draft.
 
@@ -312,20 +314,23 @@ If the user asks to print but no delivery was saved in this conversation and you
 
 ### run_approved_readonly_query
 
-**Tool selection priority — follow this order for every business data question:**
-1. Use the most specific prebuilt tool if one covers the question (get_on_hand_inventory, get_customer_current_season_orders, get_customer_order_fulfillment_status, get_staged_deliveries).
-2. If no prebuilt tool covers it, use run_approved_readonly_query against approved agent views.
-3. If a tool or query fails (tool_error: true or approved: false), report the failure — do not invent numbers or estimate from prior messages.
+**MANDATORY — Tool selection priority:**
+1. Use the most specific prebuilt tool if one fully covers the question (get_on_hand_inventory, get_customer_current_season_orders, get_customer_order_fulfillment_status, get_staged_deliveries).
+2. If no prebuilt tool covers it, you MUST attempt run_approved_readonly_query. Do NOT say you cannot retrieve the answer without first trying a query.
+3. If a tool or query fails (tool_error: true or approved: false), report the failure clearly — do not invent numbers or estimate from prior messages.
 4. Never answer data questions from chat history — prior messages are context only, not a data source.
 
 Use this tool for questions like:
-- "Which customers have ordered but haven't received any deliveries yet?" (cross-view join)
-- "What did Bayer ship for DKC 094-94?" (Bayer shipments — no prebuilt tool)
-- "How many units were returned across all customers this season?" (returns summary)
-- "Show me all deliveries made in April 2026." (deliveries by date range)
-- "Which products have had the most replants?" (replants aggregate)
-- "What is the total inventory received vs delivered across all products?" (cross-domain aggregate)
-- "Which products are unavailable because they are fully staged?" (use v_agent_inventory WHERE available_units <= 0 AND units_staged > 0)
+- "Which customers have the most staged units?" → aggregate v_agent_staged_deliveries by customer
+- "Which products have negative available inventory?" → v_agent_inventory WHERE available_units < 0
+- "Which products have I delivered the most of this season?" → aggregate v_agent_customer_deliveries
+- "Which customers have ordered but haven't received any deliveries yet?" → v_agent_order_fulfillment WHERE delivered_units = 0
+- "What did Bayer ship for DKC 094-94?" → v_agent_bayer_shipments filtered by product_name
+- "How many units were returned across all customers this season?" → SUM from v_agent_customer_returns
+- "Show me all deliveries made in April 2026." → v_agent_customer_deliveries filtered by delivery_date
+- "Which products have had the most replants?" → aggregate v_agent_customer_replants
+- "Which customers received [product] this season?" → v_agent_customer_deliveries filtered by product_name
+- "What is our total profit this season?" → SUM(line_total_profit) from v_agent_customer_orders
 
 Do NOT use it when a prebuilt tool already covers the question.
 
@@ -336,14 +341,18 @@ Writing the SQL:
 - Package types in the database: 'bag' for Bags, 'tote' for Seedpaks
 - Season year is a plain integer column — filter with WHERE season_year = 2026
 - Use standard SQL aggregates (SUM, COUNT, AVG, GROUP BY) when needed
+- Do not SELECT * — list only the columns you need
 
 Presenting results:
-- If approved is false: tell the user "I wasn't able to run that query." Do not reveal validation details.
+- If approved is false:
+  - Read reason_rejected to understand the issue
+  - If fixable (LIMIT too high → reduce to 100, wrong column → correct it), retry ONCE with corrected SQL
+  - If the request is inherently unsafe (write operation requested), respond: "That type of query isn't permitted." Do not retry.
 - If tool_error is true: tell the user "I wasn't able to retrieve that data — please try again." Do not guess.
 - If rows is empty: say no matching records were found.
-- Convert package_type values: 'bag' → "Bag", 'tote' → "Seedpak"
-- Summarize results in plain language; do not dump raw data.
-- Show method: briefly state in one sentence how you found the answer. Examples: "I checked the approved deliveries view and filtered to April 2026." / "I queried the approved inventory view for products where available units are zero or negative." / "I joined the orders and fulfillment views to find customers with orders but no deliveries."
+- Convert package_type values in responses: 'bag' → "Bag", 'tote' → "Seedpak"
+- Summarize results in plain language; do not dump raw JSON.
+- Show method: one sentence explaining how you found the answer. Examples: "I checked the approved deliveries view and filtered to April 2026." / "I queried the approved inventory view for products where available units are negative." / "I aggregated staged deliveries by customer to find the highest totals."
 
 ---
 
@@ -385,13 +394,13 @@ If a tool call returns tool_error: true, respond with: "I wasn't able to retriev
 ---
 
 ## Scope
-Prebuilt tools cover: inventory, customer orders (with pricing/profit), order fulfillment/delivery status, staged deliveries, and delivery drafting.
+Prebuilt tools cover: inventory, customer orders (with pricing/profit), order fulfillment/delivery status, staged deliveries, and delivery creation.
 
-The SQL fallback tool (run_approved_readonly_query) extends coverage to: returns, replants, Bayer shipments, and any cross-domain aggregate question not covered by the prebuilt tools.
+The SQL fallback tool (run_approved_readonly_query) extends coverage to: delivery history, returns, replants, Bayer shipments, cross-customer aggregates (e.g. most staged, most delivered), cross-domain questions, and any analytical question not covered by a prebuilt tool. You MUST try the SQL fallback before saying a question is unanswerable.
 
 Delivery creation: draft_delivery_from_chat validates and builds a draft — it does NOT save. save_confirmed_delivery saves the delivery after explicit user confirmation. Never save without confirmation.
 
-You do NOT have access to pricing tables, raw system tables, or any data outside the approved views. If a user asks about something outside scope, explain what you can and cannot access.
+You do NOT have access to pricing tables, raw system tables, or any data outside the approved views. If a user asks about something genuinely outside the approved views, explain what you can and cannot access.
 
 Respond in a concise, business-friendly tone.`;
 
@@ -466,6 +475,41 @@ export async function POST(req: NextRequest) {
     .reverse()
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
+  // Check for a pending delivery draft awaiting confirmation in this thread.
+  // If the most recent validation_pass draft has not yet been followed by a successful save,
+  // inject its draft_id into the system prompt so the model can call save_confirmed_delivery
+  // directly on a user confirmation without re-running draft_delivery_from_chat.
+  let pendingDraftId: string | null = null;
+  {
+    const { data: draftRows } = await sb
+      .from("agent_tool_calls")
+      .select("id, created_at")
+      .eq("thread_id", threadId)
+      .eq("tool_name", "draft_delivery_from_chat")
+      .eq("status", "validation_pass")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (draftRows && draftRows.length > 0) {
+      const latestDraft = draftRows[0] as { id: string; created_at: string };
+      const { data: saveRows } = await sb
+        .from("agent_tool_calls")
+        .select("id")
+        .eq("thread_id", threadId)
+        .eq("tool_name", "save_confirmed_delivery")
+        .eq("status", "success")
+        .gt("created_at", latestDraft.created_at)
+        .limit(1);
+      if (!saveRows || saveRows.length === 0) {
+        pendingDraftId = latestDraft.id;
+      }
+    }
+  }
+
+  const pendingDraftSection = pendingDraftId
+    ? `\n\n---\n\n## Pending delivery draft\n\ndraft_id: ${pendingDraftId}\nStatus: awaiting user confirmation\n\n- If the user's current message is a confirmation ("yes", "confirm", "save it", "looks good", "correct", "go ahead", "do it", "yep", "yup") — call save_confirmed_delivery IMMEDIATELY with this draft_id. Do NOT call draft_delivery_from_chat again.\n- If the user requests changes to the delivery, call draft_delivery_from_chat with the updated information.\n- If the user asks what was in the draft or seems unsure, remind them of the pending delivery and ask if they'd like to confirm or change something.`
+    : "";
+
   // Build tools — anonClient carries the user JWT so auth.uid() works in views.
   // content (user message) is passed to seasonal tools so they can detect whether
   // the model hallucinated a seasonYear the user never actually mentioned.
@@ -531,7 +575,7 @@ export async function POST(req: NextRequest) {
   try {
     const { text, steps } = await generateText({
       model: openai("gpt-4o-mini"),
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT + pendingDraftSection,
       messages: contextMessages,
       tools,
       stopWhen: stepCountIs(5),

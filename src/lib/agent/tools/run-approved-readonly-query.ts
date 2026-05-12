@@ -18,19 +18,62 @@ interface ToolOutput {
   tool_error_message?: string;
 }
 
-const TOOL_DESCRIPTION = `Run a read-only SQL SELECT against approved agent views. Use ONLY when a prebuilt tool cannot answer the user's question.
+const TOOL_DESCRIPTION = `Run a read-only SQL SELECT against approved agent views. Use this tool whenever a prebuilt tool cannot answer the user's question — do NOT say the question is unanswerable without first attempting a query.
 
-Approved views:
-- v_agent_customer_orders: order_item_id, order_id, order_date, season_year, customer_id, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_ordered, early_pay, brand_grower_pct, early_pay_pct, retail_price_per_unit, line_total_after_all_discounts, break_even_price_per_unit, profit_per_unit, line_total_profit
-- v_agent_order_fulfillment: season_year, customer_id, customer_name, farm_name, order_id, order_date, order_item_id, product_name, treatment_name, seed_size, package_type, ordered_units, delivered_units, returned_units, replanted_units, net_units, is_complete
-- v_agent_inventory: product_name, treatment_name, seed_size, package_type, units_on_hand, units_staged, available_units — units_on_hand is physical (received−delivered+returned); units_staged is reserved in staged deliveries; available_units = units_on_hand − units_staged
-- v_agent_customer_deliveries: delivery_id, delivery_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_delivered, order_id, order_item_id, notes
-- v_agent_customer_returns: return_id, return_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_returned, order_id, order_item_id, notes
-- v_agent_customer_replants: replant_id, replant_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_replanted, order_id, order_item_id, notes
-- v_agent_bayer_shipments: shipment_id, shipment_date, season_year, shipment_number, shipment_item_id, product_name, treatment_name, units_received, is_verified
-- v_agent_staged_deliveries: staged_delivery_id, customer_name, farm_name, season_year, staged_date, notes, product_name, treatment_name, seed_size, package_type, units_staged, created_at — in_progress staged deliveries only
+Approved views (all user-scoped — only the current user's data is returned):
 
-Query rules: SELECT only, LIMIT ≤ 100 required, only approved views in FROM/JOIN. Package types in DB: 'bag' (Bags) and 'tote' (Seedpaks). Use ILIKE for case-insensitive name matching. Use available_units from v_agent_inventory for "how many do we have" questions.`;
+v_agent_inventory — on-hand, staged, and available seed inventory
+  Columns: product_name, treatment_name, seed_size, package_type, units_on_hand, units_staged, available_units
+  Notes: units_on_hand = physical (received−delivered+returned); units_staged = reserved in active staged deliveries; available_units = units_on_hand − units_staged
+
+v_agent_staged_deliveries — in-progress staged deliveries only
+  Columns: staged_delivery_id, customer_name, farm_name, season_year, staged_date, notes, product_name, treatment_name, seed_size, package_type, units_staged, created_at
+
+v_agent_customer_orders — order line items with pricing and profit
+  Columns: order_item_id, order_id, order_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_ordered, early_pay, early_pay_pct, brand_grower_pct, retail_price_per_unit, line_total_after_all_discounts, break_even_price_per_unit, profit_per_unit, line_total_profit
+
+v_agent_order_fulfillment — delivery fulfillment status per order line
+  Columns: season_year, customer_name, farm_name, order_date, product_name, treatment_name, seed_size, package_type, ordered_units, delivered_units, returned_units, replanted_units, net_units, is_complete
+
+v_agent_customer_deliveries — delivery history
+  Columns: delivery_id, delivery_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_delivered, order_id, order_item_id, notes
+
+v_agent_customer_returns — return history
+  Columns: return_id, return_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_returned, order_id, order_item_id, notes
+
+v_agent_customer_replants — replant history
+  Columns: replant_id, replant_date, season_year, customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_replanted, order_id, order_item_id, notes
+
+v_agent_bayer_shipments — Bayer shipment line items
+  Columns: shipment_id, shipment_date, season_year, shipment_number, shipment_item_id, product_name, treatment_name, seed_size, package_type, units_received, is_verified, verified_at
+
+Query rules:
+- SELECT only — no writes
+- LIMIT ≤ 100 required on every query
+- Only approved views in FROM/JOIN clauses
+- Package types stored as 'bag' (display: Bag) and 'tote' (display: Seedpak)
+- Use ILIKE for case-insensitive name matching: customer_name ILIKE '%smith%'
+- Filter by season_year (integer) for season-specific questions
+- available_units from v_agent_inventory is the primary inventory answer field
+
+Example queries:
+-- Which customers have the most staged units?
+SELECT customer_name, SUM(units_staged) AS total_staged FROM v_agent_staged_deliveries GROUP BY customer_name ORDER BY total_staged DESC LIMIT 20;
+
+-- Which products have negative available inventory?
+SELECT product_name, treatment_name, seed_size, package_type, available_units FROM v_agent_inventory WHERE available_units < 0 ORDER BY available_units LIMIT 50;
+
+-- Which products have I delivered the most of this season?
+SELECT product_name, treatment_name, SUM(units_delivered) AS total_delivered FROM v_agent_customer_deliveries WHERE season_year = 2026 GROUP BY product_name, treatment_name ORDER BY total_delivered DESC LIMIT 20;
+
+-- Customers with orders but no deliveries this season
+SELECT DISTINCT f.customer_name FROM v_agent_order_fulfillment f WHERE f.season_year = 2026 AND f.delivered_units = 0 LIMIT 50;
+
+-- Total units returned this season
+SELECT SUM(units_returned) AS total_returned FROM v_agent_customer_returns WHERE season_year = 2026 LIMIT 1;
+
+-- Bayer shipments for a specific product
+SELECT shipment_date, product_name, treatment_name, seed_size, package_type, units_received FROM v_agent_bayer_shipments WHERE product_name ILIKE '%094-94%' ORDER BY shipment_date LIMIT 50;`;
 
 export function makeRunApprovedReadonlyQueryTool(
   userClient: SupabaseClient,

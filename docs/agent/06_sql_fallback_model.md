@@ -15,24 +15,25 @@ The SQL fallback is a safety valve for business questions that fall outside the 
 The agent always follows this hierarchy:
 
 1. **Prebuilt tool first.** `get_on_hand_inventory`, `get_customer_current_season_orders`, `get_customer_order_fulfillment_status`, `get_staged_deliveries`. If any of them covers the question, it is called — not the SQL fallback.
-2. **SQL fallback if no prebuilt tool fits.** `run_approved_readonly_query` is used only when the specific question is genuinely outside the prebuilt tools' scope.
-3. **Failure means failure — never guess.** If a tool returns `tool_error: true` or `approved: false`, the agent reports the failure. It does not construct an answer from prior chat messages or training data.
-4. **Chat history is context, not a data source.** Even if a prior message seems to contain the answer, the agent calls the appropriate tool.
+2. **SQL fallback if no prebuilt tool fits.** `run_approved_readonly_query` MUST be attempted for any business data question not covered by a prebuilt tool. The agent must not say "I cannot retrieve this" without first trying a query.
+3. **Rejection retry.** If the tool returns `approved: false` with a fixable issue (LIMIT too high, wrong column name), the agent retries once with corrected SQL. If the rejection is due to an inherently unsafe request (write operation), the agent stops and explains.
+4. **Failure means failure — never guess.** If a tool returns `tool_error: true` after a valid attempt, the agent reports the failure. It does not construct an answer from prior chat messages or training data.
+5. **Chat history is context, not a data source.** Even if a prior message seems to contain the answer, the agent calls the appropriate tool.
 
 ---
 
 ## Approved views
 
-| View | Purpose |
-|---|---|
-| `v_agent_customer_orders` | Order line items with pricing and profit |
-| `v_agent_order_fulfillment` | Delivery fulfillment status per order line |
-| `v_agent_inventory` | On-hand + staged + available inventory |
-| `v_agent_customer_deliveries` | Delivery history per customer |
-| `v_agent_customer_returns` | Return history per customer |
-| `v_agent_customer_replants` | Replant history per customer |
-| `v_agent_bayer_shipments` | Bayer shipment detail |
-| `v_agent_staged_deliveries` | In-progress staged deliveries |
+| View | Key columns | Purpose |
+|---|---|---|
+| `v_agent_inventory` | product_name, treatment_name, seed_size, package_type, units_on_hand, units_staged, available_units | On-hand + staged + available inventory |
+| `v_agent_staged_deliveries` | customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_staged, staged_date, season_year | In-progress staged deliveries |
+| `v_agent_customer_orders` | customer_name, product_name, treatment_name, units_ordered, retail_price_per_unit, line_total_after_all_discounts, profit_per_unit, line_total_profit, season_year | Order line items with pricing and profit |
+| `v_agent_order_fulfillment` | customer_name, product_name, treatment_name, ordered_units, delivered_units, net_units, is_complete, season_year | Delivery fulfillment status per order line |
+| `v_agent_customer_deliveries` | customer_name, product_name, treatment_name, seed_size, package_type, units_delivered, delivery_date, season_year | Delivery history per customer |
+| `v_agent_customer_returns` | customer_name, product_name, treatment_name, seed_size, package_type, units_returned, return_date, season_year | Return history per customer |
+| `v_agent_customer_replants` | customer_name, product_name, treatment_name, seed_size, package_type, units_replanted, replant_date, season_year | Replant history per customer |
+| `v_agent_bayer_shipments` | product_name, treatment_name, seed_size, package_type, units_received, shipment_date, season_year, is_verified | Bayer shipment detail |
 
 All views are user-scoped (`auth.uid()` enforced at the view level). The RPC executes as SECURITY INVOKER so the calling user's JWT is preserved.
 
@@ -50,7 +51,7 @@ Every query is checked before execution:
 
 - Must begin with `SELECT` or `WITH`
 - Every `FROM`/`JOIN` target must be an approved view or a declared CTE name
-- Forbidden keywords (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `EXECUTE`, `PG_SLEEP`, `DBLINK`, `PG_READ_FILE`, etc.) cause immediate rejection
+- Forbidden keywords (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `EXECUTE`, `CALL`, `PG_SLEEP`, `DBLINK`, `PG_READ_FILE`, etc.) cause immediate rejection
 - `LIMIT` clause required; max value is 100
 - String literals are stripped before keyword scanning to prevent false positives (e.g. a customer named "DROP" won't trigger the guard)
 
@@ -107,14 +108,17 @@ The method note appears after the data summary, not before it.
 
 ## Example use cases
 
-| Question | Why SQL fallback (not prebuilt tool) |
-|---|---|
-| "Which customers ordered but got no deliveries?" | Requires joining orders + fulfillment views |
-| "What did Bayer ship for DKC 094-94?" | No prebuilt tool covers Bayer shipments |
-| "How many units were returned this season?" | No prebuilt tool covers returns |
-| "Show deliveries made in April 2026." | Date-range filter on deliveries view |
-| "Which products have the most replants?" | No prebuilt tool covers replants |
-| "Which products are fully staged with zero available?" | Cross-column condition on inventory view |
+| Question | Approved view | Example SQL |
+|---|---|---|
+| "Which customers have the most staged units?" | `v_agent_staged_deliveries` | `SELECT customer_name, SUM(units_staged) AS total FROM v_agent_staged_deliveries GROUP BY customer_name ORDER BY total DESC LIMIT 20` |
+| "Which products have negative available inventory?" | `v_agent_inventory` | `SELECT product_name, treatment_name, available_units FROM v_agent_inventory WHERE available_units < 0 ORDER BY available_units LIMIT 50` |
+| "Which products have I delivered the most of?" | `v_agent_customer_deliveries` | `SELECT product_name, SUM(units_delivered) AS total FROM v_agent_customer_deliveries WHERE season_year = 2026 GROUP BY product_name ORDER BY total DESC LIMIT 20` |
+| "Customers with orders but no deliveries?" | `v_agent_order_fulfillment` | `SELECT DISTINCT customer_name FROM v_agent_order_fulfillment WHERE season_year = 2026 AND delivered_units = 0 LIMIT 50` |
+| "What did Bayer ship for DKC 094-94?" | `v_agent_bayer_shipments` | `SELECT shipment_date, product_name, treatment_name, seed_size, package_type, units_received FROM v_agent_bayer_shipments WHERE product_name ILIKE '%094-94%' ORDER BY shipment_date LIMIT 50` |
+| "How many units were returned this season?" | `v_agent_customer_returns` | `SELECT SUM(units_returned) AS total FROM v_agent_customer_returns WHERE season_year = 2026 LIMIT 1` |
+| "Show deliveries made in April 2026." | `v_agent_customer_deliveries` | `SELECT customer_name, product_name, units_delivered, delivery_date FROM v_agent_customer_deliveries WHERE delivery_date BETWEEN '2026-04-01' AND '2026-04-30' ORDER BY delivery_date LIMIT 100` |
+| "Which products have the most replants?" | `v_agent_customer_replants` | `SELECT product_name, SUM(units_replanted) AS total FROM v_agent_customer_replants GROUP BY product_name ORDER BY total DESC LIMIT 20` |
+| "Which products are fully staged with zero available?" | `v_agent_inventory` | `SELECT product_name, treatment_name, units_staged, available_units FROM v_agent_inventory WHERE units_staged > 0 AND available_units <= 0 LIMIT 50` |
 
 ---
 

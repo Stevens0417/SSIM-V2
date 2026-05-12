@@ -222,10 +222,16 @@ async function resolveItem(
   const PACKAGE_OPTIONS = ["Bag", "Seedpak"];
 
   // ── Product ──────────────────────────────────────────────────────────────
-  const lowerProduct = item.productName.toLowerCase();
-  const matchingProductRows = pricingRows.filter((r) =>
-    r.product_name.toLowerCase().includes(lowerProduct)
+  const lowerProduct = item.productName.toLowerCase().trim();
+  // Exact case-insensitive match first; fall back to partial (includes) only if no exact match.
+  // This prevents "fungicide" from matching both "FUNGICIDE" and "FUNGICIDE OPTIMIZE".
+  const exactProductRows = pricingRows.filter(
+    (r) => r.product_name.toLowerCase() === lowerProduct
   );
+  const matchingProductRows =
+    exactProductRows.length > 0
+      ? exactProductRows
+      : pricingRows.filter((r) => r.product_name.toLowerCase().includes(lowerProduct));
 
   const productMap = new Map<string, PricingRow>();
   for (const r of matchingProductRows) {
@@ -276,10 +282,17 @@ async function resolveItem(
       ...new Set(productPricingRows.map((r) => r.treatment_name)),
     ].sort();
 
-    const lowerTreatment = item.treatmentName.toLowerCase();
-    const matchingTreatmentRows = productPricingRows.filter((r) =>
-      r.treatment_name.toLowerCase().includes(lowerTreatment)
+    const lowerTreatment = item.treatmentName.toLowerCase().trim();
+    // Exact case-insensitive match first; fall back to partial only if no exact match.
+    const exactTreatmentRows = productPricingRows.filter(
+      (r) => r.treatment_name.toLowerCase() === lowerTreatment
     );
+    const matchingTreatmentRows =
+      exactTreatmentRows.length > 0
+        ? exactTreatmentRows
+        : productPricingRows.filter((r) =>
+            r.treatment_name.toLowerCase().includes(lowerTreatment)
+          );
 
     const treatmentMap = new Map<string, PricingRow>();
     for (const r of matchingTreatmentRows) {
