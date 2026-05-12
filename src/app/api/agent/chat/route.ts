@@ -270,9 +270,10 @@ After the tool returns:
 
 If success is true:
 - IMMEDIATELY call get_delivery_print_link with the first item from delivery_ids as the very next tool step — do not wait for the user to ask. This must happen in the same response.
-- Once get_delivery_print_link returns, compose your single reply:
-  "Delivery saved ([lines_saved] line(s)). [Open print slip](<print_url>)"
+- Once get_delivery_print_link returns, compose your reply:
+  "Delivery saved ([lines_saved] line(s))."
 - If unmatched_lines > 0, append: "Note: [N] line(s) could not be linked to an open order and were saved as unlinked deliveries."
+- Do NOT include a URL or markdown link in your text — a Print Delivery Slip button is rendered automatically below your message.
 - If get_delivery_print_link returns a tool_error, respond instead:
   "Delivery saved ([lines_saved] line(s)). You can print from the Deliveries page."
 
@@ -298,8 +299,8 @@ How to call:
 After the tool returns:
 
 If print_url is present (no tool_error):
-- Include a markdown link in your response: [Open print slip](<print_url>)
-- The print page opens and triggers printing automatically — you do not need to instruct the user further.
+- Do NOT include a URL or markdown link in your text response — a Print Delivery Slip button is rendered automatically below your message from the tool result.
+- The print page opens and triggers printing automatically when the user clicks the button.
 
 If tool_error is true:
 - Include in your response: "You can also print from the Deliveries page." Do not say the link is unavailable unless the tool actually returned tool_error: true.
@@ -526,8 +527,9 @@ export async function POST(req: NextRequest) {
 
   // Call OpenAI — stopWhen allows the model to call tools and then respond
   let assistantText: string;
+  let assistantMetadata: { actions: Array<{ type: string; label: string; href: string }> } | null = null;
   try {
-    const { text } = await generateText({
+    const { text, steps } = await generateText({
       model: openai("gpt-4o-mini"),
       system: SYSTEM_PROMPT,
       messages: contextMessages,
@@ -535,6 +537,31 @@ export async function POST(req: NextRequest) {
       stopWhen: stepCountIs(5),
     });
     assistantText = text;
+
+    // Extract a print action from tool results — populated from the tool output (safe internal URL),
+    // never from model-generated text.
+    outer: for (const step of steps) {
+      for (const tr of step.toolResults) {
+        const trAny = tr as unknown as { toolName: string; output: Record<string, unknown> };
+        if (
+          trAny.toolName === "get_delivery_print_link" &&
+          !trAny.output.tool_error &&
+          typeof trAny.output.print_url === "string" &&
+          (trAny.output.print_url as string).startsWith("/")
+        ) {
+          assistantMetadata = {
+            actions: [
+              {
+                type: "link",
+                label: "Print Delivery Slip",
+                href: trAny.output.print_url as string,
+              },
+            ],
+          };
+          break outer;
+        }
+      }
+    }
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "AI model error" },
@@ -550,8 +577,9 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       role: "assistant",
       content: assistantText,
+      metadata: assistantMetadata,
     })
-    .select("id, thread_id, role, content, created_at")
+    .select("id, thread_id, role, content, metadata, created_at")
     .single();
   if (asstErr || !asstRow) {
     return NextResponse.json({ error: "Failed to save response" }, { status: 500 });

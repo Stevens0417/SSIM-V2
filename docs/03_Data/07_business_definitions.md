@@ -42,7 +42,7 @@ Valid seed size values: `AR`, `AR2`, `AF`, `AF2`, `P26`
 
 Soybean and packaging products have `seed_size = NULL`. Forms show the seed size field only for corn products.
 
-Seed size is tracked as a dimension in delivery, return, replant, and on-hand inventory records. It is tracked at the Bayer shipment level only indirectly (through the detail vs. received CTE logic in inventory views).
+Seed size is tracked as a dimension in delivery, return, replant, Bayer shipment, and on-hand inventory records. `bayer_shipment_items.seed_size` stores the actual seed size for each shipment line item. As of migration 0029, the inventory received CTE preserves this value — received units are grouped at the correct (product, treatment, seed_size, package_type) grain, matching deliveries and staged deliveries.
 
 ---
 

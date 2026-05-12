@@ -7,11 +7,18 @@ export interface AgentThread {
   updated_at: string;
 }
 
+export interface MessageAction {
+  type: "link";
+  label: string;
+  href: string;
+}
+
 export interface AgentMessage {
   id: string;
   thread_id: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
+  metadata?: { actions?: MessageAction[] } | null;
   created_at: string;
 }
 
@@ -29,7 +36,7 @@ export async function fetchMessages(threadId: string): Promise<AgentMessage[]> {
   const sb = getSupabaseBrowserClient();
   const { data, error } = await sb
     .from("agent_messages")
-    .select("id, thread_id, role, content, created_at")
+    .select("id, thread_id, role, content, metadata, created_at")
     .eq("thread_id", threadId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message || "Failed to load messages");

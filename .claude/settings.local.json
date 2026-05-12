@@ -59,7 +59,9 @@
       "Bash(Get-ChildItem -Path src\\\\app\\\\inventory -Recurse -Include \"page.tsx\")",
       "Bash(Select-Object FullName)",
       "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\SSIMV2\\\\docs\" -Directory)",
-      "Bash(mkdir \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\deliveries\\\\print\\\\[id]\")"
+      "Bash(mkdir \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\deliveries\\\\print\\\\[id]\")",
+      "Bash(Get-ChildItem \"c:\\\\Projects\\\\SSIMV2\\\\supabase\\\\migrations\")",
+      "Bash(Select-Object Name, Length)"
     ],
     "additionalDirectories": [
       "c:\\Projects\\SSIMV2\\src\\app\\deliveries\\print"

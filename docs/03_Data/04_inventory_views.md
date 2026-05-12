@@ -27,9 +27,9 @@ available_units   = physical_on_hand - staged_units
 
 ---
 
-## Package Type and Seed Size in Inventory (as of migration 0022)
+## Package Type and Seed Size in Inventory (as of migrations 0022, 0029)
 
-As of migration 0022, `package_type` is a first-class dimension in all inventory views. The key distinction:
+As of migration 0022, `package_type` is a first-class dimension in all inventory views. As of migration 0029, `seed_size` from Bayer shipment items is also preserved in the received CTE (it was previously forced to NULL — see fix note below). The key distinction:
 
 | View | package_type | seed_size | Aggregated? |
 |---|---|---|---|
@@ -68,9 +68,11 @@ As of migration 0022, `package_type` is a first-class dimension in all inventory
 | `units_staged` | Reserved in in_progress staged deliveries (added migration 0027) |
 | `available_units` | `units_on_hand - units_staged` (added migration 0027) |
 
-**Note on received seed_size:** Bayer shipment items do not carry seed_size in the received CTE (seed_size is set to `NULL` for received rows). Seed size comes from deliveries and returns. This means: if a product has been received but no deliveries or returns have been recorded, it appears without a seed_size row. The `keys` CTE unions received + delivered + returned + staged to ensure all combinations appear — including combinations that only exist in staged deliveries.
+**Received seed_size (as of migration 0029):** The `received` CTE uses `i.seed_size` from `bayer_shipment_items`. If a Bayer shipment item was saved with `seed_size = 'AF2'`, its received units appear on the AF2 row, correctly matching deliveries and staged deliveries at the same seed_size. If the shipment item has `seed_size = NULL` (e.g. soybean), received units appear on the NULL seed_size row. All four CTEs (received, delivered, returned, staged) and all `IS NOT DISTINCT FROM` joins handle both cases correctly.
 
-**Staged-only rows:** When a staged delivery item has a seed_size or package_type that doesn't exist in any received/delivered/returned row, the `keys` CTE UNION introduces it as a new combination. This combination appears in the view with `units_received = 0`, `units_on_hand = 0`, `units_staged > 0`, and `available_units < 0`. These rows are real and critical — they show that more product is staged for delivery than is physically recorded in inventory for that seed size. Example: DKC 103-93 / FUNGICIDE received as seed_size=NULL (100 units), staged delivery entered as seed_size=AF2 (75 units). The view returns both rows. Total available = 100 − 75 = 25.
+**Migration 0029 bug fix:** Prior to migration 0029, the received CTE used `null::text as seed_size`, discarding the actual seed_size from `bayer_shipment_items`. This caused received units to be grouped under NULL seed_size even when the shipment item had a non-null seed_size (e.g. AF2), breaking inventory accuracy for corn seed sizes.
+
+**Staged-only rows:** When a staged delivery item has a seed_size or package_type that doesn't exist in any received/delivered/returned row, the `keys` CTE UNION introduces it as a new combination. This combination appears in the view with `units_received = 0`, `units_on_hand = 0`, `units_staged > 0`, and `available_units < 0`. These rows are real and critical — they show that more product is staged for delivery than is physically recorded in inventory for that seed size.
 
 **Agent aggregation behavior:** `get_on_hand_inventory` returns ALL matching rows including staged-only negative rows. The tool pre-computes `total_physical_units_on_hand`, `total_staged_units`, and `total_available_units` by summing ALL rows. The agent must use `total_available_units` as the headline — not an individual row's `available_units`. The `minAvailableUnits` query-level filter was removed because it excluded staged-only negative rows and caused over-reporting of availability.
 

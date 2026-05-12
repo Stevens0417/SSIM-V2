@@ -308,8 +308,26 @@ export default function AgentPage() {
                   {msg.role === "user" ? "You" : "Agent"}
                 </span>
                 <div className={styles.messageBubble}>{msg.content}</div>
+                {msg.metadata?.actions && msg.metadata.actions.length > 0 && (
+                  <div className={styles.messageActions}>
+                    {msg.metadata.actions
+                      .filter((a) => a.href.startsWith("/"))
+                      .map((action, i) => (
+                        <a
+                          key={i}
+                          href={action.href}
+                          className={styles.messageActionBtn}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {action.label}
+                        </a>
+                      ))}
+                  </div>
+                )}
               </div>
             ))
+
           )}
           {isSending && (
             <div className={`${styles.message} ${styles.messageAssistant}`}>
