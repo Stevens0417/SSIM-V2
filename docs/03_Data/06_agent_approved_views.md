@@ -266,6 +266,36 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 ---
 
+### v_agent_pricing
+
+| Property | Value |
+|---|---|
+| **Table** | `v_agent_pricing` |
+| **Access type** | Read-only |
+| **User-scoped** | No (global — same pricing for every authenticated user) |
+
+**Safe use cases:**
+- "What is the retail price for [product] with [treatment] this season?"
+- "What is the break-even price for [product]?"
+- "Which products have the highest margin?"
+- "Show me the margin percentage for all products this season."
+- "What is the markup on [product] [treatment]?"
+
+**Allowed filters:** `season_year`, `product_name` (ILIKE), `treatment_name` (ILIKE), `crop`
+
+**Columns safe for agent:** `season_year`, `product_name`, `crop`, `chu`, `seed_trait`, `treatment_name`, `retail_price_per_unit`, `break_even_price_per_unit`, `margin_per_unit`, `margin_pct`
+
+**Columns to exclude from responses:** `product_id`, `treatment_id` (internal UUIDs)
+
+**Notes:**
+- Grain is one row per (season_year, product, treatment). No seed_size or package_type dimension — pricing does not vary by seed size or package type.
+- `margin_per_unit` and `margin_pct` are NULL for packaging/NO_TREATMENT rows where break_even is not defined.
+- This view is GLOBAL — do not filter by user_id (no such column exists).
+- **Primary agent tool:** `get_pricing_info` — use this for standard pricing lookups (retail, break-even, margin by product/treatment). The SQL fallback (`run_approved_readonly_query`) handles custom aggregation queries that `get_pricing_info` does not cover (e.g. ranking all products by margin).
+- Migration: `0031_v_agent_pricing.sql`
+
+---
+
 ## Agent Access Rules
 
 1. **Read-only access only.** The agent must never INSERT, UPDATE, or DELETE via tool calls unless a dedicated, reviewed write-tool exists and has explicit permission.
@@ -282,4 +312,4 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 7. **Do not query raw `orders`, `deliveries`, `returns`, `replants`, `bayer_shipment_items`, `staged_deliveries`, or `staged_delivery_items` tables directly.** Use the views above.
 
-8. **SQL fallback approved views** (for `run_approved_readonly_query` tool): `v_agent_customer_orders`, `v_agent_order_fulfillment`, `v_agent_inventory`, `v_agent_customer_deliveries`, `v_agent_customer_returns`, `v_agent_customer_replants`, `v_agent_bayer_shipments`, `v_agent_staged_deliveries`. `v_agent_inventory` includes `units_on_hand` (physical), `units_staged`, and `available_units` (added migration 0027). Note: in SQL queries use the DB column names (`units_on_hand`, `units_staged`); the `get_on_hand_inventory` tool renames these to `physical_units_on_hand` and `staged_units` in its output to avoid LLM confusion. `v_agent_staged_deliveries` lists all in_progress staged deliveries. Adding a new view to the SQL fallback requires updating both the `TOOL_DESCRIPTION` in `run-approved-readonly-query.ts` and the `APPROVED_VIEWS` set in `validate-approved-query.ts`.
+8. **SQL fallback approved views** (for `run_approved_readonly_query` tool): `v_agent_customer_orders`, `v_agent_order_fulfillment`, `v_agent_inventory`, `v_agent_customer_deliveries`, `v_agent_customer_returns`, `v_agent_customer_replants`, `v_agent_bayer_shipments`, `v_agent_staged_deliveries`, `v_agent_pricing`. `v_agent_inventory` includes `units_on_hand` (physical), `units_staged`, and `available_units` (added migration 0027). Note: in SQL queries use the DB column names (`units_on_hand`, `units_staged`); the `get_on_hand_inventory` tool renames these to `physical_units_on_hand` and `staged_units` in its output to avoid LLM confusion. `v_agent_staged_deliveries` lists all in_progress staged deliveries. `v_agent_pricing` is GLOBAL (no user_id filter) — returns the same pricing rows for every authenticated user. Adding a new view to the SQL fallback requires updating both the `TOOL_DESCRIPTION` in `run-approved-readonly-query.ts` and the `APPROVED_VIEWS` set in `validate-approved-query.ts`.

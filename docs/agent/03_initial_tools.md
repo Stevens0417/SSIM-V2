@@ -116,6 +116,39 @@ The agent must never say "I cannot retrieve this" without first attempting a que
 
 ---
 
+## Prebuilt tool 5 — `get_pricing_info`
+
+**Source view:** `v_agent_pricing`
+
+**Use for:**
+- "What is the retail price for [product] / [product + treatment]?"
+- "What is the break-even price for [product]?"
+- "What is the margin / markup on [product] [treatment]?"
+- "What treatments are priced for [product]?"
+- "Show me pricing for [product] in [year]."
+- Any question about retail price, break-even price, margin per unit, or margin percentage
+
+**Does NOT cover:** custom pricing aggregations across all products (e.g. "average margin for all corn products" → SQL fallback), delivery history, inventory, orders.
+
+**Key output fields:**
+- `rows[]` — one row per (product, treatment) for the resolved season
+- `retail_price_per_unit` — the price charged per unit
+- `break_even_price_per_unit` — computed cost floor (corn/soybean formula)
+- `margin_per_unit` — retail minus break-even (present when `includeMargins: true`)
+- `margin_pct` — margin as percentage of retail (present when `includeMargins: true`)
+- `resolved_season_year`, `season_source` — which season was used and how it was resolved
+
+**Tool parameters:**
+- `productName` — optional partial name, case-insensitive
+- `treatmentName` — optional partial name, case-insensitive
+- `seasonYear` — optional; omit unless user explicitly stated a year
+- `crop` — optional; `'corn'`, `'soybean'`, or `'packaging'`
+- `includeMargins: true` — required for margin/markup questions
+
+**Pricing is GLOBAL** — all users see the same prices. No user-scoping on this view.
+
+---
+
 ## When the SQL fallback is needed instead
 
 Use `run_approved_readonly_query` when a prebuilt tool cannot answer:
@@ -129,6 +162,8 @@ Use `run_approved_readonly_query` when a prebuilt tool cannot answer:
 | "How many returns did I have this season?" | No prebuilt tool covers returns |
 | "Which customers received product X this season?" | Requires delivery history — not in fulfillment tool |
 | "What is our total profit this season?" | Requires aggregating all order lines |
+| "Which products have the highest margin?" | Custom ordering across all pricing rows — SQL fallback |
+| "What is the average margin for corn this season?" | Aggregation across all products — SQL fallback |
 
 See [06_sql_fallback_model.md](06_sql_fallback_model.md) for full SQL fallback documentation.
 
@@ -152,5 +187,6 @@ All prebuilt tool calls are logged to `agent_tool_calls` with:
 | `src/lib/agent/tools/get-customer-current-season-orders.ts` | Orders tool factory |
 | `src/lib/agent/tools/get-customer-order-fulfillment-status.ts` | Fulfillment tool factory |
 | `src/lib/agent/tools/get-staged-deliveries.ts` | Staged deliveries tool factory |
+| `src/lib/agent/tools/get-pricing-info.ts` | Pricing tool factory |
 | `src/lib/agent/tools/index.ts` | Tool exports |
 | `src/app/api/agent/chat/route.ts` | Tool registration and system prompt |

@@ -284,3 +284,50 @@ Views that support pricing display and order management. Pricing views are globa
 - Do not add a `WHERE season_year = ...` inside the view; the multi-season design is intentional so the tool can answer historical queries.
 - `package_type = 'bag'` should display as "Bag"; `package_type = 'tote'` should display as "Seedpak". The tool handles this mapping.
 - If modifying this view, use `DROP VIEW ... CREATE VIEW` (not `CREATE OR REPLACE`) if column order changes — see schema change guidelines.
+
+---
+
+## v_agent_pricing
+
+**Purpose:** Agent-approved read-only view of retail pricing, break-even prices, and computed margins per product/treatment per season. Powers pricing queries in the SQL fallback tool.
+
+**Source view:** `v_pricing_options`
+
+**Grain:** One row per (season_year, product, treatment). No seed_size or package_type dimension — pricing is the same regardless of seed size or package type.
+
+**Filter:** GLOBAL — no user_id filter. This view returns the same rows for every authenticated user. Pricing is not user-scoped.
+
+**Key columns:**
+
+| Column | Notes |
+|---|---|
+| `season_year` | |
+| `product_id` | Internal UUID |
+| `product_name` | Display label |
+| `crop` | `'corn'`, `'soybean'`, `'packaging'` |
+| `chu` | Heat units (corn products) |
+| `seed_trait` | Trait label (corn products) |
+| `treatment_id` | Internal UUID |
+| `treatment_name` | Display label |
+| `retail_price_per_unit` | Renamed from `retail_price` in `v_pricing_options` |
+| `break_even_price_per_unit` | Renamed from `break_even_price` in `v_pricing_options` |
+| `margin_per_unit` | `retail_price_per_unit − break_even_price_per_unit`; NULL when break_even_price is NULL |
+| `margin_pct` | `margin_per_unit / retail_price_per_unit × 100`; NULL when retail_price = 0 or break_even is NULL |
+
+**Agent SQL fallback use cases:**
+- "What is the retail price for [product] with [treatment] this season?" → filter by `product_name ILIKE` and `treatment_name ILIKE`
+- "What is the break-even price for [product]?" → `break_even_price_per_unit` column
+- "Which products have the highest margin?" → `ORDER BY margin_per_unit DESC`
+- "Show me the margin percentage for all products." → `margin_pct` column
+- "What is the markup on [product] [treatment]?" → `margin_per_unit` or `margin_pct`
+
+**Agent tool using it:** `get_pricing_info` — primary tool for retail price, break-even, and margin questions. The SQL fallback (`run_approved_readonly_query`) can also query this view for custom aggregation questions not served by the tool.
+
+**Migration:** `0031_v_agent_pricing.sql`
+
+**SQL fallback registration:** `APPROVED_VIEWS` in `validate-approved-query.ts`; `TOOL_DESCRIPTION` in `run-approved-readonly-query.ts`
+
+**Cautions:**
+- Pricing has no seed_size or package_type dimension — do not attempt to filter by these columns.
+- `margin_per_unit` and `margin_pct` are NULL for packaging rows (NO_TREATMENT) where break_even_price is not computed.
+- This view is GLOBAL (no auth.uid() filter). Unlike other agent views, it does not scope to the logged-in user — all users see the same pricing data.

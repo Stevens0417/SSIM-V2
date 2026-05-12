@@ -34,8 +34,9 @@ The agent always follows this hierarchy:
 | `v_agent_customer_returns` | customer_name, product_name, treatment_name, seed_size, package_type, units_returned, return_date, season_year | Return history per customer |
 | `v_agent_customer_replants` | customer_name, product_name, treatment_name, seed_size, package_type, units_replanted, replant_date, season_year | Replant history per customer |
 | `v_agent_bayer_shipments` | product_name, treatment_name, seed_size, package_type, units_received, shipment_date, season_year, is_verified | Bayer shipment detail |
+| `v_agent_pricing` | product_name, treatment_name, crop, retail_price_per_unit, break_even_price_per_unit, margin_per_unit, margin_pct, season_year | Retail price, break-even, and margin per product/treatment (**GLOBAL** — not user-scoped) |
 
-All views are user-scoped (`auth.uid()` enforced at the view level). The RPC executes as SECURITY INVOKER so the calling user's JWT is preserved.
+All views except `v_agent_pricing` are user-scoped (`auth.uid()` enforced at the view level). `v_agent_pricing` is global — pricing is the same for every authenticated user. The RPC executes as SECURITY INVOKER so the calling user's JWT is preserved.
 
 Adding a new view requires updating both:
 - `TOOL_DESCRIPTION` constant in `src/lib/agent/tools/run-approved-readonly-query.ts`
@@ -119,6 +120,9 @@ The method note appears after the data summary, not before it.
 | "Show deliveries made in April 2026." | `v_agent_customer_deliveries` | `SELECT customer_name, product_name, units_delivered, delivery_date FROM v_agent_customer_deliveries WHERE delivery_date BETWEEN '2026-04-01' AND '2026-04-30' ORDER BY delivery_date LIMIT 100` |
 | "Which products have the most replants?" | `v_agent_customer_replants` | `SELECT product_name, SUM(units_replanted) AS total FROM v_agent_customer_replants GROUP BY product_name ORDER BY total DESC LIMIT 20` |
 | "Which products are fully staged with zero available?" | `v_agent_inventory` | `SELECT product_name, treatment_name, units_staged, available_units FROM v_agent_inventory WHERE units_staged > 0 AND available_units <= 0 LIMIT 50` |
+| "What is the retail price for DKC 103-93 FUNGICIDE?" | `v_agent_pricing` | `SELECT product_name, treatment_name, retail_price_per_unit, break_even_price_per_unit, margin_per_unit, margin_pct FROM v_agent_pricing WHERE season_year = 2026 AND product_name ILIKE '%103-93%' AND treatment_name ILIKE '%fungicide%' LIMIT 10` |
+| "Which products have the highest margin this season?" | `v_agent_pricing` | `SELECT product_name, treatment_name, margin_per_unit, margin_pct FROM v_agent_pricing WHERE season_year = 2026 ORDER BY margin_per_unit DESC LIMIT 20` |
+| "Show me all pricing for this season." | `v_agent_pricing` | `SELECT product_name, treatment_name, retail_price_per_unit, break_even_price_per_unit, margin_per_unit, margin_pct FROM v_agent_pricing WHERE season_year = 2026 ORDER BY product_name, treatment_name LIMIT 100` |
 
 ---
 

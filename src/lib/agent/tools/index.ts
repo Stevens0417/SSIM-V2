@@ -6,3 +6,4 @@ export { makeRunApprovedReadonlyQueryTool } from "./run-approved-readonly-query"
 export { makeDraftDeliveryFromChatTool } from "./draft-delivery-from-chat";
 export { makeSaveConfirmedDeliveryTool } from "./save-confirmed-delivery";
 export { makeGetDeliveryPrintLinkTool } from "./get-delivery-print-link";
+export { makeGetPricingInfoTool } from "./get-pricing-info";

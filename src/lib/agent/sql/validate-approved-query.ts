@@ -8,6 +8,7 @@ const APPROVED_VIEWS = new Set([
   "v_agent_customer_replants",
   "v_agent_bayer_shipments",
   "v_agent_staged_deliveries",
+  "v_agent_pricing",
 ]);
 
 // Keywords forbidden anywhere in the query (checked against non-literal content)

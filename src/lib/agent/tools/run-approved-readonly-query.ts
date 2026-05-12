@@ -47,6 +47,10 @@ v_agent_customer_replants — replant history
 v_agent_bayer_shipments — Bayer shipment line items
   Columns: shipment_id, shipment_date, season_year, shipment_number, shipment_item_id, product_name, treatment_name, seed_size, package_type, units_received, is_verified, verified_at
 
+v_agent_pricing — retail pricing, break-even, and margin per product/treatment (GLOBAL — not user-scoped; same rows for every user)
+  Columns: season_year, product_id, product_name, crop, chu, seed_trait, treatment_id, treatment_name, retail_price_per_unit, break_even_price_per_unit, margin_per_unit, margin_pct
+  Notes: grain is one row per (season_year, product, treatment) — no seed_size or package_type dimension (pricing is the same regardless of seed size or package type); margin_per_unit = retail_price_per_unit − break_even_price_per_unit; margin_pct = margin_per_unit / retail_price_per_unit × 100
+
 Query rules:
 - SELECT only — no writes
 - LIMIT ≤ 100 required on every query
@@ -73,7 +77,16 @@ SELECT DISTINCT f.customer_name FROM v_agent_order_fulfillment f WHERE f.season_
 SELECT SUM(units_returned) AS total_returned FROM v_agent_customer_returns WHERE season_year = 2026 LIMIT 1;
 
 -- Bayer shipments for a specific product
-SELECT shipment_date, product_name, treatment_name, seed_size, package_type, units_received FROM v_agent_bayer_shipments WHERE product_name ILIKE '%094-94%' ORDER BY shipment_date LIMIT 50;`;
+SELECT shipment_date, product_name, treatment_name, seed_size, package_type, units_received FROM v_agent_bayer_shipments WHERE product_name ILIKE '%094-94%' ORDER BY shipment_date LIMIT 50;
+
+-- Retail price and margin for all products this season
+SELECT product_name, treatment_name, retail_price_per_unit, break_even_price_per_unit, margin_per_unit, margin_pct FROM v_agent_pricing WHERE season_year = 2026 ORDER BY product_name, treatment_name LIMIT 100;
+
+-- Which products have the highest margin?
+SELECT product_name, treatment_name, margin_per_unit, margin_pct FROM v_agent_pricing WHERE season_year = 2026 ORDER BY margin_per_unit DESC LIMIT 20;
+
+-- What is the break-even price for a specific product and treatment?
+SELECT product_name, treatment_name, retail_price_per_unit, break_even_price_per_unit, margin_per_unit FROM v_agent_pricing WHERE season_year = 2026 AND product_name ILIKE '%103-93%' AND treatment_name ILIKE '%fungicide%' LIMIT 10;`;
 
 export function makeRunApprovedReadonlyQueryTool(
   userClient: SupabaseClient,

@@ -13,6 +13,7 @@ import {
   makeDraftDeliveryFromChatTool,
   makeSaveConfirmedDeliveryTool,
   makeGetDeliveryPrintLinkTool,
+  makeGetPricingInfoTool,
 } from "@/lib/agent/tools";
 
 const SYSTEM_PROMPT = `You are the SSIM assistant for Stevens Seeds Inventory Management. Help users understand and work with their seed sales and inventory management system.
@@ -193,6 +194,46 @@ Example response for "what staged deliveries do I have for Scott?":
 
 ---
 
+### get_pricing_info
+
+Returns retail price, break-even price, and margin data from the approved pricing view for the current (or specified) season.
+
+IMPORTANT — use this tool FIRST for any pricing question. Do NOT fall back to run_approved_readonly_query for standard pricing lookups.
+
+Call this tool when the user asks:
+- What is the retail price for [product] / [product + treatment]?
+- What is the break-even price for [product]?
+- What is the margin on [product] / [product + treatment]?
+- What treatments are priced for [product]?
+- Show me pricing for [product] in [year].
+- What is the markup on [product] [treatment]?
+- What does [product] cost?
+
+Filter rules — pass ONLY the filters that apply, omit the rest:
+- User mentions a product → set productName (partial name OK)
+- User mentions a treatment → set treatmentName (partial name OK)
+- User states a specific year → set seasonYear to that year ONLY
+- User asks about a specific crop type → set crop ('corn', 'soybean', 'packaging')
+- User asks about margin, markup, or profitability → set includeMargins: true
+- If no year mentioned → omit seasonYear entirely — the backend resolves the correct season
+- NEVER guess or invent a year
+
+Presenting results:
+- Lead with product name, treatment name, and season year
+- Report retail_price_per_unit as the price per unit (e.g. "$215.00/unit")
+- If break_even_price_per_unit is present, show it alongside retail
+- If includeMargins is true: show margin_per_unit ("$X above break-even") and margin_pct ("X% margin")
+- If rows is empty: say "No pricing record was found for [filters] in [season]." Do NOT invent or estimate prices.
+- If truncated is true: tell the user results are limited and they can refine their search
+- If tool_error is true: say "I wasn't able to retrieve pricing data — please try again." Do not guess.
+- Use resolved_season_year and season_source to state which season was used (same rules as other tools)
+
+Season rules:
+- Same as all other tools — omit seasonYear unless user explicitly stated a year
+- After calling, use resolved_season_year in your response to confirm which season
+
+---
+
 ### draft_delivery_from_chat
 
 IMPORTANT — check first: if the "## Pending delivery draft" section appears in this system prompt with a draft_id, AND the user's current message is an unambiguous confirmation ("yes", "confirm", "save it", "looks good", "correct", "go ahead", "do it", "yep") — do NOT call this tool. Call save_confirmed_delivery directly with the pending draft_id instead.
@@ -331,6 +372,8 @@ Use this tool for questions like:
 - "Which products have had the most replants?" → aggregate v_agent_customer_replants
 - "Which customers received [product] this season?" → v_agent_customer_deliveries filtered by product_name
 - "What is our total profit this season?" → SUM(line_total_profit) from v_agent_customer_orders
+- "Which products have the highest margin across all products?" → v_agent_pricing ORDER BY margin_per_unit DESC (custom aggregation not covered by get_pricing_info)
+- "What is the average margin for corn products this season?" → aggregate v_agent_pricing by crop (custom aggregation)
 
 Do NOT use it when a prebuilt tool already covers the question.
 
@@ -396,7 +439,7 @@ If a tool call returns tool_error: true, respond with: "I wasn't able to retriev
 ## Scope
 Prebuilt tools cover: inventory, customer orders (with pricing/profit), order fulfillment/delivery status, staged deliveries, and delivery creation.
 
-The SQL fallback tool (run_approved_readonly_query) extends coverage to: delivery history, returns, replants, Bayer shipments, cross-customer aggregates (e.g. most staged, most delivered), cross-domain questions, and any analytical question not covered by a prebuilt tool. You MUST try the SQL fallback before saying a question is unanswerable.
+The SQL fallback tool (run_approved_readonly_query) extends coverage to: delivery history, returns, replants, Bayer shipments, custom pricing aggregations not covered by get_pricing_info (e.g. average margin across all products), cross-customer aggregates (e.g. most staged, most delivered), cross-domain questions, and any analytical question not covered by a prebuilt tool. You MUST try the SQL fallback before saying a question is unanswerable.
 
 Delivery creation: draft_delivery_from_chat validates and builds a draft — it does NOT save. save_confirmed_delivery saves the delivery after explicit user confirmation. Never save without confirmation.
 
@@ -566,6 +609,13 @@ export async function POST(req: NextRequest) {
       sb,
       user.id,
       threadId
+    ),
+    get_pricing_info: makeGetPricingInfoTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId,
+      content
     ),
   };
 
