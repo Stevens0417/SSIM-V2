@@ -3,3 +3,6 @@ export { makeGetCustomerCurrentSeasonOrdersTool } from "./get-customer-current-s
 export { makeGetCustomerOrderFulfillmentStatusTool } from "./get-customer-order-fulfillment-status";
 export { makeGetStagedDeliveriesTool } from "./get-staged-deliveries";
 export { makeRunApprovedReadonlyQueryTool } from "./run-approved-readonly-query";
+export { makeDraftDeliveryFromChatTool } from "./draft-delivery-from-chat";
+export { makeSaveConfirmedDeliveryTool } from "./save-confirmed-delivery";
+export { makeGetDeliveryPrintLinkTool } from "./get-delivery-print-link";

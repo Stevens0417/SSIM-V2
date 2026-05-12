@@ -169,6 +169,116 @@ All tools query approved views only (never raw tables). All tools are user-scope
 
 ---
 
+### draft_delivery_from_chat ✅
+
+**Views:** `customers` table (user-scoped), `v_pricing_options` (global), `v_on_hand_inventory` (user-scoped)
+**File:** `src/lib/agent/tools/draft-delivery-from-chat.ts`
+**Status:** Live (Phase 1 — validates and builds draft, does NOT save)
+
+**Use cases:**
+- "I delivered 5 units of DKC 103-93 FUNGICIDE to Scott Glasgow today"
+- "Record a delivery for John Smith: DKC 94-94 PONCHO, 10 units, Bag"
+- "Enter a delivery — customer Adam Stevens, DKC 100-01 FUNGICIDE 3 units AR size, yesterday"
+- "Log multi-line delivery: [product/treatment/units] and [product/treatment/units] for [customer]"
+
+**Inputs:**
+- `customerName` (required) — customer or farm name, partial OK
+- `deliveryDate` (required) — pass exactly what the user said: "today", "yesterday", "tomorrow", or a YYYY-MM-DD string. Never convert relative words to ISO; the backend resolves them.
+- `items` (required) — array of `{productName, treatmentName, units, seedSize?, packageType?}`
+- `seasonYear` (optional) — only if user explicitly stated a year
+- `notes` (optional)
+
+**Output:** `customer` (CustomerDraft), `delivery_date` (DateDraft), `season_year` (SeasonDraft), `items[]` (ResolvedItem), `missing_fields[]`, `warnings[]`, `ready_for_confirmation`
+
+**Draft sub-objects:**
+- `CustomerDraft`: `{status: "resolved"|"ambiguous"|"missing", resolved_customer_id, resolved_customer_name, farm_name, candidates?[]}`
+- `DateDraft`: `{resolved_date: string, date_source: "explicit"|"today_default", user_explicitly_requested_date: boolean, status: "resolved"}`
+- `ResolvedItem.product`: `{status: "resolved"|"ambiguous"|"missing", resolved_product_id, resolved_product_name, options?[]}`
+- `ResolvedItem.treatment`: `{status: "resolved"|"ambiguous"|"missing", resolved_treatment_id, resolved_treatment_name, options?[]}`
+- `ResolvedItem.seed_size`: `{status: "resolved"|"missing"|"not_required"|"ambiguous", resolved_seed_size, options[]}`
+- `ResolvedItem.package_type`: defaults to "Bag" when not specified
+- `ResolvedItem.units_delivered`: `{status: "resolved"|"missing"|"invalid", resolved_units}`
+- `ResolvedItem.warnings[]` — inventory availability warnings per line
+
+**Resolution logic:**
+- Customer: three-step matching (exact customer_name → exact farm_name → partial OR both)
+- Product: ILIKE filter against current season's `v_pricing_options` rows
+- Treatment: ILIKE filter on product's pricing rows; returns available treatments on miss
+- Seed size: only required for corn (`crop = 'corn'`). Options fetched from `v_on_hand_inventory` by product_id + treatment_id.
+- Package type: defaults to Bag when not specified by user
+- Units: must be a positive whole number
+
+**Date resolution:** Uses `resolveAgentDate()` from `resolve-date.ts`. Two-layer hallucination defense:
+1. If the user's raw message contains no date reference, always use server today — ignores whatever value the model passed.
+2. If the user mentioned a date, interprets the model's `deliveryDate` using real server time ("today" → `new Date()`, not training-data date).
+`date_source: "today_default"` indicates the date was not user-specified; `"explicit"` indicates the user stated it.
+
+**Inventory availability check:** After all fields resolve, queries `v_on_hand_inventory` by exact (product_id, treatment_id, seed_size, package_type) key to check available_units. Adds a warning per line if the delivery would exceed available inventory.
+
+**ready_for_confirmation:** `true` when `missing_fields` is empty. The agent should present the full summary and ask for confirmation. After user confirms, the agent informs them that saving is not yet available.
+
+**draft_id:** When `ready_for_confirmation: true`, the output includes `draft_id` — the UUID of the `agent_tool_calls` row that logged this call. The model passes this to `save_confirmed_delivery`. The stored `output_json` in `agent_tool_calls` does not include `draft_id` itself (it is set after logging to avoid a self-referential circular dependency).
+
+**Season resolution:** Same two-layer defense as other tools — explicit year from user message, or `resolveDefaultSeasonForUser()` fallback.
+
+**Logging:** Tool calls logged to `agent_tool_calls` with status `"validation_pass"`, `"validation_fail"`, or `"error"`. `logCall` returns the inserted row UUID which is used as `draft_id`.
+
+**Security:** Customer and inventory queries use user-session client (auth.uid() in views). Pricing query uses service client (global view, no user scope needed).
+
+---
+
+### save_confirmed_delivery ✅
+
+**Tables:** `deliveries` (insert), `agent_tool_calls` (read draft), `orders` + `v_delivery_customer_order_status` (order matching)
+**File:** `src/lib/agent/tools/save-confirmed-delivery.ts`
+**Status:** Live (Phase 2)
+
+**Use cases:**
+- User says "yes", "confirm", "save it", "looks good", or similar after reviewing a complete delivery draft
+- Called only after `draft_delivery_from_chat` returned `ready_for_confirmation: true` and the user explicitly confirmed
+
+**Inputs:**
+- `draft_id` (required) — UUID from `draft_delivery_from_chat` output when `ready_for_confirmation` was true
+- `confirmation_text` (required) — exact text from the user's confirmation message
+
+**Output:** `{ success, delivery_ids[], lines_saved, unmatched_lines, not_confirmed?, tool_error?, tool_error_message? }`
+
+**Confirmation guard (double-checked):**
+Two independent checks must both agree before saving:
+1. `confirmation_text` contains a CONFIRM_PATTERN match (yes, confirm, save it, looks good, correct, go ahead, do it, yep, yup)
+2. OR `userMessage` (the raw user message passed at tool construction time) contains a CONFIRM_PATTERN match
+
+If neither matches → returns `{ success: false, not_confirmed: true }` without writing anything. Logged as status `"not_confirmed"`.
+
+**Draft lookup:**
+Queries `agent_tool_calls` by `id = draft_id` AND `tool_name = 'draft_delivery_from_chat'` via `userClient`. RLS (`user_id = auth.uid()`) enforces ownership — a user cannot look up another user's draft.
+
+**Re-validation of the draft:**
+- Checks `output_json.ready_for_confirmation === true`
+- Checks all required header fields present: `customer.resolved_customer_id`, `delivery_date.resolved_date`, `season_year.resolved_season_year`
+- Checks all items have resolved `product_id`, `treatment_id`, `units`
+- Returns `tool_error` if any check fails
+
+**Order matching:**
+Server-side port of `findOrderLineMatches` from `orderMatching.service.ts`. Identical logic, but accepts a `SupabaseClient` parameter instead of calling `getSupabaseBrowserClient()`. Priority: early-pay lines first → oldest `order_date` → earliest `created_at` → stable `order_id` tiebreak. Shared `openUnits` map prevents over-allocation across multiple delivery lines in the same request.
+
+**Delivery rows:**
+- One row per matched order allocation (linked: `order_id` + `order_item_id` set)
+- One unlinked row for any units not covered by open order lines (`order_id: null`, `order_item_id: null`)
+- All rows inserted in a single `.insert(rows)` call — atomic at the Postgres statement level
+- `user_id` is set by the `trg_deliveries_set_user_id` trigger (`set_child_user_id()`) — not passed explicitly
+- RLS policy `deliveries_insert_own` checks `user_id = auth.uid()` — satisfied by the trigger
+
+**Notes:** Read from `input_json.notes` of the draft tool-call row. Applied to all delivery rows for this request.
+
+**No duplicate guard:** The tool does not detect duplicate saves. The user is responsible for reviewing the summary before confirming.
+
+**Logging:** Logged to `agent_tool_calls` with status `"success"`, `"not_confirmed"`, or `"error"`.
+
+**Security:** Draft lookup and order matching use user-session client (RLS). Insert uses user-session client (trigger + RLS). Logging uses service client.
+
+---
+
 ## Planned (not yet implemented)
 
 ### get_customer_order_status
