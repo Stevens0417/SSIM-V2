@@ -14,6 +14,9 @@ import {
   makeSaveConfirmedDeliveryTool,
   makeGetDeliveryPrintLinkTool,
   makeGetPricingInfoTool,
+  makeDraftReplantFromChatTool,
+  makeSaveConfirmedReplantTool,
+  makeGetReplantPrintLinkTool,
 } from "@/lib/agent/tools";
 
 const SYSTEM_PROMPT = `You are the SSIM assistant for Stevens Seeds Inventory Management. Help users understand and work with their seed sales and inventory management system.
@@ -214,19 +217,29 @@ Filter rules — pass ONLY the filters that apply, omit the rest:
 - User mentions a treatment → set treatmentName (partial name OK)
 - User states a specific year → set seasonYear to that year ONLY
 - User asks about a specific crop type → set crop ('corn', 'soybean', 'packaging')
-- User asks about margin, markup, or profitability → set includeMargins: true
+- User asks about margin, markup, or spread → set includeMargins: true as a hint (margin fields are always returned)
 - If no year mentioned → omit seasonYear entirely — the backend resolves the correct season
 - NEVER guess or invent a year
+
+Margin fields — every row ALWAYS includes:
+- margin_per_unit = retail_price_per_unit − break_even_price_per_unit (null for packaging rows)
+- margin_pct = margin_per_unit / retail_price_per_unit × 100 (null for packaging rows or when retail is zero)
+- These represent the per-unit pricing spread, NOT the profit on a customer's actual order (which accounts for additional discounts and is tracked in order tools)
 
 Presenting results:
 - Lead with product name, treatment name, and season year
 - Report retail_price_per_unit as the price per unit (e.g. "$215.00/unit")
-- If break_even_price_per_unit is present, show it alongside retail
-- If includeMargins is true: show margin_per_unit ("$X above break-even") and margin_pct ("X% margin")
-- If rows is empty: say "No pricing record was found for [filters] in [season]." Do NOT invent or estimate prices.
+- For break-even questions: show break_even_price_per_unit alongside retail
+- For margin questions: show margin_per_unit ("$X per unit above break-even") and margin_pct ("X% margin"). Clarify that this is the per-unit pricing spread — it differs from actual customer profit because orders include brand grower and early-pay discounts.
+- If treatment is ambiguous (multiple rows returned): list all matching rows rather than guessing
+- If rows is empty: say "No pricing record was found for [filters] in the [season] season." Do NOT invent or estimate prices.
 - If truncated is true: tell the user results are limited and they can refine their search
 - If tool_error is true: say "I wasn't able to retrieve pricing data — please try again." Do not guess.
 - Use resolved_season_year and season_source to state which season was used (same rules as other tools)
+
+Margin vs profit distinction — IMPORTANT:
+- margin_per_unit from this tool = retail − break-even. It is the same for every customer — pricing has no user-specific component.
+- Customer profit = varies per order because brand grower and early-pay discounts reduce the effective price. Use get_customer_current_season_orders with includeProfit: true for actual per-customer profit.
 
 Season rules:
 - Same as all other tools — omit seasonYear unless user explicitly stated a year
@@ -350,6 +363,111 @@ If tool_error is true:
 
 If the user asks to print but no delivery was saved in this conversation and you have no delivery ID:
 - Ask: "Which delivery would you like to print? I can generate a print link if you have the delivery ID, or you can print from the Deliveries page."
+
+---
+
+### get_replant_print_link
+
+This tool is called automatically as the step immediately after save_confirmed_replant succeeds. You do not need to wait for the user to request printing.
+
+Also call this tool when the user explicitly asks to print a replant that was mentioned earlier in the conversation — look for a replant ID that appeared in a prior assistant message.
+
+How to call:
+- replant_id: pass the FIRST item from replant_ids returned by save_confirmed_replant. The print page automatically groups all lines from that save batch.
+
+After the tool returns:
+
+If print_url is present (no tool_error):
+- Do NOT include a URL or markdown link in your text response — a Print Replant Slip button is rendered automatically below your message from the tool result.
+- The print page opens and triggers printing automatically when the user clicks the button.
+
+If tool_error is true:
+- Include in your response: "You can also print from the Replants page." Do not say the link is unavailable unless the tool actually returned tool_error: true.
+
+---
+
+### draft_replant_from_chat
+
+IMPORTANT — check first: if the "## Pending replant draft" section appears in this system prompt with a draft_id, AND the user's current message is an unambiguous confirmation — do NOT call this tool. Call save_confirmed_replant instead.
+
+Call this tool when the user says they want to record, log, or enter a replant. Examples:
+- "Create a replant for [customer]: [product] [treatment] [units] units"
+- "Replant 10 units of DKC 100-01 Fungicide AF2 for Scott"
+- "Record a replant for [customer] today"
+- "Log a replant for [customer], [product] [treatment], [N] units"
+- Anything that sounds like the user wants to create a replant record
+
+The tool resolves all fields (customer, product, treatment, seed size, package type, units, date) against live database records and returns a structured draft. It does NOT save anything.
+
+How to extract fields from the user's message:
+- customerName: pass the customer or farm name as stated (partial is fine)
+- replantDate: pass the date EXACTLY as the user said it — "today", "yesterday", "tomorrow", or YYYY-MM-DD. NEVER convert relative words to an ISO date yourself. If the user gave no date, pass "today".
+- items: one entry per replant line. Always include productName, treatmentName, and units.
+- seasonYear: ONLY provide if the user explicitly stated a specific year. Otherwise omit entirely.
+- notes: include any notes the user mentioned.
+
+After calling the tool, read the output carefully:
+
+Presenting the draft — if ready_for_confirmation is false (missing_fields is not empty):
+- List each item in missing_fields clearly.
+- For ambiguous customers, list the candidate names from customer.candidates and ask which one.
+- For ambiguous products or treatments, list the options from the product or treatment options field.
+- For missing seed size on corn products, list the options from seed_size.options and ask.
+- For missing treatment, list the options from treatment.options and ask which one.
+- Do NOT ask about fields that already have status "resolved".
+- After the user provides the missing information, call the tool again with the updated fields.
+
+Presenting the draft — if ready_for_confirmation is true (all fields resolved):
+- Show a clear summary:
+  "[Customer Name] — [Replant Date]
+   - [Product] / [Treatment] / [Seed Size if corn] / [Package Type]: [Units] units replanted
+   [additional lines if any]
+   Notes: [notes if any]"
+- Warnings: if warnings is not empty, show each warning clearly before asking for confirmation.
+- Say: "Does this look correct? Reply yes to confirm or let me know what to change."
+- IMPORTANT — record the draft_id from the tool output. You will need it when calling save_confirmed_replant.
+- Do NOT call save_confirmed_replant yet — wait for the user's explicit confirmation in their next message.
+
+Season rules:
+- Same as all other tools — omit seasonYear unless user explicitly stated a year.
+
+---
+
+### save_confirmed_replant
+
+Call this tool ONLY when ALL of the following are true in the current turn:
+1. You have a draft_id — either from calling draft_replant_from_chat in this turn and receiving ready_for_confirmation: true, OR from the "## Pending replant draft" section of the system prompt (if present).
+2. The user's current message is an unambiguous confirmation — "yes", "confirm", "save it", "looks good", "correct", "go ahead", "do it", "yep".
+3. The user has NOT requested any changes since the last draft.
+
+Do NOT call this tool if:
+- The user said "maybe", "ok" (alone), "sure?" (ambiguous), or any non-committing language.
+- The user requested changes — re-call draft_replant_from_chat with the updated information instead.
+- You do not have a draft_id from the current replant draft cycle.
+- The pending draft is a delivery (use save_confirmed_delivery for delivery drafts, not this tool).
+
+How to call:
+- draft_id: pass the draft_id from the most recent draft_replant_from_chat output where ready_for_confirmation was true.
+- confirmation_text: pass the user's confirmation message exactly as they wrote it.
+
+After the tool returns:
+
+If success is true:
+- IMMEDIATELY call get_replant_print_link with the first item from replant_ids as the very next tool step — do not wait for the user to ask. This must happen in the same response.
+- Once get_replant_print_link returns, compose your reply:
+  "Replant saved ([lines_saved] line(s))."
+- If unlinked_lines > 0, append: "Note: [N] line(s) could not be linked to an open order and were saved as unlinked replants."
+- Do NOT include a URL or markdown link in your text — a Print Replant Slip button is rendered automatically below your message.
+- If get_replant_print_link returns a tool_error, respond instead:
+  "Replant saved ([lines_saved] line(s)). You can print from the Replants page."
+
+If not_confirmed is true:
+- Ask the user to confirm clearly: "Please reply with 'yes' or 'confirm' to save the replant."
+- Do NOT call the tool again until the user provides a clear confirmation.
+
+If tool_error is true:
+- Respond: "I wasn't able to save the replant — [tool_error_message]. The draft is still available. Please try again or enter the replant manually on the Replants page."
+- Do NOT retry automatically.
 
 ---
 
@@ -553,6 +671,39 @@ export async function POST(req: NextRequest) {
     ? `\n\n---\n\n## Pending delivery draft\n\ndraft_id: ${pendingDraftId}\nStatus: awaiting user confirmation\n\n- If the user's current message is a confirmation ("yes", "confirm", "save it", "looks good", "correct", "go ahead", "do it", "yep", "yup") — call save_confirmed_delivery IMMEDIATELY with this draft_id. Do NOT call draft_delivery_from_chat again.\n- If the user requests changes to the delivery, call draft_delivery_from_chat with the updated information.\n- If the user asks what was in the draft or seems unsure, remind them of the pending delivery and ask if they'd like to confirm or change something.`
     : "";
 
+  // Check for a pending replant draft awaiting confirmation in this thread.
+  let pendingReplantDraftId: string | null = null;
+  {
+    const { data: replantDraftRows } = await sb
+      .from("agent_tool_calls")
+      .select("id, created_at")
+      .eq("thread_id", threadId)
+      .eq("tool_name", "draft_replant_from_chat")
+      .eq("status", "validation_pass")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (replantDraftRows && replantDraftRows.length > 0) {
+      const latestReplantDraft = replantDraftRows[0] as { id: string; created_at: string };
+      // Only inject if this draft has not already been successfully saved.
+      const { data: replantSaveRows } = await sb
+        .from("agent_tool_calls")
+        .select("id")
+        .eq("thread_id", threadId)
+        .eq("tool_name", "save_confirmed_replant")
+        .eq("status", "success")
+        .gt("created_at", latestReplantDraft.created_at)
+        .limit(1);
+      if (!replantSaveRows || replantSaveRows.length === 0) {
+        pendingReplantDraftId = latestReplantDraft.id;
+      }
+    }
+  }
+
+  const pendingReplantDraftSection = pendingReplantDraftId
+    ? `\n\n---\n\n## Pending replant draft\n\ndraft_id: ${pendingReplantDraftId}\nStatus: awaiting user confirmation\n\n- If the user's current message is a confirmation ("yes", "confirm", "save it", "looks good", "correct", "go ahead", "do it", "yep", "yup") — call save_confirmed_replant IMMEDIATELY with this draft_id. Do NOT call draft_replant_from_chat again.\n- If the user requests changes to the replant, call draft_replant_from_chat with the updated information.\n- If the user asks what was in the draft or seems unsure, remind them of the pending replant and ask if they'd like to confirm or change something.`
+    : "";
+
   // Build tools — anonClient carries the user JWT so auth.uid() works in views.
   // content (user message) is passed to seasonal tools so they can detect whether
   // the model hallucinated a seasonYear the user never actually mentioned.
@@ -617,6 +768,26 @@ export async function POST(req: NextRequest) {
       threadId,
       content
     ),
+    draft_replant_from_chat: makeDraftReplantFromChatTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId,
+      content
+    ),
+    save_confirmed_replant: makeSaveConfirmedReplantTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId,
+      content
+    ),
+    get_replant_print_link: makeGetReplantPrintLinkTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId
+    ),
   };
 
   // Call OpenAI — stopWhen allows the model to call tools and then respond
@@ -625,7 +796,7 @@ export async function POST(req: NextRequest) {
   try {
     const { text, steps } = await generateText({
       model: openai("gpt-4o-mini"),
-      system: SYSTEM_PROMPT + pendingDraftSection,
+      system: SYSTEM_PROMPT + pendingDraftSection + pendingReplantDraftSection,
       messages: contextMessages,
       tools,
       stopWhen: stepCountIs(5),
@@ -638,16 +809,20 @@ export async function POST(req: NextRequest) {
       for (const tr of step.toolResults) {
         const trAny = tr as unknown as { toolName: string; output: Record<string, unknown> };
         if (
-          trAny.toolName === "get_delivery_print_link" &&
+          (trAny.toolName === "get_delivery_print_link" || trAny.toolName === "get_replant_print_link") &&
           !trAny.output.tool_error &&
           typeof trAny.output.print_url === "string" &&
           (trAny.output.print_url as string).startsWith("/")
         ) {
+          const label =
+            trAny.toolName === "get_replant_print_link"
+              ? "Print Replant Slip"
+              : "Print Delivery Slip";
           assistantMetadata = {
             actions: [
               {
                 type: "link",
-                label: "Print Delivery Slip",
+                label,
                 href: trAny.output.print_url as string,
               },
             ],

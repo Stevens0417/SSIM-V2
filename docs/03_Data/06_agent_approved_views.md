@@ -287,11 +287,16 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 **Columns to exclude from responses:** `product_id`, `treatment_id` (internal UUIDs)
 
+**Margin field definitions:**
+- `margin_per_unit` = `retail_price_per_unit − break_even_price_per_unit`. The per-unit pricing spread — the same for every customer. Does NOT account for order-level brand grower or early-pay discounts.
+- `margin_pct` = `margin_per_unit / retail_price_per_unit × 100`. Null when retail price is zero or break-even is undefined.
+- Both fields are NULL for packaging/NO_TREATMENT rows.
+- **Margin vs customer profit:** `margin_per_unit` is a pricing-level concept. Actual order profit is tracked in `order_items.profit_per_unit` and is lower because it factors in per-customer discounts.
+
 **Notes:**
 - Grain is one row per (season_year, product, treatment). No seed_size or package_type dimension — pricing does not vary by seed size or package type.
-- `margin_per_unit` and `margin_pct` are NULL for packaging/NO_TREATMENT rows where break_even is not defined.
 - This view is GLOBAL — do not filter by user_id (no such column exists).
-- **Primary agent tool:** `get_pricing_info` — use this for standard pricing lookups (retail, break-even, margin by product/treatment). The SQL fallback (`run_approved_readonly_query`) handles custom aggregation queries that `get_pricing_info` does not cover (e.g. ranking all products by margin).
+- **Primary agent tool:** `get_pricing_info` — use this for standard pricing lookups (retail, break-even, margin by product/treatment). Margin fields (`margin_per_unit`, `margin_pct`) are always returned in every row. The SQL fallback (`run_approved_readonly_query`) handles custom aggregation queries not covered by the tool (e.g. ranking all products by margin).
 - Migration: `0031_v_agent_pricing.sql`
 
 ---

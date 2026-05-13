@@ -314,12 +314,15 @@ Views that support pricing display and order management. Pricing views are globa
 | `margin_per_unit` | `retail_price_per_unit − break_even_price_per_unit`; NULL when break_even_price is NULL |
 | `margin_pct` | `margin_per_unit / retail_price_per_unit × 100`; NULL when retail_price = 0 or break_even is NULL |
 
-**Agent SQL fallback use cases:**
-- "What is the retail price for [product] with [treatment] this season?" → filter by `product_name ILIKE` and `treatment_name ILIKE`
-- "What is the break-even price for [product]?" → `break_even_price_per_unit` column
-- "Which products have the highest margin?" → `ORDER BY margin_per_unit DESC`
-- "Show me the margin percentage for all products." → `margin_pct` column
-- "What is the markup on [product] [treatment]?" → `margin_per_unit` or `margin_pct`
+**Margin field definitions:**
+- `margin_per_unit` = `retail_price_per_unit − break_even_price_per_unit` — the per-unit pricing spread. This is the same for every customer; it does not account for order-level discounts.
+- `margin_pct` = `margin_per_unit / retail_price_per_unit × 100` — margin as a percentage of retail price.
+- Both fields are NULL for packaging/NO_TREATMENT rows where break-even is not defined.
+- **Margin vs customer profit:** `margin_per_unit` is a pricing-level concept. Actual profit per customer order is lower because brand grower and early-pay discounts reduce the effective selling price. Customer-level profit is tracked in `order_items.profit_per_unit` (which factors in discounts).
+
+**Agent use cases:**
+- Primary: `get_pricing_info` tool — handles retail price, break-even, and margin questions for specific products/treatments
+- SQL fallback (`run_approved_readonly_query`): for cross-product aggregation and ranking (e.g. "which products have the highest margin?", "average margin for corn products")
 
 **Agent tool using it:** `get_pricing_info` — primary tool for retail price, break-even, and margin questions. The SQL fallback (`run_approved_readonly_query`) can also query this view for custom aggregation questions not served by the tool.
 

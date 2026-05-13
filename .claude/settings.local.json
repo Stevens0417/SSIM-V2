@@ -63,10 +63,13 @@
       "Bash(Get-ChildItem \"c:\\\\Projects\\\\SSIMV2\\\\supabase\\\\migrations\")",
       "Bash(Select-Object Name, Length)",
       "Bash(Select-String -Path \"c:\\\\Projects\\\\SSIMV2\\\\supabase\\\\migrations\\\\*.sql\" -Pattern \"v_agent_staged_deliveries\")",
-      "Bash(Select-Object -First 20)"
+      "Bash(Select-Object -First 20)",
+      "Bash(mkdir \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\replants\\\\print\\\\[id]\")",
+      "Bash(npx supabase *)"
     ],
     "additionalDirectories": [
-      "c:\\Projects\\SSIMV2\\src\\app\\deliveries\\print"
+      "c:\\Projects\\SSIMV2\\src\\app\\deliveries\\print",
+      "c:\\Projects\\SSIMV2\\src\\app\\replants\\print"
     ]
   }
 }

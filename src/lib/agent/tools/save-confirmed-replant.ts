@@ -7,7 +7,7 @@ const CONFIRM_PATTERNS = [
   /\byes\b/i,
   /\bconfirm\b/i,
   /\bsave it\b/i,
-  /\bsave delivery\b/i,
+  /\bsave replant\b/i,
   /\bsave this\b/i,
   /\blooks good\b/i,
   /\bcorrect\b/i,
@@ -30,40 +30,40 @@ interface ToolInput {
 
 interface ToolOutput {
   success: boolean;
-  delivery_ids: string[];
+  replant_ids: string[];
   lines_saved: number;
-  unmatched_lines: number;
+  unlinked_lines: number;
   not_confirmed?: boolean;
   tool_error?: boolean;
   tool_error_message?: string;
 }
 
-// Shape of a resolved item stored in agent_tool_calls.output_json
+// Shape of a resolved item stored in agent_tool_calls.output_json by draft_replant_from_chat
 interface StoredResolvedItem {
   product: { resolved_product_id: string | null; status: string };
   treatment: { resolved_treatment_id: string | null; status: string };
   seed_size: { resolved_seed_size: string | null; status: string };
   package_type: { resolved_package_type: string | null; status: string };
-  units_delivered: { resolved_units: number | null; status: string };
+  units_replanted: { resolved_units: number | null; status: string };
 }
 
 // Shape of the full draft output stored in agent_tool_calls.output_json
 interface StoredDraftOutput {
+  draft_type?: string;
   ready_for_confirmation: boolean;
   customer: { resolved_customer_id: string | null; status: string };
-  delivery_date: { resolved_date: string | null; status: string };
+  replant_date: { resolved_date: string | null; status: string };
   season_year: { resolved_season_year: number | null; status: string };
   items: StoredResolvedItem[];
 }
 
-// Shape of the draft input stored in agent_tool_calls.input_json
 interface StoredDraftInput {
   notes?: string;
 }
 
 // ─── Server-side order matching ───────────────────────────────────────────────
-// Port of findOrderLineMatches from orderMatching.service.ts that accepts
-// a SupabaseClient instead of relying on getSupabaseBrowserClient().
+// Same FIFO allocation logic as deliveries: early-pay first, then oldest order.
+// Replants are linked to open order items the same way deliveries are.
 
 interface SaveLine {
   product_id: string;
@@ -125,7 +125,6 @@ async function serverFindOrderLineMatches(
 
   const statusList = (statusRows ?? []) as StatusRow[];
 
-  // Shared mutable tracker — prevents over-allocating the same order line to two delivery lines
   const openUnits = new Map<string, number>(
     statusList.map((r) => [r.order_item_id, Math.max(0, r.net_units)])
   );
@@ -191,7 +190,7 @@ async function logCall(
     thread_id: threadId,
     message_id: null,
     user_id: userId,
-    tool_name: "save_confirmed_delivery",
+    tool_name: "save_confirmed_replant",
     input_json: input,
     output_json: output,
     status,
@@ -201,7 +200,7 @@ async function logCall(
 
 // ─── Tool factory ─────────────────────────────────────────────────────────────
 
-export function makeSaveConfirmedDeliveryTool(
+export function makeSaveConfirmedReplantTool(
   userClient: SupabaseClient,
   serviceClient: SupabaseClient,
   userId: string,
@@ -210,23 +209,23 @@ export function makeSaveConfirmedDeliveryTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Saves a validated delivery draft to the database after the user has explicitly confirmed it. " +
+      "Saves a validated replant draft to the database after the user has explicitly confirmed it. " +
       "MUST only be called when the user's current message is an unambiguous confirmation (yes, confirm, looks good, save it, etc.). " +
-      "Requires a draft_id from a previous draft_delivery_from_chat call where ready_for_confirmation was true. " +
-      "Runs order matching before inserting — early-pay lines allocated first, then oldest order. " +
-      "Do NOT call this speculatively or before the user has confirmed the delivery summary.",
+      "Requires a draft_id from a previous draft_replant_from_chat call where ready_for_confirmation was true. " +
+      "Runs order matching before inserting — early-pay lines first, then oldest order. " +
+      "Do NOT call this speculatively or before the user has confirmed the replant summary.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
         draft_id: {
           type: "string",
           description:
-            "The draft_id returned by draft_delivery_from_chat when ready_for_confirmation was true. Required.",
+            "The draft_id returned by draft_replant_from_chat when ready_for_confirmation was true. Required.",
         },
         confirmation_text: {
           type: "string",
           description:
-            "The exact text from the user's current message confirming the delivery. " +
+            "The exact text from the user's current message confirming the replant. " +
             "Must be an unambiguous approval — 'yes', 'confirm', 'save it', 'looks good', 'correct', 'go ahead'. " +
             "Do not pass vague responses like 'ok', 'maybe', or 'sure'.",
         },
@@ -236,16 +235,16 @@ export function makeSaveConfirmedDeliveryTool(
     }),
 
     execute: async (input: ToolInput): Promise<ToolOutput> => {
-      // ── 1. Confirmation guard — double-checked on both model text and raw message ──
+      // ── 1. Confirmation guard — checked on both model text and raw user message ──
       const confirmed =
         isConfirmation(input.confirmation_text) || isConfirmation(userMessage);
 
       if (!confirmed) {
         const out: ToolOutput = {
           success: false,
-          delivery_ids: [],
+          replant_ids: [],
           lines_saved: 0,
-          unmatched_lines: 0,
+          unlinked_lines: 0,
           not_confirmed: true,
         };
         await logCall(serviceClient, threadId, userId, input, out, "not_confirmed", null);
@@ -257,18 +256,18 @@ export function makeSaveConfirmedDeliveryTool(
         .from("agent_tool_calls")
         .select("input_json, output_json")
         .eq("id", input.draft_id)
-        .eq("tool_name", "draft_delivery_from_chat")
+        .eq("tool_name", "draft_replant_from_chat")
         .single();
 
       if (draftErr || !draftRow) {
         const msg = draftErr?.message ?? "Draft not found";
         const out: ToolOutput = {
           success: false,
-          delivery_ids: [],
+          replant_ids: [],
           lines_saved: 0,
-          unmatched_lines: 0,
+          unlinked_lines: 0,
           tool_error: true,
-          tool_error_message: `Draft not found or does not belong to this user. ${msg}`,
+          tool_error_message: `Replant draft not found or does not belong to this user. ${msg}`,
         };
         await logCall(serviceClient, threadId, userId, input, out, "error", msg);
         return out;
@@ -278,14 +277,14 @@ export function makeSaveConfirmedDeliveryTool(
       const draftInput = draftRow.input_json as StoredDraftInput;
       const notes = draftInput.notes ?? null;
 
-      // ── 3. Verify draft is complete ────────────────────────────────────────
-      if (!draft.ready_for_confirmation) {
-        const msg = "Draft is not ready for confirmation — missing or invalid fields.";
+      // ── 3. Verify this is a replant draft and it is complete ──────────────────
+      if (draft.draft_type !== "replant") {
+        const msg = "Draft is not a replant draft — draft_type mismatch.";
         const out: ToolOutput = {
           success: false,
-          delivery_ids: [],
+          replant_ids: [],
           lines_saved: 0,
-          unmatched_lines: 0,
+          unlinked_lines: 0,
           tool_error: true,
           tool_error_message: msg,
         };
@@ -293,22 +292,36 @@ export function makeSaveConfirmedDeliveryTool(
         return out;
       }
 
-      // ── 4. Check for duplicate save — prevent re-saving the same draft ──────
+      if (!draft.ready_for_confirmation) {
+        const msg = "Replant draft is not ready for confirmation — missing or invalid fields.";
+        const out: ToolOutput = {
+          success: false,
+          replant_ids: [],
+          lines_saved: 0,
+          unlinked_lines: 0,
+          tool_error: true,
+          tool_error_message: msg,
+        };
+        await logCall(serviceClient, threadId, userId, input, out, "error", msg);
+        return out;
+      }
+
+      // ── 4. Check for duplicate save — prevent re-saving the same draft ────────
       const { data: existingSave } = await serviceClient
         .from("agent_tool_calls")
         .select("id")
-        .eq("tool_name", "save_confirmed_delivery")
+        .eq("tool_name", "save_confirmed_replant")
         .eq("status", "success")
         .contains("input_json", { draft_id: input.draft_id })
         .limit(1);
 
       if (existingSave && existingSave.length > 0) {
-        const msg = "This delivery draft has already been saved.";
+        const msg = "This replant draft has already been saved.";
         const out: ToolOutput = {
           success: false,
-          delivery_ids: [],
+          replant_ids: [],
           lines_saved: 0,
-          unmatched_lines: 0,
+          unlinked_lines: 0,
           tool_error: true,
           tool_error_message: msg,
         };
@@ -317,16 +330,16 @@ export function makeSaveConfirmedDeliveryTool(
       }
 
       const customerId = draft.customer.resolved_customer_id;
-      const deliveryDate = draft.delivery_date.resolved_date;
+      const replantDate = draft.replant_date.resolved_date;
       const seasonYear = draft.season_year.resolved_season_year;
 
-      if (!customerId || !deliveryDate || !seasonYear) {
-        const msg = "Draft is missing required header fields (customer, date, or season).";
+      if (!customerId || !replantDate || !seasonYear) {
+        const msg = "Replant draft is missing required header fields (customer, date, or season).";
         const out: ToolOutput = {
           success: false,
-          delivery_ids: [],
+          replant_ids: [],
           lines_saved: 0,
-          unmatched_lines: 0,
+          unlinked_lines: 0,
           tool_error: true,
           tool_error_message: msg,
         };
@@ -334,21 +347,29 @@ export function makeSaveConfirmedDeliveryTool(
         return out;
       }
 
-      // ── 5. Build save lines from resolved items ────────────────────────────
-      const saveLines: SaveLine[] = [];
+      // ── 5. Build save lines from resolved items ───────────────────────────────
+      interface SaveLineWithMeta extends SaveLine {
+        product_id: string;
+        treatment_id: string;
+        seed_size: string | null;
+        package_type: string;
+        units: number;
+      }
+
+      const saveLines: SaveLineWithMeta[] = [];
 
       for (const item of draft.items) {
         const productId = item.product.resolved_product_id;
         const treatmentId = item.treatment.resolved_treatment_id;
-        const units = item.units_delivered.resolved_units;
+        const units = item.units_replanted.resolved_units;
 
         if (!productId || !treatmentId || !units) {
-          const msg = "Draft contains unresolved line items — call draft_delivery_from_chat to resolve them first.";
+          const msg = "Replant draft contains unresolved line items — call draft_replant_from_chat to resolve them first.";
           const out: ToolOutput = {
             success: false,
-            delivery_ids: [],
+            replant_ids: [],
             lines_saved: 0,
-            unmatched_lines: 0,
+            unlinked_lines: 0,
             tool_error: true,
             tool_error_message: msg,
           };
@@ -357,8 +378,7 @@ export function makeSaveConfirmedDeliveryTool(
         }
 
         const displayPkg = item.package_type.resolved_package_type ?? "Bag";
-        const packageType =
-          displayPkg.toLowerCase() === "seedpak" ? "tote" : "bag";
+        const packageType = displayPkg.toLowerCase() === "seedpak" ? "tote" : "bag";
         const seedSize =
           item.seed_size.status === "not_required"
             ? null
@@ -367,7 +387,7 @@ export function makeSaveConfirmedDeliveryTool(
         saveLines.push({ product_id: productId, treatment_id: treatmentId, seed_size: seedSize, package_type: packageType, units });
       }
 
-      // ── 6. Order matching ──────────────────────────────────────────────────
+      // ── 6. Order matching ─────────────────────────────────────────────────────
       let allocationsByLine: OrderLineAllocation[][];
       try {
         allocationsByLine = await serverFindOrderLineMatches(
@@ -380,9 +400,9 @@ export function makeSaveConfirmedDeliveryTool(
         const msg = err instanceof Error ? err.message : "Order matching failed";
         const out: ToolOutput = {
           success: false,
-          delivery_ids: [],
+          replant_ids: [],
           lines_saved: 0,
-          unmatched_lines: 0,
+          unlinked_lines: 0,
           tool_error: true,
           tool_error_message: msg,
         };
@@ -390,14 +410,14 @@ export function makeSaveConfirmedDeliveryTool(
         return out;
       }
 
-      // ── 7. Build delivery insert rows ──────────────────────────────────────
-      interface DeliveryInsertRow {
-        delivery_date: string;
+      // ── 7. Build replant insert rows ──────────────────────────────────────────
+      interface ReplantInsertRow {
+        replant_date: string;
         season_year: number;
         customer_id: string;
         product_id: string;
         treatment_id: string;
-        units_delivered: number;
+        units_replanted: number;
         seed_size: string | null;
         package_type: string;
         order_id: string | null;
@@ -405,15 +425,15 @@ export function makeSaveConfirmedDeliveryTool(
         notes: string | null;
       }
 
-      const insertRows: DeliveryInsertRow[] = [];
-      let unmatchedLines = 0;
+      const insertRows: ReplantInsertRow[] = [];
+      let unlinkedLines = 0;
 
       for (let i = 0; i < saveLines.length; i++) {
         const line = saveLines[i];
         const allocations = allocationsByLine[i] ?? [];
 
         const baseRow = {
-          delivery_date: deliveryDate,
+          replant_date: replantDate,
           season_year: seasonYear,
           customer_id: customerId,
           product_id: line.product_id,
@@ -424,35 +444,34 @@ export function makeSaveConfirmedDeliveryTool(
         };
 
         if (allocations.length === 0) {
-          unmatchedLines++;
-          insertRows.push({ ...baseRow, units_delivered: line.units, order_id: null, order_item_id: null });
+          unlinkedLines++;
+          insertRows.push({ ...baseRow, units_replanted: line.units, order_id: null, order_item_id: null });
         } else {
           let remaining = line.units;
           for (const alloc of allocations) {
-            insertRows.push({ ...baseRow, units_delivered: alloc.units, order_id: alloc.order_id, order_item_id: alloc.order_item_id });
+            insertRows.push({ ...baseRow, units_replanted: alloc.units, order_id: alloc.order_id, order_item_id: alloc.order_item_id });
             remaining -= alloc.units;
           }
-          // Any units not covered by order lines → unlinked row
           if (remaining > 0) {
-            unmatchedLines++;
-            insertRows.push({ ...baseRow, units_delivered: remaining, order_id: null, order_item_id: null });
+            unlinkedLines++;
+            insertRows.push({ ...baseRow, units_replanted: remaining, order_id: null, order_item_id: null });
           }
         }
       }
 
-      // ── 8. Atomic insert ───────────────────────────────────────────────────
+      // ── 8. Atomic insert ──────────────────────────────────────────────────────
       const { data: inserted, error: insertErr } = await userClient
-        .from("deliveries")
+        .from("replants")
         .insert(insertRows)
         .select("id");
 
       if (insertErr || !inserted) {
-        const msg = insertErr?.message ?? "Failed to insert delivery rows";
+        const msg = insertErr?.message ?? "Failed to insert replant rows";
         const out: ToolOutput = {
           success: false,
-          delivery_ids: [],
+          replant_ids: [],
           lines_saved: 0,
-          unmatched_lines: 0,
+          unlinked_lines: 0,
           tool_error: true,
           tool_error_message: msg,
         };
@@ -460,12 +479,12 @@ export function makeSaveConfirmedDeliveryTool(
         return out;
       }
 
-      const deliveryIds = (inserted as Array<{ id: string }>).map((r) => r.id);
+      const replantIds = (inserted as Array<{ id: string }>).map((r) => r.id);
       const out: ToolOutput = {
         success: true,
-        delivery_ids: deliveryIds,
+        replant_ids: replantIds,
         lines_saved: insertRows.length,
-        unmatched_lines: unmatchedLines,
+        unlinked_lines: unlinkedLines,
       };
       await logCall(serviceClient, threadId, userId, input, out, "success", null);
       return out;

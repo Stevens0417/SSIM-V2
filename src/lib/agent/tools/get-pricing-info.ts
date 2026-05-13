@@ -23,8 +23,9 @@ interface PricingRow {
   treatment_name: string | null;
   retail_price_per_unit: number | null;
   break_even_price_per_unit: number | null;
-  margin_per_unit?: number | null;
-  margin_pct?: number | null;
+  // Margin fields are always present; null for packaging rows where break-even is undefined
+  margin_per_unit: number | null;
+  margin_pct: number | null;
 }
 
 interface ToolOutput {
@@ -47,12 +48,14 @@ export function makeGetPricingInfoTool(
   return tool<ToolInput, ToolOutput>({
     description:
       "Returns retail price, break-even price, and margin information for products and treatments from the approved pricing view. " +
+      "Every row always includes margin_per_unit (retail minus break-even) and margin_pct (margin as a percentage of retail). " +
       "Use this tool for any pricing question: retail price, break-even price, margin per unit, margin percentage, or listing which treatments are priced for a product. " +
       "All filters are optional — pass only the filters the user specified. " +
       "If no seasonYear is provided, the backend resolves the correct season automatically — never guess a year. " +
       "Supports partial, case-insensitive product and treatment name matching. " +
       "Pricing is GLOBAL — all users see the same prices. " +
-      "Use the SQL fallback only when a pricing question requires custom aggregation (e.g. average margin across all products) not directly returned by this tool.",
+      "margin_per_unit and margin_pct are null for packaging rows where break-even is not defined. " +
+      "Use the SQL fallback only when a pricing question requires custom aggregation (e.g. ranking all products by margin) not directly returned by this tool.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
@@ -79,13 +82,13 @@ export function makeGetPricingInfoTool(
         includeMargins: {
           type: "boolean",
           description:
-            "Set to true when the user asks about margin, markup, or profitability on pricing. Adds margin_per_unit and margin_pct to each row.",
+            "Hint that the user is asking about margin or markup. margin_per_unit and margin_pct are always returned regardless of this flag — set it to true so your response emphasizes those fields.",
         },
       },
       additionalProperties: false,
     }),
     execute: async (input: ToolInput): Promise<ToolOutput> => {
-      const { productName, treatmentName, crop, includeMargins } = input;
+      const { productName, treatmentName, crop } = input;
 
       // Season resolution: honour model-provided year only if the user actually mentioned it.
       // This prevents the model from injecting a hallucinated year from its training data.
@@ -153,21 +156,16 @@ export function makeGetPricingInfoTool(
       const truncated = data.length > LIMIT;
       const rawRows = truncated ? data.slice(0, LIMIT) : data;
 
-      const rows: PricingRow[] = rawRows.map((r) => {
-        const row: PricingRow = {
-          season_year: r.season_year as number,
-          product_name: r.product_name as string,
-          crop: r.crop as string | null,
-          treatment_name: r.treatment_name as string | null,
-          retail_price_per_unit: r.retail_price_per_unit as number | null,
-          break_even_price_per_unit: r.break_even_price_per_unit as number | null,
-        };
-        if (includeMargins) {
-          row.margin_per_unit = r.margin_per_unit as number | null;
-          row.margin_pct = r.margin_pct as number | null;
-        }
-        return row;
-      });
+      const rows: PricingRow[] = rawRows.map((r) => ({
+        season_year: r.season_year as number,
+        product_name: r.product_name as string,
+        crop: r.crop as string | null,
+        treatment_name: r.treatment_name as string | null,
+        retail_price_per_unit: r.retail_price_per_unit as number | null,
+        break_even_price_per_unit: r.break_even_price_per_unit as number | null,
+        margin_per_unit: r.margin_per_unit as number | null,
+        margin_pct: r.margin_pct as number | null,
+      }));
 
       const output: ToolOutput = {
         rows,

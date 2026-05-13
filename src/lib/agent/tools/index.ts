@@ -7,3 +7,6 @@ export { makeDraftDeliveryFromChatTool } from "./draft-delivery-from-chat";
 export { makeSaveConfirmedDeliveryTool } from "./save-confirmed-delivery";
 export { makeGetDeliveryPrintLinkTool } from "./get-delivery-print-link";
 export { makeGetPricingInfoTool } from "./get-pricing-info";
+export { makeDraftReplantFromChatTool } from "./draft-replant-from-chat";
+export { makeSaveConfirmedReplantTool } from "./save-confirmed-replant";
+export { makeGetReplantPrintLinkTool } from "./get-replant-print-link";

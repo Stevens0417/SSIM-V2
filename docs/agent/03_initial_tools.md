@@ -134,16 +134,20 @@ The agent must never say "I cannot retrieve this" without first attempting a que
 - `rows[]` — one row per (product, treatment) for the resolved season
 - `retail_price_per_unit` — the price charged per unit
 - `break_even_price_per_unit` — computed cost floor (corn/soybean formula)
-- `margin_per_unit` — retail minus break-even (present when `includeMargins: true`)
-- `margin_pct` — margin as percentage of retail (present when `includeMargins: true`)
+- `margin_per_unit` — retail minus break-even; always present in every row (null for packaging)
+- `margin_pct` — margin as percentage of retail; always present in every row (null for packaging)
 - `resolved_season_year`, `season_source` — which season was used and how it was resolved
+
+**Margin vs customer profit:**
+- `margin_per_unit` is a **pricing-level** concept: retail − break-even. It is the same for every customer.
+- Customer **profit** on an actual order is lower because brand grower and early-pay discounts reduce the effective selling price. Use `get_customer_current_season_orders` with `includeProfit: true` for per-customer order profit.
 
 **Tool parameters:**
 - `productName` — optional partial name, case-insensitive
 - `treatmentName` — optional partial name, case-insensitive
 - `seasonYear` — optional; omit unless user explicitly stated a year
 - `crop` — optional; `'corn'`, `'soybean'`, or `'packaging'`
-- `includeMargins: true` — required for margin/markup questions
+- `includeMargins` — hint that the user is asking about margin; margin fields are always returned regardless
 
 **Pricing is GLOBAL** — all users see the same prices. No user-scoping on this view.
 
