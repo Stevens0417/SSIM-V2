@@ -76,6 +76,8 @@ As of migration 0022, `package_type` is a first-class dimension in all inventory
 
 **Agent aggregation behavior:** `get_on_hand_inventory` returns ALL matching rows including staged-only negative rows. The tool pre-computes `total_physical_units_on_hand`, `total_staged_units`, and `total_available_units` by summing ALL rows. The agent must use `total_available_units` as the headline — not an individual row's `available_units`. The `minAvailableUnits` query-level filter was removed because it excluded staged-only negative rows and caused over-reporting of availability.
 
+**Agent row-level display — seed_size and package_type are required:** Every row in the breakdown must show treatment, seed_size (or "—" when null), and package_type. The agent must never omit seed_size from inventory responses. Rows with different seed sizes must be listed separately — never combined. This ensures users can make accurate delivery decisions (delivery draft requires seed_size for corn products).
+
 **Where used in UI:** On-Hand Inventory page (detail view). The detail table shows all columns including `units_staged` (Staged column) and `available_units` (Available column). The "Negative available only" filter and KPI cards use `available_units`. Also feeds `v_on_hand_inventory_wide`, `v_inventory_print_sheet`, and `v_agent_inventory`.
 
 **Agent tool:** `get_on_hand_inventory` queries this view and maps `units_on_hand` → `physical_units_on_hand`, `units_staged` → `staged_units`, `available_units` → `available_units` per row. Pre-computes `total_physical_units_on_hand`, `total_staged_units`, `total_available_units`. The agent leads responses with `total_available_units`. `v_agent_inventory` (SELECT * wrapper) is also available to the SQL fallback tool.

@@ -33,7 +33,18 @@ The agent must never say "I cannot retrieve this" without first attempting a que
 - `total_available_units` — primary answer to "how many do I have?" (physical minus staged)
 - `total_physical_units_on_hand` — warehouse count only
 - `total_staged_units` — reserved in active staged deliveries
-- `rows[]` — per (product/treatment/seed_size/package_type) detail
+- `rows[]` — one row per (product/treatment/seed_size/package_type); each row always carries `seed_size` (null for soybeans) and `package_type`
+
+**Row-level display rules (seed_size is required):**
+- Every inventory response must include a per-row breakdown after the total headline.
+- Each row must show: treatment / seed_size (use "—" when null) / package_type / physical / staged / available.
+- Rows with different seed sizes must be listed separately — never combined.
+- This is operationally required: users need seed_size to create deliveries and make fulfillment decisions for corn products.
+
+**Aggregation rules by query type:**
+1. Product-only question → headline total + breakdown by treatment / seed_size / package_type for every row
+2. Product + treatment question → headline total for that treatment + breakdown by seed_size / package_type
+3. Product + treatment + seed_size question → single matching row with physical / staged / available
 
 **See also:** [inventory-tool.md](inventory-tool.md) for full response patterns.
 

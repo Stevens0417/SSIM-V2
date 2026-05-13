@@ -34,7 +34,7 @@ interface DraftItemInput {
 
 interface ToolInput {
   customerName: string;
-  deliveryDate: string;
+  returnDate: string;
   seasonYear?: number;
   items: DraftItemInput[];
   notes?: string;
@@ -99,7 +99,7 @@ interface PackageTypeDraft {
   options: string[];
 }
 
-interface UnitsDraft {
+interface UnitsReturnedDraft {
   input: number | null;
   resolved_units: number | null;
   status: "resolved" | "missing" | "invalid";
@@ -111,14 +111,14 @@ interface ResolvedItem {
   treatment: TreatmentDraft;
   seed_size: SeedSizeDraft;
   package_type: PackageTypeDraft;
-  units_delivered: UnitsDraft;
+  units_returned: UnitsReturnedDraft;
   warnings: string[];
 }
 
 interface ToolOutput {
-  draft_type: "delivery";
+  draft_type: "return";
   customer: CustomerDraft;
-  delivery_date: DateDraft;
+  return_date: DateDraft;
   season_year: SeasonDraft;
   items: ResolvedItem[];
   missing_fields: string[];
@@ -142,10 +142,7 @@ interface PricingRow {
 
 type CustomerRow = { id: string; customer_name: string; farm_name: string | null };
 
-function candidatesFromRows(
-  input: string,
-  rows: CustomerRow[]
-): CustomerDraft {
+function candidatesFromRows(input: string, rows: CustomerRow[]): CustomerDraft {
   if (rows.length === 1) {
     return {
       input,
@@ -175,7 +172,7 @@ async function resolveCustomer(
 ): Promise<CustomerDraft> {
   const SELECT = "id, customer_name, farm_name";
 
-  // Step 1 — exact customer_name (ILIKE without wildcards = case-insensitive exact)
+  // Step 1 — exact customer_name (case-insensitive)
   const { data: d1, error: e1 } = await userClient
     .from("customers")
     .select(SELECT)
@@ -222,10 +219,10 @@ async function resolveItem(
   const warnings: string[] = [];
   const PACKAGE_OPTIONS = ["Bag", "Seedpak"];
 
-  // ── Product ──────────────────────────────────────────────────────────────
+  // ── Product ────────────────────────────────────────────────────────────────
   const lowerProduct = item.productName.toLowerCase().trim();
-  // Exact case-insensitive match first; fall back to partial (includes) only if no exact match.
-  // This prevents "fungicide" from matching both "FUNGICIDE" and "FUNGICIDE OPTIMIZE".
+  // Exact case-insensitive match first to prevent "fungicide" matching both
+  // "FUNGICIDE" and "FUNGICIDE OPTIMIZE".
   const exactProductRows = pricingRows.filter(
     (r) => r.product_name.toLowerCase() === lowerProduct
   );
@@ -270,10 +267,9 @@ async function resolveItem(
     };
   }
 
-  // ── Treatment ─────────────────────────────────────────────────────────────
+  // ── Treatment ──────────────────────────────────────────────────────────────
   let treatmentDraft: TreatmentDraft;
   let resolvedTreatmentId: string | null = null;
-  let resolvedTreatmentName: string | null = null;
 
   if (resolvedProductId !== null) {
     const productPricingRows = pricingRows.filter(
@@ -284,7 +280,6 @@ async function resolveItem(
     ].sort();
 
     const lowerTreatment = item.treatmentName.toLowerCase().trim();
-    // Exact case-insensitive match first; fall back to partial only if no exact match.
     const exactTreatmentRows = productPricingRows.filter(
       (r) => r.treatment_name.toLowerCase() === lowerTreatment
     );
@@ -309,7 +304,6 @@ async function resolveItem(
         status: "resolved",
       };
       resolvedTreatmentId = uniqueTreatments[0].treatment_id;
-      resolvedTreatmentName = uniqueTreatments[0].treatment_name;
     } else if (uniqueTreatments.length === 0) {
       treatmentDraft = {
         input: item.treatmentName,
@@ -336,12 +330,11 @@ async function resolveItem(
     };
   }
 
-  // ── Seed size ─────────────────────────────────────────────────────────────
+  // ── Seed size ──────────────────────────────────────────────────────────────
   let seedSizeDraft: SeedSizeDraft;
   const isCorn = resolvedCrop?.toLowerCase() === "corn";
 
   if (!isCorn) {
-    // Soybean and other non-corn products — seed size not required
     seedSizeDraft = {
       input: item.seedSize ?? null,
       resolved_seed_size: null,
@@ -349,17 +342,12 @@ async function resolveItem(
       options: [],
     };
   } else if (resolvedProductId === null || resolvedTreatmentId === null) {
-    // Can't determine seed size options without a resolved product/treatment
     seedSizeDraft = {
       input: item.seedSize ?? null,
-      resolved_seed_size: null,
+      resolved_seed_size: item.seedSize ? item.seedSize.toUpperCase().trim() : null,
       status: item.seedSize ? "resolved" : "missing",
       options: [],
     };
-    if (item.seedSize) {
-      (seedSizeDraft as SeedSizeDraft).resolved_seed_size =
-        item.seedSize.toUpperCase().trim();
-    }
   } else {
     // Corn with resolved product/treatment — fetch seed size options from inventory
     const { data: invSizes } = await userClient
@@ -391,20 +379,18 @@ async function resolveItem(
         status: "resolved",
         options: seedSizeOptions,
       };
-      // Soft warning if size not found in current inventory
       if (seedSizeOptions.length > 0 && !seedSizeOptions.includes(normalizedSize)) {
         warnings.push(
-          `Seed size "${normalizedSize}" for ${productDraft.resolved_product_name ?? item.productName} / ${resolvedTreatmentName ?? item.treatmentName} was not found in current inventory. Known sizes: ${seedSizeOptions.join(", ")}.`
+          `Seed size "${normalizedSize}" for ${productDraft.resolved_product_name ?? item.productName} / ${treatmentDraft.resolved_treatment_name ?? item.treatmentName} was not found in current inventory. Known sizes: ${seedSizeOptions.join(", ")}.`
         );
       }
     }
   }
 
-  // ── Package type ──────────────────────────────────────────────────────────
+  // ── Package type ───────────────────────────────────────────────────────────
   let packageTypeDraft: PackageTypeDraft;
 
   if (!item.packageType) {
-    // Default to Bag when not specified
     packageTypeDraft = {
       input: null,
       resolved_package_type: "Bag",
@@ -422,8 +408,8 @@ async function resolveItem(
     };
   }
 
-  // ── Units ─────────────────────────────────────────────────────────────────
-  let unitsDraft: UnitsDraft;
+  // ── Units returned ─────────────────────────────────────────────────────────
+  let unitsDraft: UnitsReturnedDraft;
 
   if (item.units === null || item.units === undefined) {
     unitsDraft = { input: null, resolved_units: null, status: "missing" };
@@ -433,47 +419,7 @@ async function resolveItem(
     unitsDraft = { input: item.units, resolved_units: item.units, status: "resolved" };
   }
 
-  // ── Inventory availability check ──────────────────────────────────────────
-  if (
-    resolvedProductId !== null &&
-    resolvedTreatmentId !== null &&
-    unitsDraft.status === "resolved" &&
-    unitsDraft.resolved_units !== null &&
-    packageTypeDraft.resolved_package_type !== null
-  ) {
-    const dbPkg = toDbPackageType(packageTypeDraft.resolved_package_type);
-    const resolvedSeedSize = seedSizeDraft.resolved_seed_size ?? null;
-
-    // Build query — must match the exact (product, treatment, seed_size, package_type) key
-    // that v_on_hand_inventory uses, including NULL seed_size via IS NULL
-    let invAvailQuery = userClient
-      .from("v_on_hand_inventory")
-      .select("available_units")
-      .eq("product_id", resolvedProductId)
-      .eq("treatment_id", resolvedTreatmentId)
-      .eq("package_type", dbPkg);
-
-    if (resolvedSeedSize !== null) {
-      invAvailQuery = invAvailQuery.eq("seed_size", resolvedSeedSize);
-    } else {
-      invAvailQuery = invAvailQuery.is("seed_size", null);
-    }
-
-    const { data: avail } = await invAvailQuery;
-    const availableUnits = (
-      (avail ?? []) as Array<{ available_units: number }>
-    ).reduce((sum, r) => sum + (r.available_units ?? 0), 0);
-
-    if (unitsDraft.resolved_units > availableUnits) {
-      const over = unitsDraft.resolved_units - availableUnits;
-      const productLabel = productDraft.resolved_product_name ?? item.productName;
-      const treatLabel = resolvedTreatmentName ?? item.treatmentName;
-      const sizeLabel = resolvedSeedSize ? ` / ${resolvedSeedSize}` : "";
-      warnings.push(
-        `Only ${availableUnits} available units for ${productLabel} / ${treatLabel}${sizeLabel} / ${packageTypeDraft.resolved_package_type} — delivery would exceed available inventory by ${over} units.`
-      );
-    }
-  }
+  // No inventory availability check for returns — returning seed increases available stock.
 
   return {
     line_index: lineIndex,
@@ -481,7 +427,7 @@ async function resolveItem(
     treatment: treatmentDraft,
     seed_size: seedSizeDraft,
     package_type: packageTypeDraft,
-    units_delivered: unitsDraft,
+    units_returned: unitsDraft,
     warnings,
   };
 }
@@ -503,7 +449,7 @@ async function logCall(
       thread_id: threadId,
       message_id: null,
       user_id: userId,
-      tool_name: "draft_delivery_from_chat",
+      tool_name: "draft_return_from_chat",
       input_json: input,
       output_json: output,
       status,
@@ -517,7 +463,7 @@ async function logCall(
 
 // ─── Tool factory ─────────────────────────────────────────────────────────────
 
-export function makeDraftDeliveryFromChatTool(
+export function makeDraftReturnFromChatTool(
   userClient: SupabaseClient,
   serviceClient: SupabaseClient,
   userId: string,
@@ -526,12 +472,12 @@ export function makeDraftDeliveryFromChatTool(
 ) {
   return tool<ToolInput, ToolOutput>({
     description:
-      "Extracts a delivery from the user's natural language, resolves all fields " +
-      "(customer, product, treatment, seed size, package type, units) against live database records, " +
+      "Extracts a return from the user's natural language, resolves all fields " +
+      "(customer, product, treatment, seed size, package type, units returned) against live database records, " +
       "and returns a structured draft with validation status and options for any missing fields. " +
-      "Supports multiple delivery lines in a single call. " +
+      "Supports multiple return lines in a single call. " +
       "Does NOT save — use this tool to build and validate the draft, then present it to the user " +
-      "for confirmation. Saving is a separate step.",
+      "for confirmation before saving.",
     inputSchema: jsonSchema<ToolInput>({
       type: "object",
       properties: {
@@ -540,7 +486,7 @@ export function makeDraftDeliveryFromChatTool(
           description:
             "Customer name or farm/business name as stated by the user. Partial names are accepted. Required.",
         },
-        deliveryDate: {
+        returnDate: {
           type: "string",
           description:
             'Pass the date exactly as the user stated it: "today", "yesterday", "tomorrow", or a specific date as YYYY-MM-DD. ' +
@@ -555,14 +501,14 @@ export function makeDraftDeliveryFromChatTool(
         items: {
           type: "array",
           description:
-            "One entry per delivery line. Multi-line deliveries are fully supported.",
+            "One entry per return line. Multi-line returns are fully supported.",
           items: {
             type: "object",
             properties: {
               productName: {
                 type: "string",
                 description:
-                  'Product name or variety as mentioned. Examples: "DKC 100-01", "103-93", "94-94".',
+                  'Product name or variety as mentioned. Examples: "DKC 100-01", "103-93".',
               },
               treatmentName: {
                 type: "string",
@@ -571,7 +517,7 @@ export function makeDraftDeliveryFromChatTool(
               },
               units: {
                 type: "number",
-                description: "Number of units to deliver. Must be a positive whole number.",
+                description: "Number of units being returned. Must be a positive whole number.",
               },
               seedSize: {
                 type: "string",
@@ -590,18 +536,18 @@ export function makeDraftDeliveryFromChatTool(
         },
         notes: {
           type: "string",
-          description: "Any notes or comments the user mentioned for this delivery.",
+          description: "Any notes or comments the user mentioned for this return.",
         },
       },
-      required: ["customerName", "deliveryDate", "items"],
+      required: ["customerName", "returnDate", "items"],
       additionalProperties: false,
     }),
 
     execute: async (input: ToolInput): Promise<ToolOutput> => {
-      // ── 1. Delivery date ────────────────────────────────────────────────
-      const dateResolution = resolveAgentDate(userMessage, input.deliveryDate);
-      const deliveryDateDraft: DateDraft = {
-        input: input.deliveryDate,
+      // ── 1. Return date ──────────────────────────────────────────────────
+      const dateResolution = resolveAgentDate(userMessage, input.returnDate);
+      const returnDateDraft: DateDraft = {
+        input: input.returnDate,
         resolved_date: dateResolution.resolved_date,
         date_source: dateResolution.date_source,
         user_explicitly_requested_date: dateResolution.user_explicitly_requested_date,
@@ -638,7 +584,7 @@ export function makeDraftDeliveryFromChatTool(
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Customer lookup failed";
         const errorOutput: ToolOutput = {
-          draft_type: "delivery",
+          draft_type: "return",
           customer: {
             input: input.customerName,
             resolved_customer_id: null,
@@ -646,7 +592,7 @@ export function makeDraftDeliveryFromChatTool(
             farm_name: null,
             status: "missing",
           },
-          delivery_date: deliveryDateDraft,
+          return_date: returnDateDraft,
           season_year: seasonDraft,
           items: [],
           missing_fields: ["customer name"],
@@ -680,7 +626,6 @@ export function makeDraftDeliveryFromChatTool(
       const missingFields: string[] = [];
       const allWarnings: string[] = [];
 
-      // Header-level missing
       if (customerDraft.status === "ambiguous") {
         const names = (customerDraft.candidates ?? [])
           .map((c) => c.customer_name)
@@ -690,14 +635,13 @@ export function makeDraftDeliveryFromChatTool(
         missingFields.push("customer name");
       }
 
-      if (deliveryDateDraft.status !== "resolved") {
-        missingFields.push("delivery date");
+      if (returnDateDraft.status !== "resolved") {
+        missingFields.push("return date");
       }
       if (seasonDraft.status !== "resolved") {
         missingFields.push("season year");
       }
 
-      // Item-level missing
       for (const ri of resolvedItems) {
         const lbl = `line ${ri.line_index + 1}`;
 
@@ -708,7 +652,6 @@ export function makeDraftDeliveryFromChatTool(
               : `product for ${lbl}`
           );
         }
-        // Only report treatment as missing if product is resolved (otherwise product is the blocker)
         if (ri.product.status === "resolved" && ri.treatment.status !== "resolved") {
           missingFields.push(
             ri.treatment.status === "ambiguous"
@@ -723,9 +666,9 @@ export function makeDraftDeliveryFromChatTool(
               : "";
           missingFields.push(`seed size for ${lbl}${opts}`);
         }
-        if (ri.units_delivered.status !== "resolved") {
+        if (ri.units_returned.status !== "resolved") {
           missingFields.push(
-            ri.units_delivered.status === "invalid"
+            ri.units_returned.status === "invalid"
               ? `units for ${lbl} must be a positive whole number`
               : `units for ${lbl}`
           );
@@ -737,9 +680,9 @@ export function makeDraftDeliveryFromChatTool(
       const ready_for_confirmation = missingFields.length === 0;
 
       const output: ToolOutput = {
-        draft_type: "delivery",
+        draft_type: "return",
         customer: customerDraft,
-        delivery_date: deliveryDateDraft,
+        return_date: returnDateDraft,
         season_year: seasonDraft,
         items: resolvedItems,
         missing_fields: missingFields,
@@ -750,8 +693,6 @@ export function makeDraftDeliveryFromChatTool(
       const status = ready_for_confirmation ? "validation_pass" : "validation_fail";
       const logId = await logCall(serviceClient, threadId, userId, input, output, status, null);
 
-      // Expose the tool-call row ID as draft_id so the model can pass it to
-      // save_confirmed_delivery without re-describing the full draft.
       if (ready_for_confirmation && logId !== null) {
         output.draft_id = logId;
       }

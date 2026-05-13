@@ -10,3 +10,6 @@ export { makeGetPricingInfoTool } from "./get-pricing-info";
 export { makeDraftReplantFromChatTool } from "./draft-replant-from-chat";
 export { makeSaveConfirmedReplantTool } from "./save-confirmed-replant";
 export { makeGetReplantPrintLinkTool } from "./get-replant-print-link";
+export { makeDraftReturnFromChatTool } from "./draft-return-from-chat";
+export { makeSaveConfirmedReturnTool } from "./save-confirmed-return";
+export { makeGetReturnPrintLinkTool } from "./get-return-print-link";
