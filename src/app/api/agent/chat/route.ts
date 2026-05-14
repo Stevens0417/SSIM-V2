@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { openai } from "@ai-sdk/openai";
 import { generateText, stepCountIs } from "ai";
+import { AGENT_MAIN_MODEL } from "@/lib/agent/model-config";
 import { getSupabaseServerClient } from "@/lib/supabase/serverClient";
 import {
   makeGetOnHandInventoryTool,
@@ -493,46 +494,39 @@ If tool_error is true:
 ### run_approved_readonly_query
 
 **MANDATORY — Tool selection priority:**
-1. Use the most specific prebuilt tool if one fully covers the question (get_on_hand_inventory, get_customer_current_season_orders, get_customer_order_fulfillment_status, get_staged_deliveries).
+1. Use the most specific prebuilt tool if one fully covers the question (get_on_hand_inventory, get_customer_current_season_orders, get_customer_order_fulfillment_status, get_staged_deliveries, get_pricing_info).
 2. If no prebuilt tool covers it, you MUST attempt run_approved_readonly_query. Do NOT say you cannot retrieve the answer without first trying a query.
-3. If a tool or query fails (tool_error: true or approved: false), report the failure clearly — do not invent numbers or estimate from prior messages.
+3. If a tool or query fails (tool_error: true, sql_generation_error: true, or approved: false), report the failure clearly — do not invent numbers or estimate from prior messages.
 4. Never answer data questions from chat history — prior messages are context only, not a data source.
 
 Use this tool for questions like:
-- "Which customers have the most staged units?" → aggregate v_agent_staged_deliveries by customer
-- "Which products have negative available inventory?" → v_agent_inventory WHERE available_units < 0
-- "Which products have I delivered the most of this season?" → aggregate v_agent_customer_deliveries
-- "Which customers have ordered but haven't received any deliveries yet?" → v_agent_order_fulfillment WHERE delivered_units = 0
-- "What did Bayer ship for DKC 094-94?" → v_agent_bayer_shipments filtered by product_name
-- "How many units were returned across all customers this season?" → SUM from v_agent_customer_returns
-- "Show me all deliveries made in April 2026." → v_agent_customer_deliveries filtered by delivery_date
-- "Which products have had the most replants?" → aggregate v_agent_customer_replants
-- "Which customers received [product] this season?" → v_agent_customer_deliveries filtered by product_name
-- "What is our total profit this season?" → SUM(line_total_profit) from v_agent_customer_orders
-- "Which products have the highest margin across all products?" → v_agent_pricing ORDER BY margin_per_unit DESC (custom aggregation not covered by get_pricing_info)
-- "What is the average margin for corn products this season?" → aggregate v_agent_pricing by crop (custom aggregation)
+- "Which customers have the most staged units?"
+- "Which products have negative available inventory?"
+- "Which products have I delivered the most of this season?"
+- "Which customers have ordered but haven't received any deliveries yet?"
+- "What did Bayer ship for DKC 094-94?"
+- "How many units were returned across all customers this season?"
+- "Show me all deliveries made in April 2026."
+- "Which products have had the most replants?"
+- "Which customers received [product] this season?"
+- "What is our total profit this season?"
+- "Which products have the highest margin across all products?" (custom aggregation not covered by get_pricing_info)
+- "What is the average margin for corn products this season?" (custom aggregation)
 
 Do NOT use it when a prebuilt tool already covers the question.
 
-Writing the SQL:
-- Always use LIMIT ≤ 100
-- Query only from approved views listed in the tool description
-- Use ILIKE for name matching: customer_name ILIKE '%smith%'
-- Package types in the database: 'bag' for Bags, 'tote' for Seedpaks
-- Season year is a plain integer column — filter with WHERE season_year = 2026
-- Use standard SQL aggregates (SUM, COUNT, AVG, GROUP BY) when needed
-- Do not SELECT * — list only the columns you need
+How to call this tool:
+- question: pass the user's question in natural language. Include any year, customer name, product name, or other filter they stated. Do NOT write SQL — the backend generates it automatically.
+- reasoning: one sentence explaining why no prebuilt tool covers this question.
 
 Presenting results:
-- If approved is false:
-  - Read reason_rejected to understand the issue
-  - If fixable (LIMIT too high → reduce to 100, wrong column → correct it), retry ONCE with corrected SQL
-  - If the request is inherently unsafe (write operation requested), respond: "That type of query isn't permitted." Do not retry.
+- The tool returns method_summary — use it as the one-sentence method note in your response. Example: "I queried the approved deliveries view filtered to April 2026."
+- If approved is false: report reason_rejected. If it indicates a fixable problem, retry ONCE with a clarified question. If the request is inherently unsafe, respond: "That type of query isn't permitted." Do not retry.
+- If sql_generation_error is true: tell the user "I wasn't able to generate a query for that question — please try again or rephrase the question."
 - If tool_error is true: tell the user "I wasn't able to retrieve that data — please try again." Do not guess.
 - If rows is empty: say no matching records were found.
 - Convert package_type values in responses: 'bag' → "Bag", 'tote' → "Seedpak"
 - Summarize results in plain language; do not dump raw JSON.
-- Show method: one sentence explaining how you found the answer. Examples: "I checked the approved deliveries view and filtered to April 2026." / "I queried the approved inventory view for products where available units are negative." / "I aggregated staged deliveries by customer to find the highest totals."
 
 ---
 
@@ -963,7 +957,7 @@ export async function POST(req: NextRequest) {
   let assistantMetadata: { actions: Array<{ type: string; label: string; href: string }> } | null = null;
   try {
     const { text, steps } = await generateText({
-      model: openai("gpt-4o-mini"),
+      model: openai(AGENT_MAIN_MODEL),
       system: SYSTEM_PROMPT + pendingDraftSection + pendingReplantDraftSection + pendingReturnDraftSection,
       messages: contextMessages,
       tools,

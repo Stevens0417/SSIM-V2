@@ -166,6 +166,8 @@ The agent must never say "I cannot retrieve this" without first attempting a que
 
 ## When the SQL fallback is needed instead
 
+The main model does NOT write SQL — it passes `question` (natural language) and `reasoning` to the tool. A dedicated SQL reasoning model (`AGENT_SQL_MODEL`) generates the query internally before it is validated and executed.
+
 Use `run_approved_readonly_query` when a prebuilt tool cannot answer:
 
 | Question | Why SQL fallback |

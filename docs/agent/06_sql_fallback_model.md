@@ -1,12 +1,27 @@
 # Agent — SQL Fallback Model
 
-Documents the `run_approved_readonly_query` tool: when to use it, how the security model works, and what the agent is expected to do when it uses it.
+Documents the `run_approved_readonly_query` tool: when to use it, how the two-model routing works, how the security model works, and what the agent is expected to do when it uses it.
 
 ---
 
 ## Purpose
 
-The SQL fallback is a safety valve for business questions that fall outside the coverage of the four prebuilt tools. It lets the agent query a fixed set of approved, user-scoped views rather than inventing an answer or refusing to help.
+The SQL fallback is a safety valve for business questions that fall outside the coverage of the prebuilt tools. It lets the agent query a fixed set of approved, user-scoped views rather than inventing an answer or refusing to help.
+
+---
+
+## Two-model routing
+
+SQL generation is delegated to a dedicated reasoning model so the main orchestration model does not write SQL directly.
+
+| Role | Model | Env var | Task |
+|---|---|---|---|
+| Main model | `AGENT_MAIN_MODEL` (default `gpt-4o-mini`) | Yes | Orchestration, tool selection, composing replies |
+| SQL model | `AGENT_SQL_MODEL` (default `gpt-4o`) | Yes | Generating safe SQL inside `run_approved_readonly_query` |
+
+When the main model selects `run_approved_readonly_query`, it passes a natural-language `question` and `reasoning` — it does NOT write SQL. Inside the tool's `execute` function, the SQL model receives the full approved-view schema and query rules, and produces a structured plan: `{ sql, reason, expected_result, method_summary }`. The generated SQL then passes through the TypeScript validator before execution — the SQL model has no path to bypass the security layer.
+
+`model_used` is recorded in the `output_json` column of `agent_tool_calls` for every SQL fallback call.
 
 ---
 
@@ -14,11 +29,12 @@ The SQL fallback is a safety valve for business questions that fall outside the 
 
 The agent always follows this hierarchy:
 
-1. **Prebuilt tool first.** `get_on_hand_inventory`, `get_customer_current_season_orders`, `get_customer_order_fulfillment_status`, `get_staged_deliveries`. If any of them covers the question, it is called — not the SQL fallback.
+1. **Prebuilt tool first.** `get_on_hand_inventory`, `get_customer_current_season_orders`, `get_customer_order_fulfillment_status`, `get_staged_deliveries`, `get_pricing_info`. If any of them covers the question, it is called — not the SQL fallback.
 2. **SQL fallback if no prebuilt tool fits.** `run_approved_readonly_query` MUST be attempted for any business data question not covered by a prebuilt tool. The agent must not say "I cannot retrieve this" without first trying a query.
-3. **Rejection retry.** If the tool returns `approved: false` with a fixable issue (LIMIT too high, wrong column name), the agent retries once with corrected SQL. If the rejection is due to an inherently unsafe request (write operation), the agent stops and explains.
-4. **Failure means failure — never guess.** If a tool returns `tool_error: true` after a valid attempt, the agent reports the failure. It does not construct an answer from prior chat messages or training data.
-5. **Chat history is context, not a data source.** Even if a prior message seems to contain the answer, the agent calls the appropriate tool.
+3. **Rejection retry.** If the tool returns `approved: false` with a fixable issue, the agent retries once with a clarified question. If the rejection is due to an inherently unsafe request (write operation), the agent stops and explains.
+4. **SQL model error.** If `sql_generation_error: true`, the agent reports that it could not generate a query and asks the user to rephrase.
+5. **Failure means failure — never guess.** If a tool returns `tool_error: true` after a valid attempt, the agent reports the failure. It does not construct an answer from prior chat messages or training data.
+6. **Chat history is context, not a data source.** Even if a prior message seems to contain the answer, the agent calls the appropriate tool.
 
 ---
 
@@ -82,15 +98,15 @@ The tool never `throw`s. Execution errors return `tool_error: true` with a messa
 
 ## Logging
 
-All executions — including rejections — are logged to `agent_tool_calls`:
+All executions — including rejections and SQL model errors — are logged to `agent_tool_calls`:
 
 | Column | Value |
 |---|---|
 | `tool_name` | `"run_approved_readonly_query"` |
-| `input_json` | `{ sql, reasoning }` |
-| `output_json` | Full tool output |
+| `input_json` | `{ question, reasoning, generated_sql }` — `generated_sql` populated after SQL model step |
+| `output_json` | Full tool output plus `model_used` (the SQL model identifier) |
 | `status` | `"success"` / `"rejected"` / `"error"` |
-| `error_message` | Validation reason or DB error message |
+| `error_message` | Validation reason, SQL model error, or DB error message |
 
 ---
 
@@ -130,6 +146,7 @@ The method note appears after the data summary, not before it.
 
 | File | Purpose |
 |---|---|
-| `src/lib/agent/tools/run-approved-readonly-query.ts` | Tool factory and TOOL_DESCRIPTION (approved view list) |
-| `src/lib/agent/sql/validate-approved-query.ts` | TypeScript security validator |
-| `src/app/api/agent/chat/route.ts` | Tool registration and SYSTEM_PROMPT |
+| `src/lib/agent/model-config.ts` | `AGENT_MAIN_MODEL` and `AGENT_SQL_MODEL` from env vars |
+| `src/lib/agent/tools/run-approved-readonly-query.ts` | Tool factory, SQL_MODEL_SYSTEM_PROMPT, and TOOL_DESCRIPTION |
+| `src/lib/agent/sql/validate-approved-query.ts` | TypeScript security validator (unchanged) |
+| `src/app/api/agent/chat/route.ts` | Tool registration, SYSTEM_PROMPT, uses `AGENT_MAIN_MODEL` |
