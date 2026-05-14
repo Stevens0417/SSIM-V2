@@ -66,12 +66,14 @@
       "Bash(Select-Object -First 20)",
       "Bash(mkdir \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\replants\\\\print\\\\[id]\")",
       "Bash(npx supabase *)",
-      "Bash(mkdir -p \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\returns\\\\print\\\\[id]\")"
+      "Bash(mkdir -p \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\returns\\\\print\\\\[id]\")",
+      "Bash(mkdir -p \"c:/Projects/SSIMV2/src/app/staged-deliveries/print/[id]\" 2>/dev/null; echo \"done\")"
     ],
     "additionalDirectories": [
       "c:\\Projects\\SSIMV2\\src\\app\\deliveries\\print",
       "c:\\Projects\\SSIMV2\\src\\app\\replants\\print",
-      "c:\\Projects\\SSIMV2\\src\\app\\returns\\print"
+      "c:\\Projects\\SSIMV2\\src\\app\\returns\\print",
+      "c:\\Projects\\SSIMV2\\src\\app\\staged-deliveries\\print"
     ]
   }
 }

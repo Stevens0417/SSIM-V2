@@ -13,3 +13,6 @@ export { makeGetReplantPrintLinkTool } from "./get-replant-print-link";
 export { makeDraftReturnFromChatTool } from "./draft-return-from-chat";
 export { makeSaveConfirmedReturnTool } from "./save-confirmed-return";
 export { makeGetReturnPrintLinkTool } from "./get-return-print-link";
+export { makeDraftStagedDeliveryFromChatTool } from "./draft-staged-delivery-from-chat";
+export { makeSaveConfirmedStagedDeliveryTool } from "./save-confirmed-staged-delivery";
+export { makeGetStagedDeliveryPrintLinkTool } from "./get-staged-delivery-print-link";
