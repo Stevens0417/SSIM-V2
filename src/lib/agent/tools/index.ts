@@ -16,3 +16,5 @@ export { makeGetReturnPrintLinkTool } from "./get-return-print-link";
 export { makeDraftStagedDeliveryFromChatTool } from "./draft-staged-delivery-from-chat";
 export { makeSaveConfirmedStagedDeliveryTool } from "./save-confirmed-staged-delivery";
 export { makeGetStagedDeliveryPrintLinkTool } from "./get-staged-delivery-print-link";
+export { makePrepareStagedDeliveryConversionTool } from "./prepare-staged-delivery-conversion";
+export { makeConvertConfirmedStagedDeliveryTool } from "./convert-confirmed-staged-delivery";

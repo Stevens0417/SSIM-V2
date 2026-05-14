@@ -24,6 +24,8 @@ import {
   makeDraftStagedDeliveryFromChatTool,
   makeSaveConfirmedStagedDeliveryTool,
   makeGetStagedDeliveryPrintLinkTool,
+  makePrepareStagedDeliveryConversionTool,
+  makeConvertConfirmedStagedDeliveryTool,
 } from "@/lib/agent/tools";
 
 const SYSTEM_PROMPT = `You are the SSIM assistant for Stevens Seeds Inventory Management. Help users understand and work with their seed sales and inventory management system.
@@ -771,6 +773,88 @@ If tool_error is true:
 
 ---
 
+### prepare_staged_delivery_conversion
+
+IMPORTANT — check first: if the "## Pending staged delivery conversion" section appears in this system prompt with a staged_delivery_id, AND the user's current message is an unambiguous confirmation ("yes", "confirm", "looks good", "correct", "go ahead", "do it", "yep", "yup") — do NOT call this tool. Call convert_confirmed_staged_delivery directly with the staged_delivery_id from that section.
+
+Call this tool when the user says they want to convert, turn, or change a staged delivery into a real or actual delivery. Examples:
+- "Convert [customer]'s staged delivery into a real delivery"
+- "Turn the staged delivery for [customer] into an actual delivery"
+- "Make [customer]'s staged [product] into a delivery"
+- "Convert the staged delivery I just created"
+- Any message expressing intent to formally convert a staged delivery
+
+This tool does NOT perform the conversion. It identifies the staged delivery and prepares a confirmation summary. The actual conversion happens via convert_confirmed_staged_delivery after the user confirms.
+
+How to call:
+- customerName: pass the customer or farm name as stated (partial names are fine)
+- stagedDeliveryId: pass if the user mentions a specific ID or if you already know the ID from earlier in this conversation
+- productName / treatmentName / seedSize / packageType: pass these to narrow results when the customer may have multiple staged deliveries
+- seasonYear: ONLY provide if the user explicitly stated a specific year number
+
+After calling, read the status field:
+
+If status is "ready_for_confirmation":
+- Present selected_summary clearly:
+  "[Customer Name] [(Farm Name if present)] — [Staged Date]
+   - [Product] / [Treatment] / [Seed Size] / [Package]: [Units] units
+   [additional lines if any]
+   Total: [total_units_staged] units
+   Notes: [notes if any]"
+- State: "This will create an actual delivery and mark the staged delivery as converted."
+- Ask: "Do you want me to convert this staged delivery into an actual delivery? Reply yes to confirm or no to cancel."
+- Record the staged_delivery_id — you will need it when calling convert_confirmed_staged_delivery.
+- Do NOT call convert_confirmed_staged_delivery yet — wait for the user's explicit confirmation in their next message.
+
+If status is "needs_selection":
+- List each option from matched_options clearly, numbered, with date and item summary:
+  "1. [staged_date] — [total_units_staged] units ([item_summary])
+   2. [staged_date] — [total_units_staged] units ([item_summary])"
+- Ask: "Which staged delivery would you like to convert? You can say the number, the date, or describe the products."
+- When the user identifies one (by number, date, or product description), call prepare_staged_delivery_conversion again with stagedDeliveryId set to the matching staged_delivery_id from matched_options.
+
+If status is "not_found":
+- Say: "No in-progress staged deliveries were found [for that customer]. You can check the Staged Deliveries page to verify."
+- Do NOT guess or estimate from prior messages.
+
+If tool_error is true:
+- Say: "I wasn't able to retrieve the staged delivery data — please try again." Do not guess.
+
+---
+
+### convert_confirmed_staged_delivery
+
+Call this tool ONLY when ALL of the following are true in the current turn:
+1. You have a staged_delivery_id — either from calling prepare_staged_delivery_conversion in this turn where status was "ready_for_confirmation", OR from the "## Pending staged delivery conversion" section of the system prompt (if present).
+2. The user's current message is an unambiguous confirmation — "yes", "confirm", "looks good", "correct", "go ahead", "do it", "yep", "yup".
+3. The user has NOT said no or requested changes.
+
+Do NOT call this tool if:
+- The user said "maybe", "ok" (alone), or any non-committing language.
+- The user cancelled or said no — acknowledge the cancellation, the staged delivery remains in-progress.
+- You do not have a staged_delivery_id from the current conversion cycle.
+
+How to call:
+- staged_delivery_id: the staged_delivery_id from prepare_staged_delivery_conversion where status was "ready_for_confirmation".
+- confirmation_text: the user's exact confirmation message.
+
+After the tool returns:
+
+If success is true:
+- Compose your reply: "Staged delivery converted ([delivery_rows_created] delivery row(s) created)."
+- Do NOT include a URL or markdown link — a Print Delivery Slip button is rendered automatically from the tool result.
+- Do NOT call get_delivery_print_link — the print_url is already in this tool's output and the button renders automatically.
+
+If tool_error is true:
+- Respond: "I wasn't able to complete the conversion — [tool_error_message]."
+- Do NOT retry automatically.
+
+If not_confirmed is true:
+- Ask the user to confirm clearly: "Please reply with 'yes' or 'confirm' to convert the staged delivery."
+- Do NOT call the tool again until the user provides a clear confirmation.
+
+---
+
 ## Scope
 Prebuilt tools cover: inventory, customer orders (with pricing/profit), order fulfillment/delivery status, staged deliveries, delivery creation, replant creation, return creation, and staged delivery creation (draft and save).
 
@@ -781,6 +865,8 @@ Delivery creation: draft_delivery_from_chat validates and builds a draft — it 
 Return creation: draft_return_from_chat validates and builds a return draft. save_confirmed_return saves the return after explicit user confirmation. Never save without confirmation.
 
 Staged delivery creation: draft_staged_delivery_from_chat validates and builds a staged delivery draft — it does NOT save. save_confirmed_staged_delivery saves the staged delivery after explicit user confirmation. Never save without confirmation.
+
+Staged delivery conversion: prepare_staged_delivery_conversion identifies the staged delivery the user wants to convert and prepares a confirmation summary — it does NOT convert. convert_confirmed_staged_delivery performs the actual conversion after explicit user confirmation. Never convert without confirmation.
 
 You do NOT have access to pricing tables, raw system tables, or any data outside the approved views. If a user asks about something genuinely outside the approved views, explain what you can and cannot access.
 
@@ -992,6 +1078,91 @@ export async function POST(req: NextRequest) {
     ? `\n\n---\n\n## Pending staged delivery draft\n\ndraft_id: ${pendingStagedDeliveryDraftId}\nStatus: awaiting user confirmation\n\n- If the user's current message is a confirmation ("yes", "confirm", "save it", "looks good", "correct", "go ahead", "do it", "yep", "yup") — call save_confirmed_staged_delivery IMMEDIATELY with this draft_id. Do NOT call draft_staged_delivery_from_chat again.\n- If the user requests changes to the staged delivery, call draft_staged_delivery_from_chat with the updated information.\n- If the user asks what was in the draft or seems unsure, remind them of the pending staged delivery and ask if they'd like to confirm or change something.`
     : "";
 
+  // Check for a pending staged delivery conversion awaiting user confirmation.
+  // Injected when prepare_staged_delivery_conversion returned "ready_for_confirmation"
+  // and no successful convert_confirmed_staged_delivery has followed in this thread.
+  let pendingConversionStagedDeliveryId: string | null = null;
+  let pendingConversionSummary: Record<string, unknown> | null = null;
+  {
+    const { data: convPrepRows } = await sb
+      .from("agent_tool_calls")
+      .select("id, output_json, created_at")
+      .eq("thread_id", threadId)
+      .eq("tool_name", "prepare_staged_delivery_conversion")
+      .eq("status", "ready_for_confirmation")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (convPrepRows && convPrepRows.length > 0) {
+      const latestPrep = convPrepRows[0] as {
+        id: string;
+        output_json: Record<string, unknown>;
+        created_at: string;
+      };
+      // Only inject if no successful conversion has occurred after this prep call.
+      const { data: convDoneRows } = await sb
+        .from("agent_tool_calls")
+        .select("id")
+        .eq("thread_id", threadId)
+        .eq("tool_name", "convert_confirmed_staged_delivery")
+        .eq("status", "success")
+        .gt("created_at", latestPrep.created_at)
+        .limit(1);
+
+      if (!convDoneRows || convDoneRows.length === 0) {
+        const oj = latestPrep.output_json;
+        pendingConversionStagedDeliveryId =
+          typeof oj.staged_delivery_id === "string" ? oj.staged_delivery_id : null;
+        pendingConversionSummary =
+          oj.selected_summary != null && typeof oj.selected_summary === "object"
+            ? (oj.selected_summary as Record<string, unknown>)
+            : null;
+      }
+    }
+  }
+
+  let pendingConversionSection = "";
+  if (pendingConversionStagedDeliveryId && pendingConversionSummary) {
+    const ss = pendingConversionSummary;
+    const customerName = typeof ss.customer_name === "string" ? ss.customer_name : "";
+    const farmName = typeof ss.farm_name === "string" ? ss.farm_name : null;
+    const stagedDate = typeof ss.staged_date === "string" ? ss.staged_date : "";
+    const notes = typeof ss.notes === "string" ? ss.notes : null;
+    const totalUnits =
+      typeof ss.total_units_staged === "number" ? ss.total_units_staged : 0;
+    const items = Array.isArray(ss.items)
+      ? (ss.items as Array<Record<string, unknown>>)
+      : [];
+
+    const customerLine = `Customer: ${customerName}${farmName ? ` (${farmName})` : ""}`;
+    const itemLines = items
+      .map((item) => {
+        const parts = [
+          item.product_name,
+          item.treatment_name,
+          item.seed_size,
+          item.package_type,
+        ]
+          .filter((v) => v != null && v !== "")
+          .join(" / ");
+        return `- ${parts}: ${item.units_staged} units`;
+      })
+      .join("\n");
+    const notesLine = notes ? `\nNotes: ${notes}` : "";
+
+    pendingConversionSection =
+      `\n\n---\n\n## Pending staged delivery conversion\n\n` +
+      `staged_delivery_id: ${pendingConversionStagedDeliveryId}\n` +
+      `${customerLine}\n` +
+      `Staged date: ${stagedDate}\n` +
+      `${itemLines}\n` +
+      `Total: ${totalUnits} units${notesLine}\n\n` +
+      `Status: awaiting user confirmation\n\n` +
+      `- If the user's current message is a confirmation ("yes", "confirm", "looks good", "correct", "go ahead", "do it", "yep", "yup") — call convert_confirmed_staged_delivery IMMEDIATELY with staged_delivery_id: ${pendingConversionStagedDeliveryId} and confirmation_text set to the user's message. Do NOT call prepare_staged_delivery_conversion again.\n` +
+      `- If the user says no, cancel, or stop — acknowledge the cancellation. The staged delivery remains in-progress.\n` +
+      `- If the user asks what was pending or seems unsure — remind them of the staged delivery details above and ask if they'd like to confirm or cancel.`;
+  }
+
   // Build tools — anonClient carries the user JWT so auth.uid() works in views.
   // content (user message) is passed to seasonal tools so they can detect whether
   // the model hallucinated a seasonYear the user never actually mentioned.
@@ -1116,6 +1287,20 @@ export async function POST(req: NextRequest) {
       user.id,
       threadId
     ),
+    prepare_staged_delivery_conversion: makePrepareStagedDeliveryConversionTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId,
+      content
+    ),
+    convert_confirmed_staged_delivery: makeConvertConfirmedStagedDeliveryTool(
+      anonClient,
+      sb,
+      user.id,
+      threadId,
+      content
+    ),
   };
 
   // Call OpenAI — stopWhen allows the model to call tools and then respond
@@ -1124,7 +1309,7 @@ export async function POST(req: NextRequest) {
   try {
     const { text, steps } = await generateText({
       model: openai(AGENT_MAIN_MODEL),
-      system: SYSTEM_PROMPT + pendingDraftSection + pendingReplantDraftSection + pendingReturnDraftSection + pendingStagedDeliveryDraftSection,
+      system: SYSTEM_PROMPT + pendingDraftSection + pendingReplantDraftSection + pendingReturnDraftSection + pendingStagedDeliveryDraftSection + pendingConversionSection,
       messages: contextMessages,
       tools,
       stopWhen: stepCountIs(5),
@@ -1137,7 +1322,7 @@ export async function POST(req: NextRequest) {
       for (const tr of step.toolResults) {
         const trAny = tr as unknown as { toolName: string; output: Record<string, unknown> };
         if (
-          (trAny.toolName === "get_delivery_print_link" || trAny.toolName === "get_replant_print_link" || trAny.toolName === "get_return_print_link" || trAny.toolName === "get_staged_delivery_print_link") &&
+          (trAny.toolName === "get_delivery_print_link" || trAny.toolName === "get_replant_print_link" || trAny.toolName === "get_return_print_link" || trAny.toolName === "get_staged_delivery_print_link" || trAny.toolName === "convert_confirmed_staged_delivery") &&
           !trAny.output.tool_error &&
           typeof trAny.output.print_url === "string" &&
           (trAny.output.print_url as string).startsWith("/")
