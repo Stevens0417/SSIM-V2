@@ -22,6 +22,7 @@ export interface RowErrors {
     product?: boolean;
     treatment?: boolean;
     units?: boolean;
+    seedSize?: boolean;
   };
 }
 
@@ -249,7 +250,7 @@ export default function ReturnItemsTable({
                   <td>
                     {cropByProduct.get(item.productId) === "corn" ? (
                       <select
-                        className={styles.sizeSelect}
+                        className={`${styles.sizeSelect} ${errors.seedSize ? styles.inputError : ""}`}
                         value={item.seedSize}
                         disabled={disabled}
                         onChange={(e) => updateItem(i, { seedSize: e.target.value })}
@@ -374,7 +375,7 @@ export default function ReturnItemsTable({
                 <div className={styles.cardField}>
                   <label className={styles.cardLabel}>Seed Size</label>
                   <select
-                    className={styles.cardNumInput}
+                    className={`${styles.cardNumInput} ${errors.seedSize ? styles.inputError : ""}`}
                     value={item.seedSize}
                     disabled={disabled}
                     onChange={(e) => updateItem(i, { seedSize: e.target.value })}
@@ -386,6 +387,9 @@ export default function ReturnItemsTable({
                     <option value="AF2">AF2</option>
                     <option value="P26">P26</option>
                   </select>
+                  {errors.seedSize && (
+                    <span className={styles.errorText}>Seed size required for corn</span>
+                  )}
                 </div>
               )}
               {!isPackaging && (

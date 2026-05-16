@@ -9,6 +9,10 @@ import styles from "./OrderItemsTable.module.css";
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+export interface RowErrors {
+  [rowId: string]: { seedSize?: boolean };
+}
+
 export interface OrderItem {
   id: string;
   productId: string;
@@ -157,12 +161,14 @@ interface Props {
   items: OrderItem[];
   onChange: (items: OrderItem[]) => void;
   pricingOptions: PricingOption[];
+  rowErrors?: RowErrors;
 }
 
 export default function OrderItemsTable({
   items,
   onChange,
   pricingOptions,
+  rowErrors = {},
 }: Props) {
   const productSelectOptions = useMemo<SelectOption[]>(() => {
     const seen = new Map<string, { id: string; name: string }>();
@@ -295,6 +301,8 @@ export default function OrderItemsTable({
             {items.map((item, i) => {
               const treatmentOpts =
                 treatmentSelectByProduct.get(item.productId) ?? [];
+              const isCorn = cropByProduct.get(item.productId) === "corn";
+              const errors = rowErrors[item.id] ?? {};
               return (
                 <tr key={item.id}>
                   <td>
@@ -332,9 +340,9 @@ export default function OrderItemsTable({
                     </select>
                   </td>
                   <td>
-                    {cropByProduct.get(item.productId) === "corn" ? (
+                    {isCorn ? (
                       <select
-                        className={styles.sizeSelect}
+                        className={`${styles.sizeSelect} ${errors.seedSize ? styles.inputError : ""}`}
                         value={item.seedSize}
                         onChange={(e) =>
                           update(i, { seedSize: e.target.value })

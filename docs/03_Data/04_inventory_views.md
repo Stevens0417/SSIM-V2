@@ -27,9 +27,9 @@ available_units   = physical_on_hand - staged_units
 
 ---
 
-## Package Type and Seed Size in Inventory (as of migrations 0022, 0029)
+## Package Type and Seed Size in Inventory (as of migrations 0022, 0029, 0032)
 
-As of migration 0022, `package_type` is a first-class dimension in all inventory views. As of migration 0029, `seed_size` from Bayer shipment items is also preserved in the received CTE (it was previously forced to NULL — see fix note below). The key distinction:
+As of migration 0022, `package_type` is a first-class dimension in all inventory views. As of migration 0029, `seed_size` from Bayer shipment items is also preserved in the received CTE (it was previously forced to NULL — see fix note below). As of migration 0032, corn rows without `seed_size` are blocked at the database level by a BEFORE INSERT OR UPDATE trigger — so inventory views will not encounter orphaned null-seed_size corn rows from new writes. The key distinction:
 
 | View | package_type | seed_size | Aggregated? |
 |---|---|---|---|

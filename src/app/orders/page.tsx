@@ -3,9 +3,11 @@
 import { useState, useMemo, useEffect } from "react";
 import OrderItemsTable, {
   type OrderItem,
+  type RowErrors,
   createEmptyItem,
   recalcAllItems,
 } from "@/components/orders/OrderItemsTable";
+import { requiresSeedSize } from "@/lib/validation/seed-size";
 import CustomerCreatePanel, {
   type CustomerDraft,
 } from "@/components/orders/CustomerCreatePanel";
@@ -154,6 +156,7 @@ export default function OrdersPage() {
   // Recalc wiring: items change from table
   const handleItemsChange = (newItems: OrderItem[]) => {
     setItems(recalcAllItems(newItems, brandGrowerPct, earlyPayPct));
+    if (Object.keys(rowErrors).length > 0) setRowErrors({});
   };
 
   // Recalc wiring: header discount changes
@@ -261,6 +264,7 @@ export default function OrdersPage() {
     setItems([createEmptyItem()]);
     setSaveError(null);
     setSaveSuccess(false);
+    setRowErrors({});
   };
 
   // Load order for editing
@@ -341,6 +345,7 @@ export default function OrdersPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [rowErrors, setRowErrors] = useState<RowErrors>({});
 
   const validLines = items.filter(
     (it) => it.productId && it.treatmentId && it.units > 0
@@ -350,6 +355,24 @@ export default function OrdersPage() {
 
   const handleSaveOrder = async () => {
     if (!canSave || !selectedCustomerId) return;
+
+    // Validate corn lines have seed_size
+    const cropByProduct = new Map(pricingOptions.map((o) => [o.product_id, o.crop]));
+    const newRowErrors: RowErrors = {};
+    let hasRowError = false;
+    for (const line of validLines) {
+      if (requiresSeedSize(cropByProduct.get(line.productId)) && !line.seedSize?.trim()) {
+        newRowErrors[line.id] = { seedSize: true };
+        hasRowError = true;
+      }
+    }
+    if (hasRowError) {
+      setRowErrors(newRowErrors);
+      setSaveError("Seed size is required for corn products. Please select a size for each corn line.");
+      return;
+    }
+    setRowErrors({});
+
     setSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
@@ -600,6 +623,7 @@ export default function OrdersPage() {
             items={items}
             onChange={handleItemsChange}
             pricingOptions={pricingOptions}
+            rowErrors={rowErrors}
           />
 
           {/* ---- Discounts ---- */}

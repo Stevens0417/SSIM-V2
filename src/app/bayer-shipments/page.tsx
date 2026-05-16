@@ -13,6 +13,7 @@ import {
   fetchPricingOptions,
   type PricingOption,
 } from "@/services/pricing.service";
+import { requiresSeedSize } from "@/lib/validation/seed-size";
 import {
   createBayerShipment,
   updateBayerShipment,
@@ -347,7 +348,7 @@ export default function BayerShipmentsPage() {
     const seenLines = new Set<string>();
 
     for (const row of nonEmptyRows) {
-      const rowErr: { product?: boolean; treatment?: boolean; units?: boolean } = {};
+      const rowErr: { product?: boolean; treatment?: boolean; units?: boolean; seedSize?: boolean } = {};
       if (!row.productId) {
         rowErr.product = true;
         ok = false;
@@ -363,6 +364,10 @@ export default function BayerShipmentsPage() {
 
       if (row.productId && row.treatmentId) {
         const isCorn = cropByProduct.get(row.productId) === "corn";
+        if (requiresSeedSize(cropByProduct.get(row.productId)) && !row.seedSize?.trim()) {
+          rowErr.seedSize = true;
+          ok = false;
+        }
         const lineKey = isCorn
           ? `${row.productId}::${row.treatmentId}::${row.seedSize}::${row.packageType}`
           : `${row.productId}::${row.treatmentId}::${row.packageType}`;

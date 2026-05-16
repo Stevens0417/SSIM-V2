@@ -44,6 +44,10 @@ Soybean and packaging products have `seed_size = NULL`. Forms show the seed size
 
 Seed size is tracked as a dimension in delivery, return, replant, Bayer shipment, and on-hand inventory records. `bayer_shipment_items.seed_size` stores the actual seed size for each shipment line item. As of migration 0029, the inventory received CTE preserves this value — received units are grouped at the correct (product, treatment, seed_size, package_type) grain, matching deliveries and staged deliveries.
 
+**Enforcement (as of migration 0032):** Corn products must have a non-null, non-empty `seed_size` on every insert and update. This is enforced at two layers:
+- **Frontend:** All five item-table components block save and highlight the missing field.
+- **Database:** The trigger function `validate_required_seed_size_for_corn()` raises a `check_violation` exception on `order_items`, `deliveries`, `returns`, `replants`, `bayer_shipment_items`, and `staged_delivery_items`. The database layer catches any path that bypasses the UI (agent tools, direct API calls, future code paths).
+
 ---
 
 ## Package Type

@@ -13,6 +13,7 @@ import {
   fetchPricingOptions,
   type PricingOption,
 } from "@/services/pricing.service";
+import { requiresSeedSize } from "@/lib/validation/seed-size";
 import {
   fetchCustomers,
   type CustomerOption,
@@ -235,8 +236,10 @@ export default function StagedDeliveriesPage() {
       ok = false;
     }
 
+    const cropByProduct = new Map(pricingOptions.map((o) => [o.product_id, o.crop]));
+
     for (const row of nonEmptyRows) {
-      const rowErr: { product?: boolean; treatment?: boolean; units?: boolean } =
+      const rowErr: { product?: boolean; treatment?: boolean; units?: boolean; seedSize?: boolean } =
         {};
       if (!row.productId) {
         rowErr.product = true;
@@ -248,6 +251,10 @@ export default function StagedDeliveriesPage() {
       }
       if (!row.units || row.units <= 0 || !Number.isInteger(row.units)) {
         rowErr.units = true;
+        ok = false;
+      }
+      if (requiresSeedSize(cropByProduct.get(row.productId)) && !row.seedSize?.trim()) {
+        rowErr.seedSize = true;
         ok = false;
       }
       if (Object.keys(rowErr).length > 0) {

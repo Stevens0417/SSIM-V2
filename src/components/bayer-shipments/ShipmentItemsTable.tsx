@@ -22,6 +22,7 @@ export interface RowErrors {
     product?: boolean;
     treatment?: boolean;
     units?: boolean;
+    seedSize?: boolean;
   };
 }
 
@@ -262,7 +263,7 @@ export default function ShipmentItemsTable({
                   <td>
                     {cropByProduct.get(item.productId) === "corn" ? (
                       <select
-                        className={styles.sizeSelect}
+                        className={`${styles.sizeSelect} ${errors.seedSize ? styles.inputError : ""}`}
                         value={item.seedSize}
                         disabled={disabled}
                         onChange={(e) => updateItem(i, { seedSize: e.target.value })}
@@ -313,6 +314,7 @@ export default function ShipmentItemsTable({
             treatmentSelectByProduct.get(item.productId) ?? [];
           const errors = rowErrors[item.id] ?? {};
           const noTreat = packagingIds.has(item.productId);
+          const isCornMobile = cropByProduct.get(item.productId) === "corn";
           return (
             <div key={item.id} className={styles.card}>
               <div className={styles.cardHeader}>
@@ -377,11 +379,11 @@ export default function ShipmentItemsTable({
                   <span className={styles.errorText}>Enter a non-zero integer</span>
                 )}
               </div>
-              {cropByProduct.get(item.productId) === "corn" && (
+              {isCornMobile && (
                 <div className={styles.cardField}>
                   <label className={styles.cardLabel}>Seed Size</label>
                   <select
-                    className={styles.cardSizeSelect}
+                    className={`${styles.cardSizeSelect} ${errors.seedSize ? styles.inputError : ""}`}
                     value={item.seedSize}
                     disabled={disabled}
                     onChange={(e) => updateItem(i, { seedSize: e.target.value })}
@@ -393,6 +395,9 @@ export default function ShipmentItemsTable({
                     <option value="AF2">AF2</option>
                     <option value="P26">P26</option>
                   </select>
+                  {errors.seedSize && (
+                    <span className={styles.errorText}>Seed size required for corn</span>
+                  )}
                 </div>
               )}
               <div className={styles.cardField}>

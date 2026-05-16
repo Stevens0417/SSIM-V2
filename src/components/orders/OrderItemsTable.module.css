@@ -146,6 +146,11 @@
   color: var(--color-red-600);
 }
 
+/* Error states */
+.inputError {
+  border-color: var(--color-red-600) !important;
+}
+
 /* Actions */
 .removeBtn {
   background: none;

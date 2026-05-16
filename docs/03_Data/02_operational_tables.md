@@ -76,6 +76,7 @@ Transactional tables that record business events. All are user-scoped.
 
 **Business rules:**
 - `seed_size` is only relevant for corn products.
+- `seed_size` is required (non-null, non-empty) for corn products — enforced by the `trg_order_items_seed_size_corn` BEFORE INSERT OR UPDATE trigger (migration `0032`). Inserts or updates of corn rows without `seed_size` will raise an exception.
 - `package_type = 'tote'` (stored value) = "Seedpak" (user-facing label). Always display as "Seedpak" in UI.
 - These rows are the targets for delivery allocation — `deliveries.order_item_id` links a delivery to a specific order line.
 
@@ -110,6 +111,9 @@ Transactional tables that record business events. All are user-scoped.
 
 **Allocation priority rule:** Early-pay order lines are fulfilled first, then oldest order date first. See `orderMatching.service.ts` for implementation.
 
+**Business rules:**
+- `seed_size` is required (non-null, non-empty) for corn products — enforced by the `trg_deliveries_seed_size_corn` BEFORE INSERT OR UPDATE trigger (migration `0032`).
+
 **Effect on inventory:** Reduces `units_on_hand` in all inventory views.
 
 **Effect on order status:** Linked deliveries (with `order_item_id`) reduce `net_units` in `v_delivery_customer_order_status`. Unlinked deliveries (no `order_item_id`) reduce `v_on_hand_inventory` but do not appear in order status.
@@ -143,6 +147,9 @@ Transactional tables that record business events. All are user-scoped.
 
 **How rows are created:** Via the Returns page. The system uses the same order-matching logic as deliveries (highest-priority order line = first allocation), but returns always link to a single order line (no split).
 
+**Business rules:**
+- `seed_size` is required (non-null, non-empty) for corn products — enforced by the `trg_returns_seed_size_corn` BEFORE INSERT OR UPDATE trigger (migration `0032`).
+
 **Effect on inventory:** Increases `units_on_hand` in all inventory views.
 
 **Effect on order status:** Linked returns increase `net_units` in `v_delivery_customer_order_status` (returned units come back to the customer's remaining balance).
@@ -175,6 +182,9 @@ Transactional tables that record business events. All are user-scoped.
 | `created_at` / `updated_at` | timestamptz | |
 
 **How rows are created:** Via the Replants page. Same order-matching logic as returns.
+
+**Business rules:**
+- `seed_size` is required (non-null, non-empty) for corn products — enforced by the `trg_replants_seed_size_corn` BEFORE INSERT OR UPDATE trigger (migration `0032`).
 
 **Effect on inventory:** Does NOT increase `units_on_hand`. Replanted units are consumed, not returned.
 
@@ -230,6 +240,9 @@ Transactional tables that record business events. All are user-scoped.
 
 This index allows the same product + treatment to appear twice on the same shipment with different package types (e.g., Bag and Seedpak). Previous index (v2) did not include package_type and caused save failures when both types were present.
 
+**Business rules:**
+- `seed_size` is required (non-null, non-empty) for corn products — enforced by the `trg_bayer_shipment_items_seed_size_corn` BEFORE INSERT OR UPDATE trigger (migration `0032`).
+
 **Effect on inventory:** Increases `units_on_hand` in all inventory views. Negative `units_received` reduces inventory (used for Bayer-side returns/corrections).
 
 ---
@@ -284,6 +297,9 @@ This index allows the same product + treatment to appear twice on the same shipm
 | `package_type` | text | `'bag'` or `'tote'` |
 | `units_staged` | integer | Must be > 0 (enforced by CHECK constraint) |
 | `created_at` / `updated_at` | timestamptz | `updated_at` managed by trigger |
+
+**Business rules:**
+- `seed_size` is required (non-null, non-empty) for corn products — enforced by the `trg_staged_delivery_items_seed_size_corn` BEFORE INSERT OR UPDATE trigger (migration `0032`).
 
 **Effect on inventory:** When the parent `staged_delivery.status = 'in_progress'`, these units are included in the `staged_units` CTE in `v_on_hand_inventory`, reducing `available_units`. No effect on `units_on_hand`.
 
