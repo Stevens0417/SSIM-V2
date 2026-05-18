@@ -190,6 +190,7 @@ export default function AdjustmentsTable({
                 <th>Early Pay Bucket</th>
                 <th className={styles.right}>Units Ordered</th>
                 <th className={styles.right}>Units Delivered</th>
+                <th className={styles.right}>Units Replanted</th>
                 <th className={styles.right}>Units Returned</th>
                 <th className={styles.right}>Net Units</th>
                 <th className={styles.center}>Completed</th>
@@ -213,6 +214,7 @@ export default function AdjustmentsTable({
                     </td>
                     <td className={styles.mono}>{r.units_ordered}</td>
                     <td className={styles.mono}>{r.units_delivered}</td>
+                    <td className={styles.mono}>{r.units_replanted}</td>
                     <td className={styles.mono}>{r.units_returned}</td>
                     <td
                       className={`${styles.mono} ${r.net_units !== 0 ? styles.netHighlight : ""}`}

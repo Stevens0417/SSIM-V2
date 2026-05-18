@@ -212,9 +212,9 @@ Views that support pricing display and order management. Pricing views are globa
 
 ## v_year_end_adjustments
 
-**Purpose:** Year-end view of ordered vs. delivered vs. returned units per customer per product per treatment, split by early_pay bucket. Used for invoice adjustment review at season close.
+**Purpose:** Year-end view of ordered vs. delivered vs. replanted vs. returned units per customer per product per treatment, split by early_pay bucket. Used for invoice adjustment review at season close. Replanted units represent seed the customer received but does not pay for; they require supplier credit tracking and therefore appear as a separate column.
 
-**Source tables:** `orders`, `order_items`, `deliveries`, `returns`, `customers`, `products`, `treatments`, `invoice_adjustment_checks`
+**Source tables:** `orders`, `order_items`, `deliveries`, `replants`, `returns`, `customers`, `products`, `treatments`, `invoice_adjustment_checks`
 
 **Grain:** One row per (season_year, customer, product, treatment, early_pay_bucket).
 
@@ -230,16 +230,23 @@ Views that support pricing display and order management. Pricing views are globa
 | `early_pay_pct` | From order |
 | `units_ordered` | |
 | `units_delivered` | |
+| `units_replanted` | Sum of replanted units for this (customer, product, treatment, bucket) |
 | `units_returned` | |
-| `net_units` | `ordered - delivered + returned` |
+| `net_units` | `ordered - delivered - replanted + returned` |
 | `is_completed` | From invoice_adjustment_checks |
 | `completed_at` | |
 
+**net_units formula (as of migration 0034):** `units_ordered - units_delivered - units_replanted + units_returned`. Replanted units reduce net_units because they are product the customer has received (and consumed) but has not paid for — they need a supplier credit adjustment, not re-delivery.
+
+**Early-pay bucket for replants:** Same logic as deliveries/returns: `UNKNOWN` if `order_item_id` is null, `EARLY_PAY` if the linked order item has a non-zero early pay discount or the order has a non-zero `early_pay_pct`, otherwise `NO_EARLY_PAY`.
+
 **Pages using it:** Adjustments page. Used by `fetchAdjustments(seasonYear)`.
 
-**Business meaning:** `early_pay_bucket = 'UNKNOWN'` means the delivery or return had no `order_item_id` link — these cannot be attributed to either early-pay or non-early-pay.
+**Business meaning:** `early_pay_bucket = 'UNKNOWN'` means the delivery, replant, or return had no `order_item_id` link — these cannot be attributed to either early-pay or non-early-pay.
 
 **Caution:** This view spans all seasons, filtered only by `user_id`. It is not restricted to the current season — the caller must pass `seasonYear` to filter results.
+
+**Migration history:** Created in 0014. Rebuilt in 0034 to add `units_replanted` and update `net_units` formula.
 
 ---
 

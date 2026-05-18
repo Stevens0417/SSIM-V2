@@ -229,6 +229,23 @@ The 7.5% deduction represents Bayer's margin, and the fixed deduction represents
 
 ---
 
+## Year-End Adjustment
+
+**Year-end adjustment** is the process of reconciling ordered vs. delivered vs. replanted vs. returned units per customer per product per treatment at season close. Each row represents one (customer, product, treatment, early_pay_bucket) combination and shows whether outstanding units need a supplier credit or invoice correction.
+
+Managed via:
+- `v_year_end_adjustments` view — computes units_ordered, units_delivered, units_replanted, units_returned, and net_units per row
+- `invoice_adjustment_checks` table — stores per-row sign-off status (is_completed, completed_at)
+- The Year-End Adjustments page in the UI
+
+**net_units formula:** `units_ordered - units_delivered - units_replanted + units_returned`
+
+Replanted units reduce net_units because they are product the customer consumed (but will not pay for) — these require a supplier credit from Bayer, not a re-delivery or a payment.
+
+A row with `net_units != 0` is flagged as "Needs Adjustment" in the UI.
+
+---
+
 ## Year-End Verification
 
 **Year-end verification** is the process of confirming that the Bayer shipment totals on record match what was physically received. Done once per season per product + treatment + seed_size + package_type combination.

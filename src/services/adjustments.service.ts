@@ -12,6 +12,7 @@ export interface AdjustmentRow {
   early_pay_pct: number | null;
   units_ordered: number;
   units_delivered: number;
+  units_replanted: number;
   units_returned: number;
   net_units: number;
   is_completed: boolean;

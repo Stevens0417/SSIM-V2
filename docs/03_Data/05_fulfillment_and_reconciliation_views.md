@@ -133,7 +133,7 @@ If total delivery units exceed all open order quantities, the remainder is saved
 
 ## v_year_end_adjustments
 
-**Purpose:** Season-level reconciliation of ordered vs. delivered vs. returned units per customer per product per treatment, split into early-pay and non-early-pay buckets. Used to identify invoice adjustments needed at season close.
+**Purpose:** Season-level reconciliation of ordered vs. delivered vs. replanted vs. returned units per customer per product per treatment, split into early-pay and non-early-pay buckets. Used to identify invoice adjustments needed at season close.
 
 *(Full documentation in [03_pricing_and_order_views.md](03_pricing_and_order_views.md) — this view is listed there as it is driven primarily by order logic.)*
 
@@ -142,7 +142,11 @@ If total delivery units exceed all open order quantities, the remainder is saved
 **Key business rule:**
 - `early_pay_bucket = 'EARLY_PAY'` — customer ordered under early-pay terms
 - `early_pay_bucket = 'NO_EARLY_PAY'` — standard order
-- `early_pay_bucket = 'UNKNOWN'` — delivery or return has no order link; cannot determine bucket
+- `early_pay_bucket = 'UNKNOWN'` — delivery, replant, or return has no order link; cannot determine bucket
+
+**net_units formula (as of migration 0034):** `units_ordered - units_delivered - units_replanted + units_returned`
+
+**units_replanted:** Replanted units are non-revenue units the customer received due to field failure. They reduce `net_units` because they represent seed the customer has consumed but will not pay for — the dealer requires a supplier credit for these units.
 
 ---
 

@@ -68,7 +68,8 @@
       "Bash(npx supabase *)",
       "Bash(mkdir -p \"c:\\\\Projects\\\\SSIMV2\\\\src\\\\app\\\\returns\\\\print\\\\[id]\")",
       "Bash(mkdir -p \"c:/Projects/SSIMV2/src/app/staged-deliveries/print/[id]\" 2>/dev/null; echo \"done\")",
-      "Bash(Get-Content \"c:\\\\Projects\\\\SSIMV2\\\\supabase\\\\migrations\\\\0006_deliveries_returns_replants.sql\")"
+      "Bash(Get-Content \"c:\\\\Projects\\\\SSIMV2\\\\supabase\\\\migrations\\\\0006_deliveries_returns_replants.sql\")",
+      "Bash(Get-Content 'c:\\\\Projects\\\\SSIMV2\\\\supabase\\\\migrations\\\\0006_deliveries_returns_replants.sql')"
     ],
     "additionalDirectories": [
       "c:\\Projects\\SSIMV2\\src\\app\\deliveries\\print",

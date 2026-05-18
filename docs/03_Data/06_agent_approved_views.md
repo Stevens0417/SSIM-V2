@@ -192,14 +192,15 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 **Allowed filters:** `season_year`, `customer_name`, `product_name`, `early_pay_bucket`, `is_completed`
 
-**Columns safe for agent:** `season_year`, `customer_name`, `product_name`, `treatment_name`, `early_pay_bucket`, `early_pay_pct`, `units_ordered`, `units_delivered`, `units_returned`, `net_units`, `is_completed`, `completed_at`
+**Columns safe for agent:** `season_year`, `customer_name`, `product_name`, `treatment_name`, `early_pay_bucket`, `early_pay_pct`, `units_ordered`, `units_delivered`, `units_replanted`, `units_returned`, `net_units`, `is_completed`, `completed_at`
 
 **Columns to exclude:** `customer_id`, `product_id`, `treatment_id` (internal UUIDs)
 
 **Notes:**
 - Filter by `season_year` — this view covers all seasons.
-- `early_pay_bucket = 'UNKNOWN'` rows represent unlinked deliveries/returns — cannot be attributed to a pricing tier.
-- `net_units > 0` means customer still has outstanding seed (ordered but not delivered or returned).
+- `early_pay_bucket = 'UNKNOWN'` rows represent unlinked deliveries, replants, or returns — cannot be attributed to a pricing tier.
+- `net_units = units_ordered - units_delivered - units_replanted + units_returned`. A positive value means the customer still has seed they received but have not fully settled (ordered but not fully delivered/replanted/returned).
+- `units_replanted` represents non-revenue seed the customer received due to field failure — these require a supplier credit and are tracked separately from deliveries.
 
 ---
 
