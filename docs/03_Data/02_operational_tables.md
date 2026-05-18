@@ -82,9 +82,35 @@ Transactional tables that record business events. All are user-scoped.
 
 ---
 
+## delivery_headers
+
+**Purpose:** Header record for a multi-line delivery form submission. Groups the individual `deliveries` rows that belong to one form save. Created as of migration 0033.
+
+**Grain:** One row per form submission (one header per "Save Delivery" click).
+
+**User-scoped:** Yes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | Referenced by `deliveries.delivery_header_id` |
+| `user_id` | uuid | RLS-enforced, `DEFAULT auth.uid()` |
+| `customer_id` | uuid FK → customers | `ON DELETE RESTRICT` |
+| `delivery_date` | date | |
+| `season_year` | integer | |
+| `notes` | text \| null | |
+| `created_at` / `updated_at` | timestamptz | |
+
+**Indexes:** `user_id`, `customer_id`, `(delivery_date, season_year)`.
+
+**RLS:** Full CRUD scoped to `user_id = auth.uid()`.
+
+**Backward compatibility:** Pre-migration-0033 delivery rows have `delivery_header_id = NULL`. Those rows continue to function normally — print and edit fall back to `created_at` grouping.
+
+---
+
 ## deliveries
 
-**Purpose:** Records an actual seed delivery event to a customer. Optionally linked to a specific order_item.
+**Purpose:** Records an actual seed delivery event to a customer. Optionally linked to a specific order_item and to a `delivery_headers` row.
 
 **Grain:** One row per product + treatment + seed_size + package_type delivered in a single delivery transaction. A single form submission may create multiple rows (one per line item, and potentially multiple rows per line item if split across order lines by the auto-allocation system).
 
@@ -105,16 +131,18 @@ Transactional tables that record business events. All are user-scoped.
 | `order_id` | uuid FK → orders \| null | Optional link to order |
 | `order_item_id` | uuid FK → order_items \| null | Optional link to specific order line |
 | `notes` | text \| null | |
+| `delivery_header_id` | uuid FK → delivery_headers \| null | `ON DELETE SET NULL`. Null for legacy rows. |
 | `created_at` / `updated_at` | timestamptz | |
 
-**How rows are created:** Via the Deliveries page. The auto-allocation system (`orderMatching.service.ts`) attempts to link each delivery line to open order lines. A single form line item may produce multiple delivery rows if it spans more than one order line (split allocation). Unmatched units are saved with `order_id = null`.
+**How rows are created:** Via the Deliveries page. The auto-allocation system (`orderMatching.service.ts`) attempts to link each delivery line to open order lines. A single form line item may produce multiple delivery rows if it spans more than one order line (split allocation). Unmatched units are saved with `order_id = null`. As of migration 0033, a `delivery_headers` row is created first and all delivery rows are linked via `delivery_header_id`.
 
 **Allocation priority rule:** Early-pay order lines are fulfilled first, then oldest order date first. See `orderMatching.service.ts` for implementation.
 
 **Business rules:**
 - `seed_size` is required (non-null, non-empty) for corn products — enforced by the `trg_deliveries_seed_size_corn` BEFORE INSERT OR UPDATE trigger (migration `0032`).
+- `delivery_header_id` is null for all rows created before migration 0033. Those rows are treated as single-line records for edit/print purposes unless they share a `created_at` timestamp (legacy grouping fallback).
 
-**Effect on inventory:** Reduces `units_on_hand` in all inventory views.
+**Effect on inventory:** Reduces `units_on_hand` in all inventory views. Inventory calculations read only from `deliveries` — `delivery_headers` is not involved.
 
 **Effect on order status:** Linked deliveries (with `order_item_id`) reduce `net_units` in `v_delivery_customer_order_status`. Unlinked deliveries (no `order_item_id`) reduce `v_on_hand_inventory` but do not appear in order status.
 

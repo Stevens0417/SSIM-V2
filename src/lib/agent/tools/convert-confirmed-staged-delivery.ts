@@ -193,6 +193,7 @@ interface DeliveryInsertRow {
   order_id: string | null;
   order_item_id: string | null;
   notes: string | null;
+  delivery_header_id: string | null;
 }
 
 // ─── Tool factory ─────────────────────────────────────────────────────────────
@@ -360,7 +361,38 @@ export function makeConvertConfirmedStagedDeliveryTool(
         return log(out, "error", msg);
       }
 
-      // ── Step 6: Build delivery insert rows ───────────────────────────────
+      // ── Step 6a: Create delivery header ──────────────────────────────────
+      const { data: headerData, error: headerErr } = await userClient
+        .from("delivery_headers")
+        .insert({
+          customer_id: anchor.customer_id,
+          delivery_date: anchor.staged_date,
+          season_year: anchor.season_year,
+          notes: anchor.notes ?? null,
+        })
+        .select("id")
+        .single();
+
+      if (headerErr || !headerData) {
+        const msg = headerErr?.message ?? "Failed to create delivery header";
+        const out: ToolOutput = {
+          success: false,
+          staged_delivery_id: input.staged_delivery_id,
+          delivery_ids: [],
+          delivery_id: null,
+          delivery_rows_created: 0,
+          customer_name: anchor.customer_name,
+          converted_at: null,
+          print_url: null,
+          tool_error: true,
+          tool_error_message: msg,
+        };
+        return log(out, "error", msg);
+      }
+
+      const headerId = (headerData as { id: string }).id;
+
+      // ── Step 6b: Build delivery insert rows ──────────────────────────────
       const deliveryRows: DeliveryInsertRow[] = [];
 
       for (let i = 0; i < rows.length; i++) {
@@ -375,6 +407,7 @@ export function makeConvertConfirmedStagedDeliveryTool(
           seed_size: row.seed_size ?? null,
           package_type: row.package_type,
           notes: anchor.notes ?? null,
+          delivery_header_id: headerId,
         };
 
         if (allocations.length === 0) {

@@ -19,14 +19,15 @@ import {
   type CustomerOption,
 } from "@/services/customer.service";
 import {
-  createDeliveries,
+  createDeliveryWithHeader,
   fetchDeliveriesThisSeason,
   fetchCustomerOrderStatus,
-  updateDelivery,
+  applyDeliveryGroupEdits,
   deleteDelivery,
   type DeliveryInsert,
   type DeliveryViewRow,
   type CustomerOrderStatusRow,
+  type GroupEditPayload,
 } from "@/services/delivery.service";
 import { findOrderLineMatches } from "@/services/orderMatching.service";
 import {
@@ -348,7 +349,15 @@ export default function DeliveriesPage() {
         }
       }
 
-      const result = await createDeliveries(payloadRows);
+      const result = await createDeliveryWithHeader(
+        {
+          customer_id: selectedCustomerId!,
+          delivery_date: deliveryDate,
+          season_year: seasonYear!,
+          notes: notes.trim() || null,
+        },
+        payloadRows
+      );
       setSaveSuccess(`Saved delivery (${rowsToSave.length} line${rowsToSave.length !== 1 ? "s" : ""}, ${result.ids.length} DB row${result.ids.length !== 1 ? "s" : ""}).`);
       setHasSaved(true);
       setFormErrors({});
@@ -463,22 +472,9 @@ export default function DeliveriesPage() {
     }
   };
 
-  const handleUpdateDelivery = async (
-    deliveryId: string,
-    updates: {
-      delivery_date: string;
-      customer_id: string;
-      product_id: string;
-      treatment_id: string;
-      units_delivered: number;
-      seed_size: string | null;
-      package_type: string;
-      notes: string | null;
-    }
-  ) => {
+  const handleGroupUpdate = async (payload: GroupEditPayload) => {
     try {
-      await updateDelivery(deliveryId, updates);
-      // Reload the list to get fresh data
+      await applyDeliveryGroupEdits(payload);
       await loadDeliveries();
     } catch (err) {
       setListError(err instanceof Error ? err.message : "Failed to update delivery");
@@ -514,8 +510,9 @@ export default function DeliveriesPage() {
           error={listError}
           pricingOptions={pricingOptions}
           customers={customers}
+          seasonYear={seasonYear}
           onDelete={handleDeleteDelivery}
-          onUpdate={handleUpdateDelivery}
+          onGroupUpdate={handleGroupUpdate}
         />
       ) : (
         <>

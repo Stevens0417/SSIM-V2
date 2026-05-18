@@ -419,7 +419,31 @@ export function makeSaveConfirmedDeliveryTool(
         order_id: string | null;
         order_item_id: string | null;
         notes: string | null;
+        delivery_header_id: string | null;
       }
+
+      // ── 9a. Create delivery header ─────────────────────────────────────────
+      const { data: headerData, error: headerErr } = await userClient
+        .from("delivery_headers")
+        .insert({ customer_id: customerId, delivery_date: deliveryDate, season_year: seasonYear, notes })
+        .select("id")
+        .single();
+
+      if (headerErr || !headerData) {
+        const msg = headerErr?.message ?? "Failed to create delivery header";
+        const out: ToolOutput = {
+          success: false,
+          delivery_ids: [],
+          lines_saved: 0,
+          unmatched_lines: 0,
+          tool_error: true,
+          tool_error_message: msg,
+        };
+        await logCall(serviceClient, threadId, userId, input, out, "error", msg);
+        return out;
+      }
+
+      const headerId = (headerData as { id: string }).id;
 
       const insertRows: DeliveryInsertRow[] = [];
       let unmatchedLines = 0;
@@ -437,6 +461,7 @@ export function makeSaveConfirmedDeliveryTool(
           seed_size: line.seed_size,
           package_type: line.package_type,
           notes,
+          delivery_header_id: headerId,
         };
 
         if (allocations.length === 0) {
@@ -456,7 +481,7 @@ export function makeSaveConfirmedDeliveryTool(
         }
       }
 
-      // ── 9. Atomic insert ───────────────────────────────────────────────────
+      // ── 9b. Insert delivery rows linked to the header ──────────────────────
       const { data: inserted, error: insertErr } = await userClient
         .from("deliveries")
         .insert(insertRows)

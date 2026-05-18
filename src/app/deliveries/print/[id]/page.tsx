@@ -15,6 +15,7 @@ interface AnchorRow {
   season_year: number;
   notes: string | null;
   created_at: string;
+  delivery_header_id: string | null;
 }
 
 interface SiblingRow {
@@ -40,6 +41,7 @@ interface PrintData {
   customer: DeliveryPrintCustomer;
   items: DeliveryPrintItem[];
   notes: string;
+  deliveryId: string;
 }
 
 export default function DeliveryPrintByIdPage() {
@@ -57,7 +59,7 @@ export default function DeliveryPrintByIdPage() {
       // 1. Fetch the anchor delivery row from the view (includes product/treatment names)
       const { data: anchorRows, error: anchorErr } = await supabase
         .from("v_deliveries_this_season")
-        .select("customer_id, delivery_date, season_year, notes, created_at")
+        .select("customer_id, delivery_date, season_year, notes, created_at, delivery_header_id")
         .eq("delivery_id", id)
         .limit(1);
 
@@ -70,20 +72,27 @@ export default function DeliveryPrintByIdPage() {
       const anchor = anchorRows[0] as AnchorRow;
 
       // 2. Fetch all rows from the same save batch.
-      // Rows from save_confirmed_delivery share an identical created_at (same atomic INSERT),
-      // so grouping by (customer_id, delivery_date, season_year, notes, created_at) is exact.
+      // New records: group by delivery_header_id (explicit and reliable).
+      // Legacy records (delivery_header_id = null): fall back to
+      // (customer_id, delivery_date, season_year, notes, created_at) grouping.
       let siblingQuery = supabase
         .from("v_deliveries_this_season")
-        .select("product_name, treatment_name, seed_size, units_delivered")
-        .eq("customer_id", anchor.customer_id)
-        .eq("delivery_date", anchor.delivery_date)
-        .eq("season_year", anchor.season_year)
-        .eq("created_at", anchor.created_at);
+        .select("product_name, treatment_name, seed_size, units_delivered");
 
-      if (anchor.notes === null) {
-        siblingQuery = siblingQuery.is("notes", null);
+      if (anchor.delivery_header_id) {
+        siblingQuery = siblingQuery.eq("delivery_header_id", anchor.delivery_header_id);
       } else {
-        siblingQuery = siblingQuery.eq("notes", anchor.notes);
+        siblingQuery = siblingQuery
+          .eq("customer_id", anchor.customer_id)
+          .eq("delivery_date", anchor.delivery_date)
+          .eq("season_year", anchor.season_year)
+          .eq("created_at", anchor.created_at);
+
+        if (anchor.notes === null) {
+          siblingQuery = siblingQuery.is("notes", null);
+        } else {
+          siblingQuery = siblingQuery.eq("notes", anchor.notes);
+        }
       }
 
       const { data: siblingRows } = await siblingQuery;
@@ -135,11 +144,14 @@ export default function DeliveryPrintByIdPage() {
         postalCode: cust.postal_code ?? "",
       };
 
+      const displayId = anchor.delivery_header_id?.slice(0, 8) ?? id.slice(0, 8);
+
       setPrintData({
         deliveryDate: anchor.delivery_date,
         customer: printCustomer,
         items,
         notes: anchor.notes ?? "",
+        deliveryId: displayId,
       });
     }
 
@@ -201,6 +213,7 @@ export default function DeliveryPrintByIdPage() {
         customer={data.customer}
         items={data.items}
         notes={data.notes}
+        deliveryId={data.deliveryId}
       />
     </div>
   );

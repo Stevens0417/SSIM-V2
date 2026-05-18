@@ -22,6 +22,7 @@ interface Props {
   customer: DeliveryPrintCustomer;
   items: DeliveryPrintItem[];
   notes: string;
+  deliveryId?: string;
 }
 
 const MAX_PRINT_ROWS = 11;
@@ -32,6 +33,7 @@ export default function DeliveryPrintView({
   customer,
   items,
   notes,
+  deliveryId,
 }: Props) {
   const totalUnits = items.reduce((sum, it) => sum + it.units, 0);
   const emptyRowCount = Math.max(0, MAX_PRINT_ROWS - items.length) + EXTRA_FILLER;
@@ -46,6 +48,11 @@ export default function DeliveryPrintView({
           src="/assets/logos/dekalb.png"
           alt="DEKALB"
         />
+        {deliveryId && (
+          <div className={styles.deliveryIdBadge}>
+            DELIVERY ID: {deliveryId}
+          </div>
+        )}
         <div className={styles.headerText}>
           <div className={styles.headerLine1}>Seed Delivery Form</div>
           <div className={styles.headerLine2}>Travis Stevens</div>

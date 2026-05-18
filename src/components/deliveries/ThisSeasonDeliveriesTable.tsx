@@ -1,16 +1,25 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { DeliveryViewRow } from "@/services/delivery.service";
+import type { DeliveryViewRow, GroupEditPayload, DeliveryInsert } from "@/services/delivery.service";
+import { fetchDeliveryGroup } from "@/services/delivery.service";
 import type { PricingOption } from "@/services/pricing.service";
 import type { CustomerOption } from "@/services/customer.service";
-import type {
-  DeliveryPrintItem,
-  DeliveryPrintCustomer,
-} from "@/components/print/DeliveryPrintView";
 import SearchableSelect from "@/components/orders/SearchableSelect";
 import { fmtPackageType } from "@/lib/fmt";
+import { requiresSeedSize } from "@/lib/validation/seed-size";
 import styles from "./ThisSeasonDeliveriesTable.module.css";
+
+interface EditableItem {
+  deliveryId: string | null; // null = newly added
+  productId: string;
+  productName: string;
+  treatmentId: string;
+  treatmentName: string;
+  units: number;
+  seedSize: string;
+  packageType: "bag" | "tote";
+}
 
 interface Props {
   rows: DeliveryViewRow[];
@@ -18,20 +27,9 @@ interface Props {
   error: string | null;
   pricingOptions: PricingOption[];
   customers: CustomerOption[];
+  seasonYear: number | null;
   onDelete: (deliveryId: string) => void;
-  onUpdate: (
-    deliveryId: string,
-    updates: {
-      delivery_date: string;
-      customer_id: string;
-      product_id: string;
-      treatment_id: string;
-      units_delivered: number;
-      seed_size: string | null;
-      package_type: string;
-      notes: string | null;
-    }
-  ) => void;
+  onGroupUpdate: (payload: GroupEditPayload) => void;
 }
 
 export default function ThisSeasonDeliveriesTable({
@@ -40,24 +38,26 @@ export default function ThisSeasonDeliveriesTable({
   error,
   pricingOptions,
   customers,
+  seasonYear,
   onDelete,
-  onUpdate,
+  onGroupUpdate,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{
-    delivery_date: string;
+
+  // Group edit state
+  const [editGroupKey, setEditGroupKey] = useState<string | null>(null);
+  const [editHeaderId, setEditHeaderId] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSeasonYear, setEditSeasonYear] = useState<number | null>(null);
+  const [editHeader, setEditHeader] = useState<{
     customer_id: string;
-    product_id: string;
-    treatment_id: string;
-    units_delivered: number;
-    seed_size: string;
-    package_type: string;
+    delivery_date: string;
     notes: string;
   } | null>(null);
+  const [editItems, setEditItems] = useState<EditableItem[]>([]);
+  const [originalIds, setOriginalIds] = useState<string[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
 
-  // Filter rows by search term
   const filtered = useMemo(() => {
     if (!searchTerm.trim()) return rows;
     const term = searchTerm.toLowerCase();
@@ -69,37 +69,25 @@ export default function ThisSeasonDeliveriesTable({
     );
   }, [rows, searchTerm]);
 
-  // Compute product and treatment options for edit modal
   const productOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const o of pricingOptions) {
-      if (!seen.has(o.product_id)) {
-        seen.set(o.product_id, o.product_name);
-      }
+      if (!seen.has(o.product_id)) seen.set(o.product_id, o.product_name);
     }
-    return Array.from(seen.entries()).map(([id, name]) => ({
-      value: id,
-      label: name,
-    }));
+    return Array.from(seen.entries()).map(([id, name]) => ({ value: id, label: name }));
   }, [pricingOptions]);
 
-  const treatmentOptionsForProduct = useMemo(() => {
-    if (!editForm?.product_id) return [];
-    const treatments: { value: string; label: string }[] = [];
-    const seen = new Set<string>();
+  const treatmentsByProduct = useMemo(() => {
+    const map = new Map<string, Array<{ value: string; label: string }>>();
     for (const o of pricingOptions) {
-      if (o.product_id === editForm.product_id && !seen.has(o.treatment_id)) {
-        seen.add(o.treatment_id);
-        treatments.push({ value: o.treatment_id, label: o.treatment_name });
+      if (!map.has(o.product_id)) map.set(o.product_id, []);
+      const arr = map.get(o.product_id)!;
+      if (!arr.some((t) => t.value === o.treatment_id)) {
+        arr.push({ value: o.treatment_id, label: o.treatment_name });
       }
     }
-    return treatments;
-  }, [pricingOptions, editForm?.product_id]);
-
-  const customerOptions = useMemo(
-    () => customers.map((c) => ({ value: c.id, label: c.customer_name })),
-    [customers]
-  );
+    return map;
+  }, [pricingOptions]);
 
   const cropByProduct = useMemo(() => {
     const map = new Map<string, string>();
@@ -109,105 +97,210 @@ export default function ThisSeasonDeliveriesTable({
     return map;
   }, [pricingOptions]);
 
-  const startEdit = (row: DeliveryViewRow) => {
-    setEditingId(row.delivery_id);
-    setEditForm({
-      delivery_date: row.delivery_date,
-      customer_id: row.customer_id,
-      product_id: row.product_id,
-      treatment_id: row.treatment_id,
-      units_delivered: row.units_delivered,
-      seed_size: row.seed_size ?? "",
-      package_type: row.package_type ?? "bag",
-      notes: row.notes ?? "",
-    });
+  const customerOptions = useMemo(
+    () => customers.map((c) => ({ value: c.id, label: c.customer_name })),
+    [customers]
+  );
+
+  // Print: navigate to the group-aware print route
+  const handlePrintRow = (row: DeliveryViewRow) => {
+    window.open(`/deliveries/print/${row.delivery_id}`, "_blank");
+  };
+
+  // Edit: fetch all sibling rows in the same save batch
+  const startGroupEdit = async (row: DeliveryViewRow) => {
+    setEditGroupKey(row.delivery_id);
+    setEditLoading(true);
     setEditError(null);
+    try {
+      const group = await fetchDeliveryGroup(row.delivery_id);
+      if (!group) {
+        setEditError("Could not load delivery group.");
+        setEditLoading(false);
+        return;
+      }
+      setEditHeaderId(group.header_id);
+      setEditSeasonYear(group.season_year);
+      setEditHeader({
+        customer_id: group.customer_id,
+        delivery_date: group.delivery_date,
+        notes: group.notes ?? "",
+      });
+      const items: EditableItem[] = group.items.map((it) => ({
+        deliveryId: it.delivery_id,
+        productId: it.product_id,
+        productName: it.product_name,
+        treatmentId: it.treatment_id,
+        treatmentName: it.treatment_name,
+        units: it.units_delivered,
+        seedSize: it.seed_size ?? "",
+        packageType: (it.package_type ?? "bag") as "bag" | "tote",
+      }));
+      setEditItems(items);
+      setOriginalIds(items.map((it) => it.deliveryId!));
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to load delivery group.");
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm(null);
+    setEditGroupKey(null);
+    setEditHeaderId(null);
+    setEditLoading(false);
+    setEditSeasonYear(null);
+    setEditHeader(null);
+    setEditItems([]);
+    setOriginalIds([]);
     setEditError(null);
   };
 
-  const saveEdit = () => {
-    if (!editingId || !editForm) return;
+  const handleEditItemProduct = (index: number, productId: string) => {
+    const opt = pricingOptions.find((o) => o.product_id === productId);
+    const productName = opt?.product_name ?? "";
+    const treatments = treatmentsByProduct.get(productId) ?? [];
+    const treatmentId = treatments.length === 1 ? treatments[0].value : "";
+    const treatmentName = treatments.length === 1 ? treatments[0].label : "";
+    const crop = cropByProduct.get(productId) ?? "";
+    setEditItems((prev) =>
+      prev.map((it, i) =>
+        i === index
+          ? {
+              ...it,
+              productId,
+              productName,
+              treatmentId,
+              treatmentName,
+              seedSize: crop === "corn" ? it.seedSize : "",
+            }
+          : it
+      )
+    );
+  };
 
-    // Validate
-    if (!editForm.customer_id) {
+  const handleEditItemTreatment = (index: number, treatmentId: string) => {
+    setEditItems((prev) => {
+      const item = prev[index];
+      const opt = pricingOptions.find(
+        (o) => o.product_id === item.productId && o.treatment_id === treatmentId
+      );
+      return prev.map((it, i) =>
+        i === index ? { ...it, treatmentId, treatmentName: opt?.treatment_name ?? "" } : it
+      );
+    });
+  };
+
+  const updateEditItem = (index: number, patch: Partial<EditableItem>) => {
+    setEditItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
+  };
+
+  const removeEditItem = (index: number) => {
+    setEditItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addEditItem = () => {
+    setEditItems((prev) => [
+      ...prev,
+      {
+        deliveryId: null,
+        productId: "",
+        productName: "",
+        treatmentId: "",
+        treatmentName: "",
+        units: 0,
+        seedSize: "",
+        packageType: "bag",
+      },
+    ]);
+  };
+
+  const saveGroupEdit = () => {
+    if (!editGroupKey || !editHeader) return;
+
+    if (!editHeader.customer_id) {
       setEditError("Customer is required");
       return;
     }
-    if (!editForm.product_id) {
-      setEditError("Product is required");
-      return;
-    }
-    if (!editForm.treatment_id) {
-      setEditError("Treatment is required");
-      return;
-    }
-    if (!editForm.units_delivered || editForm.units_delivered <= 0) {
-      setEditError("Units must be greater than 0");
-      return;
-    }
-    if (!editForm.delivery_date) {
+    if (!editHeader.delivery_date) {
       setEditError("Delivery date is required");
       return;
     }
+    if (editItems.length === 0) {
+      setEditError("At least one item is required");
+      return;
+    }
 
-    onUpdate(editingId, {
-      delivery_date: editForm.delivery_date,
-      customer_id: editForm.customer_id,
-      product_id: editForm.product_id,
-      treatment_id: editForm.treatment_id,
-      units_delivered: editForm.units_delivered,
-      seed_size: cropByProduct.get(editForm.product_id) === "corn" ? (editForm.seed_size || null) : null,
-      package_type: editForm.package_type,
-      notes: editForm.notes.trim() || null,
-    });
+    for (let i = 0; i < editItems.length; i++) {
+      const item = editItems[i];
+      if (!item.productId) {
+        setEditError(`Item ${i + 1}: select a product`);
+        return;
+      }
+      if (!item.treatmentId) {
+        setEditError(`Item ${i + 1}: select a treatment`);
+        return;
+      }
+      if (!item.units || item.units <= 0) {
+        setEditError(`Item ${i + 1}: units must be greater than 0`);
+        return;
+      }
+      if (
+        requiresSeedSize(cropByProduct.get(item.productId)) &&
+        !item.seedSize?.trim()
+      ) {
+        setEditError(`Item ${i + 1}: seed size required for corn`);
+        return;
+      }
+    }
+
+    const sharedNotes = editHeader.notes.trim() || null;
+
+    const currentIds = new Set(
+      editItems.filter((it) => it.deliveryId !== null).map((it) => it.deliveryId!)
+    );
+    const deletes = originalIds.filter((id) => !currentIds.has(id));
+
+    const updates: GroupEditPayload["updates"] = editItems
+      .filter((it) => it.deliveryId !== null)
+      .map((it) => ({
+        id: it.deliveryId!,
+        data: {
+          delivery_date: editHeader.delivery_date,
+          customer_id: editHeader.customer_id,
+          product_id: it.productId,
+          treatment_id: it.treatmentId,
+          units_delivered: it.units,
+          seed_size:
+            cropByProduct.get(it.productId) === "corn"
+              ? it.seedSize.trim() || null
+              : null,
+          package_type: it.packageType,
+          notes: sharedNotes,
+        },
+      }));
+
+    const inserts: DeliveryInsert[] = editItems
+      .filter((it) => it.deliveryId === null)
+      .map((it) => ({
+        delivery_date: editHeader.delivery_date,
+        season_year: editSeasonYear ?? seasonYear ?? 0,
+        customer_id: editHeader.customer_id,
+        product_id: it.productId,
+        treatment_id: it.treatmentId,
+        units_delivered: it.units,
+        seed_size:
+          cropByProduct.get(it.productId) === "corn"
+            ? it.seedSize.trim() || null
+            : null,
+        package_type: it.packageType,
+        notes: sharedNotes,
+        order_id: null,
+        order_item_id: null,
+      }));
+
+    onGroupUpdate({ header_id: editHeaderId, updates, deletes, inserts });
     cancelEdit();
-  };
-
-  const handleProductChange = (productId: string) => {
-    if (!editForm) return;
-    const treatments = pricingOptions.filter((o) => o.product_id === productId);
-    const treatmentId = treatments.length === 1 ? treatments[0].treatment_id : "";
-    const crop = cropByProduct.get(productId) ?? "";
-    setEditForm({
-      ...editForm,
-      product_id: productId,
-      treatment_id: treatmentId,
-      seed_size: crop === "corn" ? editForm.seed_size : "",
-    });
-  };
-
-  const handlePrintRow = (row: DeliveryViewRow) => {
-    const customer = customers.find((c) => c.id === row.customer_id);
-    const printCustomer: DeliveryPrintCustomer = {
-      name: customer?.customer_name ?? row.customer_name,
-      farmName: customer?.farm_name ?? "",
-      tsaNumber: customer?.tsa_number ?? "",
-      phone: customer?.phone_number ?? "",
-      address: customer?.address ?? "",
-      city: customer?.city ?? "",
-      province: customer?.province ?? "",
-      postalCode: customer?.postal_code ?? "",
-    };
-    const printItems: DeliveryPrintItem[] = [
-      {
-        product: row.product_name,
-        treatment: row.treatment_name,
-        units: row.units_delivered,
-      },
-    ];
-    const printData = {
-      deliveryDate: row.delivery_date,
-      customer: printCustomer,
-      items: printItems,
-      notes: row.notes ?? "",
-    };
-    sessionStorage.setItem("ssim-delivery-print-data", JSON.stringify(printData));
-    window.open("/deliveries/print", "_blank");
   };
 
   if (loading) return <div className={styles.status}>Loading deliveries…</div>;
@@ -225,10 +318,7 @@ export default function ThisSeasonDeliveriesTable({
           onChange={(e) => setSearchTerm(e.target.value)}
         />
         {searchTerm && (
-          <button
-            className={styles.clearSearchBtn}
-            onClick={() => setSearchTerm("")}
-          >
+          <button className={styles.clearSearchBtn} onClick={() => setSearchTerm("")}>
             ×
           </button>
         )}
@@ -260,9 +350,7 @@ export default function ThisSeasonDeliveriesTable({
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.delivery_id}>
-                  <td className={styles.deliveryId}>
-                    {r.delivery_id.slice(0, 8)}
-                  </td>
+                  <td className={styles.deliveryId}>{r.delivery_id.slice(0, 8)}</td>
                   <td>{r.delivery_date}</td>
                   <td>{r.customer_name}</td>
                   <td>{r.product_name}</td>
@@ -273,9 +361,7 @@ export default function ThisSeasonDeliveriesTable({
                   <td className={styles.notes}>
                     {r.notes ? (
                       <span title={r.notes}>
-                        {r.notes.length > 30
-                          ? r.notes.slice(0, 30) + "…"
-                          : r.notes}
+                        {r.notes.length > 30 ? r.notes.slice(0, 30) + "…" : r.notes}
                       </span>
                     ) : (
                       "—"
@@ -285,7 +371,7 @@ export default function ThisSeasonDeliveriesTable({
                     <span className={styles.actionGroup}>
                       <button
                         className={styles.editBtn}
-                        onClick={() => startEdit(r)}
+                        onClick={() => startGroupEdit(r)}
                       >
                         Edit
                       </button>
@@ -319,144 +405,187 @@ export default function ThisSeasonDeliveriesTable({
       )}
 
       {/* Edit Modal */}
-      {editingId && editForm && (
+      {editGroupKey && (
         <div className={styles.modalOverlay} onClick={cancelEdit}>
           <div
-            className={styles.modal}
+            className={`${styles.modal} ${styles.modalWide}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Edit Delivery</h3>
+              <div>
+                <h3 className={styles.modalTitle}>Edit Delivery</h3>
+                {(editHeaderId ?? editGroupKey) && (
+                  <div className={styles.editDeliveryId}>
+                    Delivery ID:{" "}
+                    {(editHeaderId ?? editGroupKey)?.slice(0, 8)}
+                  </div>
+                )}
+              </div>
               <button className={styles.modalClose} onClick={cancelEdit}>
                 ×
               </button>
             </div>
-            <div className={styles.modalBody}>
-              {editError && <div className={styles.error}>{editError}</div>}
 
-              <div className={styles.formField}>
-                <label className={styles.formLabel}>Customer</label>
-                <SearchableSelect
-                  options={customerOptions}
-                  value={editForm.customer_id}
-                  onChange={(v) =>
-                    setEditForm({ ...editForm, customer_id: v })
-                  }
-                  placeholder="Select customer…"
-                />
-              </div>
+            {editLoading ? (
+              <div className={styles.editLoadingOverlay}>Loading delivery…</div>
+            ) : (
+              <>
+                <div className={styles.modalBody}>
+                  {editError && <div className={styles.error}>{editError}</div>}
 
-              <div className={styles.formField}>
-                <label className={styles.formLabel}>Delivery Date</label>
-                <input
-                  type="date"
-                  className={styles.formInput}
-                  value={editForm.delivery_date}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, delivery_date: e.target.value })
-                  }
-                />
-              </div>
+                  {/* ---- Header fields ---- */}
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Customer</label>
+                    <SearchableSelect
+                      options={customerOptions}
+                      value={editHeader?.customer_id ?? ""}
+                      onChange={(v) =>
+                        setEditHeader((h) => h ? { ...h, customer_id: v } : h)
+                      }
+                      placeholder="Select customer…"
+                    />
+                  </div>
 
-              <div className={styles.formField}>
-                <label className={styles.formLabel}>Product</label>
-                <SearchableSelect
-                  options={productOptions}
-                  value={editForm.product_id}
-                  onChange={handleProductChange}
-                  placeholder="Select product…"
-                />
-              </div>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Delivery Date</label>
+                    <input
+                      type="date"
+                      className={styles.formInput}
+                      value={editHeader?.delivery_date ?? ""}
+                      onChange={(e) =>
+                        setEditHeader((h) => h ? { ...h, delivery_date: e.target.value } : h)
+                      }
+                    />
+                  </div>
 
-              <div className={styles.formField}>
-                <label className={styles.formLabel}>Treatment</label>
-                <SearchableSelect
-                  options={treatmentOptionsForProduct}
-                  value={editForm.treatment_id}
-                  onChange={(v) =>
-                    setEditForm({ ...editForm, treatment_id: v })
-                  }
-                  placeholder="Select treatment…"
-                  disabled={!editForm.product_id}
-                />
-              </div>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Notes</label>
+                    <textarea
+                      className={styles.formTextarea}
+                      value={editHeader?.notes ?? ""}
+                      onChange={(e) =>
+                        setEditHeader((h) => h ? { ...h, notes: e.target.value } : h)
+                      }
+                      rows={2}
+                      placeholder="Optional notes…"
+                    />
+                  </div>
 
-              <div className={styles.formField}>
-                <label className={styles.formLabel}>Units Delivered</label>
-                <input
-                  type="number"
-                  className={styles.formInput}
-                  value={editForm.units_delivered || ""}
-                  onChange={(e) =>
-                    setEditForm({
-                      ...editForm,
-                      units_delivered: parseInt(e.target.value) || 0,
-                    })
-                  }
-                  min={1}
-                />
-              </div>
+                  {/* ---- Item rows ---- */}
+                  <div className={styles.sectionDivider}>Items</div>
 
-              {cropByProduct.get(editForm.product_id) === "corn" && (
-                <div className={styles.formField}>
-                  <label className={styles.formLabel}>Seed Size</label>
-                  <select
-                    className={styles.formInput}
-                    value={editForm.seed_size}
-                    onChange={(e) => setEditForm({ ...editForm, seed_size: e.target.value })}
-                  >
-                    <option value="">—</option>
-                    <option value="AR">AR</option>
-                    <option value="AR2">AR2</option>
-                    <option value="AF">AF</option>
-                    <option value="AF2">AF2</option>
-                    <option value="P26">P26</option>
-                  </select>
+                  {editItems.map((item, i) => {
+                    const treatOpts = treatmentsByProduct.get(item.productId) ?? [];
+                    const isCorn = cropByProduct.get(item.productId) === "corn";
+                    return (
+                      <div key={i} className={styles.editItemCard}>
+                        <div className={styles.editItemCardHeader}>
+                          <span className={styles.editItemNum}>Item {i + 1}</span>
+                          <button
+                            className={styles.editItemRemove}
+                            onClick={() => removeEditItem(i)}
+                            title="Remove item"
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        <div className={styles.formField} style={{ marginBottom: 8 }}>
+                          <label className={styles.formLabel}>Product</label>
+                          <SearchableSelect
+                            options={productOptions}
+                            value={item.productId}
+                            onChange={(v) => handleEditItemProduct(i, v)}
+                            placeholder="Select product…"
+                          />
+                        </div>
+
+                        <div className={styles.formField} style={{ marginBottom: 8 }}>
+                          <label className={styles.formLabel}>Treatment</label>
+                          <SearchableSelect
+                            options={treatOpts}
+                            value={item.treatmentId}
+                            onChange={(v) => handleEditItemTreatment(i, v)}
+                            placeholder="Select treatment…"
+                            disabled={!item.productId}
+                          />
+                        </div>
+
+                        <div className={styles.editItemRow2}>
+                          <div className={styles.editItemFieldCompact}>
+                            <label>Units</label>
+                            <input
+                              className={styles.editItemInput}
+                              type="number"
+                              min={1}
+                              value={item.units || ""}
+                              onChange={(e) =>
+                                updateEditItem(i, { units: parseInt(e.target.value) || 0 })
+                              }
+                            />
+                          </div>
+                          {isCorn && (
+                            <div className={styles.editItemFieldCompact}>
+                              <label>Size</label>
+                              <select
+                                className={styles.editItemSelect}
+                                value={item.seedSize}
+                                onChange={(e) =>
+                                  updateEditItem(i, { seedSize: e.target.value })
+                                }
+                              >
+                                <option value="">—</option>
+                                <option value="AR">AR</option>
+                                <option value="AR2">AR2</option>
+                                <option value="AF">AF</option>
+                                <option value="AF2">AF2</option>
+                                <option value="P26">P26</option>
+                              </select>
+                            </div>
+                          )}
+                          <div className={styles.editItemFieldCompact}>
+                            <label>Pkg</label>
+                            <select
+                              className={styles.editItemSelect}
+                              value={item.packageType}
+                              onChange={(e) =>
+                                updateEditItem(i, {
+                                  packageType: e.target.value as "bag" | "tote",
+                                })
+                              }
+                            >
+                              <option value="bag">Bag</option>
+                              <option value="tote">Seedpak</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <button className={styles.addItemBtn} onClick={addEditItem}>
+                    + Add Item
+                  </button>
                 </div>
-              )}
 
-              <div className={styles.formField}>
-                <label className={styles.formLabel}>Package Type</label>
-                <select
-                  className={styles.formInput}
-                  value={editForm.package_type}
-                  onChange={(e) => setEditForm({ ...editForm, package_type: e.target.value })}
-                >
-                  <option value="bag">Bag</option>
-                  <option value="tote">Seedpak</option>
-                </select>
-              </div>
-
-              <div className={styles.formField}>
-                <label className={styles.formLabel}>Notes</label>
-                <textarea
-                  className={styles.formTextarea}
-                  value={editForm.notes}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, notes: e.target.value })
-                  }
-                  rows={2}
-                  placeholder="Optional notes…"
-                />
-              </div>
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.cancelBtn} onClick={cancelEdit}>
-                Cancel
-              </button>
-              <button
-                className={styles.printBtn}
-                onClick={() => {
-                  const row = rows.find((r) => r.delivery_id === editingId);
-                  if (row) handlePrintRow(row);
-                }}
-              >
-                Print
-              </button>
-              <button className={styles.saveBtn} onClick={saveEdit}>
-                Save Changes
-              </button>
-            </div>
+                <div className={styles.modalFooter}>
+                  <button className={styles.cancelBtn} onClick={cancelEdit}>
+                    Cancel
+                  </button>
+                  <button
+                    className={styles.printBtn}
+                    onClick={() =>
+                      window.open(`/deliveries/print/${editGroupKey}`, "_blank")
+                    }
+                  >
+                    Print
+                  </button>
+                  <button className={styles.saveBtn} onClick={saveGroupEdit}>
+                    Save Changes
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
