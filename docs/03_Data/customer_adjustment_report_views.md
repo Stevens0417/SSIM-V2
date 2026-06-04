@@ -4,6 +4,8 @@ These five read-only views power the printable Customer Adjustment Report under 
 
 Migration: `0035_customer_adjustment_report_views.sql`
 
+For feature-level documentation (how to use the report, print behavior, user workflow), see [`/docs/features/customer_adjustment_report.md`](../features/customer_adjustment_report.md).
+
 ---
 
 ## Views

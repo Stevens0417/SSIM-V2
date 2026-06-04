@@ -230,7 +230,7 @@
 }
 
 .table thead th {
-  text-align: left;
+  text-align: left !important;
   font-size: 11px;
   font-weight: 600;
   color: var(--color-gray-700);
@@ -252,15 +252,15 @@
 }
 
 .right {
-  text-align: right;
+  text-align: right !important;
 }
 
 .center {
-  text-align: center;
+  text-align: center !important;
 }
 
 .mono {
-  text-align: right;
+  text-align: right !important;
   font-variant-numeric: tabular-nums;
 }
 
