@@ -262,3 +262,23 @@ A verification is toggled (verified/unverified) per line. Verification metadata 
 ## tote_bulk_discount
 
 A **tote/bulk discount** (displayed as a Seedpak discount in UI) is a per-unit discount applied when a customer orders in Seedpak (tote) format. Stored as `tote_bulk_discount_amount` on order_items and `tote_bulk_discount_total` on the order header. This discount reflects the lower per-unit packaging cost for bulk containers.
+
+---
+
+## Customer Adjustment Report
+
+The **Customer Adjustment Report** is a printable, per-customer, per-season report that exposes the detail behind the Year-End Adjustments tab. It shows all orders, deliveries, replants, and returns for a selected customer and season, plus a summary reconciliation table.
+
+**Net units formula** (matches Year-End Adjustments):
+
+```
+net_units = units_ordered - units_delivered - units_replanted + units_returned
+```
+
+A `net_units = 0` line means the order line is fully reconciled. Positive values represent outstanding seed to settle.
+
+**Replants vs. Returns in this report:**
+- Replants appear as a negative contribution (seed is consumed, triggers supplier credit).
+- Returns appear as a positive contribution (seed comes back to dealer inventory).
+
+**Backed by views:** `v_customer_adjustment_report_orders`, `v_customer_adjustment_report_deliveries`, `v_customer_adjustment_report_replants`, `v_customer_adjustment_report_returns`, `v_customer_adjustment_report_summary`. See `customer_adjustment_report_views.md`.

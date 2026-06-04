@@ -77,3 +77,18 @@ table td {
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* ---- Customer Adjustment Report print mode ---- */
+/* Applied via body class so only the report content prints */
+@media print {
+  body.printing-customer-report .no-print {
+    display: none !important;
+  }
+
+  /* Hide the adjustments page header band and tab nav */
+  body.printing-customer-report [data-adjustments-header],
+  body.printing-customer-report [data-adjustments-tabnav],
+  body.printing-customer-report [data-adjustments-seasonbar] {
+    display: none !important;
+  }
+}

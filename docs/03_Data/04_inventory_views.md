@@ -288,3 +288,21 @@ As of migration 0022, `package_type` is a first-class dimension in all inventory
 **Where used in UI:** Bayer Shipments page year-end verification section. Used by `fetchYearEndTotals(seasonYear)`.
 
 **Cautions:** This view was DROP + RECREATED in migration 0022 to add seed_size and package_type grouping. The live DB had `crop` at column position 4; the migration removed crop from this view (it is not needed for year-end totals). Always DROP + CREATE when changing column positions.
+
+---
+
+## Customer Adjustment Report Views (migration 0035)
+
+See [`customer_adjustment_report_views.md`](./customer_adjustment_report_views.md) for full documentation.
+
+Five read-only views for the printable Customer Adjustment Report:
+
+| View | Purpose |
+|---|---|
+| `v_customer_adjustment_report_orders` | All order line items for a customer/season |
+| `v_customer_adjustment_report_deliveries` | All delivery lines for a customer/season |
+| `v_customer_adjustment_report_replants` | All replant lines for a customer/season |
+| `v_customer_adjustment_report_returns` | All return lines for a customer/season |
+| `v_customer_adjustment_report_summary` | Summarized reconciliation — one row per product+treatment+seed_size+package_type+early_pay_bucket |
+
+All views are scoped to `auth.uid()`. The summary view uses the same net_units formula as `v_year_end_adjustments` and adds `seed_size` and `package_type` to the grain.
