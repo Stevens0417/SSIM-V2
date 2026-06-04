@@ -123,7 +123,9 @@ export default function CustomerReportTab({ seasons }: Props) {
   }
 
   function handlePrint() {
+    document.body.classList.add("printing-customer-report");
     window.print();
+    document.body.classList.remove("printing-customer-report");
   }
 
   // KPI totals computed from summary rows

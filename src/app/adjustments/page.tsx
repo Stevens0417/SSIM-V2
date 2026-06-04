@@ -72,7 +72,7 @@ export default function AdjustmentsPage() {
   return (
     <div>
       {/* ---- Header Band ---- */}
-      <div className={styles.headerBand}>
+      <div className={styles.headerBand} data-adjustments-header>
         <div className={styles.headerText}>
           <div className={styles.headerTitle}>Adjustments</div>
           <div className={styles.headerSub}>{headerSubtitle}</div>
@@ -80,7 +80,7 @@ export default function AdjustmentsPage() {
       </div>
 
       {/* ---- Tab Navigation ---- */}
-      <div className={styles.tabNav}>
+      <div className={styles.tabNav} data-adjustments-tabnav>
         <button
           className={`${styles.tabBtn} ${activeTab === "yearEnd" ? styles.tabBtnActive : ""}`}
           onClick={() => setActiveTab("yearEnd")}
@@ -99,7 +99,7 @@ export default function AdjustmentsPage() {
       {activeTab === "yearEnd" && (
         <>
           {seasons.length > 0 && (
-            <div className={styles.seasonBar}>
+            <div className={styles.seasonBar} data-adjustments-seasonbar>
               <label className={styles.seasonLabel}>Season</label>
               <select
                 className={styles.seasonSelect}
