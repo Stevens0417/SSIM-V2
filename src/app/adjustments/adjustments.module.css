@@ -26,6 +26,36 @@
   margin-top: 2px;
 }
 
+/* ---- Tab Navigation ---- */
+.tabNav {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--color-gray-200);
+  margin-bottom: 20px;
+}
+
+.tabBtn {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  color: var(--color-gray-500);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabBtn:hover {
+  color: var(--color-primary-800);
+}
+
+.tabBtnActive {
+  color: var(--color-primary-800);
+  border-bottom-color: var(--color-primary-800);
+}
+
 /* ---- Season Selector ---- */
 .seasonBar {
   display: flex;
