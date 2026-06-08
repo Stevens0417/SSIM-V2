@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import styles from "./Sidebar.module.css";
@@ -73,7 +74,15 @@ export default function Sidebar() {
     <>
       {/* ---- Mobile Top Bar ---- */}
       <div className={styles.mobileTopBar}>
-        <span className={styles.mobileTopLogo}>Stevens Seeds Inventory Management</span>
+        <Image
+          src="/assets/logos/logo-horizontal.png"
+          alt="Stevens Seeds Inventory Management"
+          width={180}
+          height={40}
+          className={styles.mobileTopLogoImg}
+          style={{ objectFit: "contain", height: "36px", width: "auto" }}
+          priority
+        />
         <button
           className={styles.hamburger}
           onClick={() => setOpen(true)}
@@ -139,7 +148,17 @@ export default function Sidebar() {
 
       {/* ---- Desktop Sidebar ---- */}
       <aside className={styles.sidebar}>
-        <div className={styles.logo}>Stevens Seeds Inventory Management</div>
+        <div className={styles.logo}>
+          <Image
+            src="/assets/logos/logo-main.png"
+            alt="Stevens Seeds Inventory Management"
+            width={180}
+            height={80}
+            className={styles.logoImg}
+            style={{ objectFit: "contain", width: "100%", height: "auto", maxHeight: "80px" }}
+            priority
+          />
+        </div>
         <nav className={styles.nav}>
           {NAV_SECTIONS.map((section) => (
             <div key={section.label}>
