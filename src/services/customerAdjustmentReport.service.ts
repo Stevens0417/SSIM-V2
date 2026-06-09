@@ -100,12 +100,41 @@ export interface ReportSummaryRow {
   completed: boolean;
 }
 
+export interface PackagingRow {
+  user_id: string;
+  season_year: number;
+  customer_id: string;
+  customer_name: string;
+  farm_name: string | null;
+  product_id: string;
+  packaging_item: string;
+  units_delivered: number;
+  units_returned: number;
+  net_outstanding: number;
+}
+
+export interface PackagingDetailRow {
+  user_id: string;
+  season_year: number;
+  customer_id: string;
+  customer_name: string;
+  farm_name: string | null;
+  movement_type: string;
+  movement_date: string | null;
+  movement_id: string;
+  packaging_item: string;
+  units: number;
+  notes: string | null;
+}
+
 export interface CustomerAdjustmentReport {
   orders: ReportOrderRow[];
   deliveries: ReportDeliveryRow[];
   replants: ReportReplantRow[];
   returns: ReportReturnRow[];
   summary: ReportSummaryRow[];
+  packaging: PackagingRow[];
+  packagingDetail: PackagingDetailRow[];
 }
 
 export async function fetchCustomerAdjustmentReport(
@@ -114,7 +143,7 @@ export async function fetchCustomerAdjustmentReport(
 ): Promise<CustomerAdjustmentReport> {
   const sb = getSupabaseBrowserClient();
 
-  const [ordersRes, deliveriesRes, replantsRes, returnsRes, summaryRes] =
+  const [ordersRes, deliveriesRes, replantsRes, returnsRes, summaryRes, packagingRes, packagingDetailRes] =
     await Promise.all([
       sb
         .from("v_customer_adjustment_report_orders")
@@ -141,6 +170,17 @@ export async function fetchCustomerAdjustmentReport(
         .select("*")
         .eq("season_year", seasonYear)
         .eq("customer_id", customerId),
+      sb
+        .from("v_customer_adjustment_report_packaging")
+        .select("*")
+        .eq("season_year", seasonYear)
+        .eq("customer_id", customerId),
+      sb
+        .from("v_customer_adjustment_report_packaging_detail")
+        .select("*")
+        .eq("season_year", seasonYear)
+        .eq("customer_id", customerId)
+        .order("movement_date", { ascending: true }),
     ]);
 
   if (ordersRes.error)
@@ -153,6 +193,10 @@ export async function fetchCustomerAdjustmentReport(
     throw new Error(returnsRes.error.message || "Failed to load returns");
   if (summaryRes.error)
     throw new Error(summaryRes.error.message || "Failed to load summary");
+  if (packagingRes.error)
+    throw new Error(packagingRes.error.message || "Failed to load packaging");
+  if (packagingDetailRes.error)
+    throw new Error(packagingDetailRes.error.message || "Failed to load packaging detail");
 
   const orders = (ordersRes.data ?? []) as ReportOrderRow[];
   orders.sort((a, b) => {
@@ -203,5 +247,15 @@ export async function fetchCustomerAdjustmentReport(
     return a.early_pay_bucket.localeCompare(b.early_pay_bucket);
   });
 
-  return { orders, deliveries, replants, returns, summary };
+  const packaging = (packagingRes.data ?? []) as PackagingRow[];
+  packaging.sort((a, b) => a.packaging_item.localeCompare(b.packaging_item));
+
+  const packagingDetail = (packagingDetailRes.data ?? []) as PackagingDetailRow[];
+  packagingDetail.sort((a, b) => {
+    const d = (a.movement_date ?? "").localeCompare(b.movement_date ?? "");
+    if (d !== 0) return d;
+    return a.packaging_item.localeCompare(b.packaging_item);
+  });
+
+  return { orders, deliveries, replants, returns, summary, packaging, packagingDetail };
 }

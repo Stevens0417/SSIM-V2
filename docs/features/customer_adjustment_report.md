@@ -73,7 +73,7 @@ Detailed table of all return records. Returns represent seed returned by the cus
 Columns: Return Date, Return ID, Product, Treatment, Seed Size, Package Type, Units Returned, Notes.
 
 ### Reconciliation Summary
-Aggregated reconciliation table. One row per product + treatment + seed size + package type + early pay bucket. This is the most important section for year-end settlement.
+Aggregated reconciliation table. **Seed products only** — packaging items (pallets, seedpak containers) are excluded and tracked separately below. One row per product + treatment + seed size + package type + early pay bucket.
 
 Columns: Product, Treatment, Seed Size, Package Type, Early Pay Bucket, Units Ordered, Units Delivered, Units Replanted, Units Returned, Net Units, Completed.
 
@@ -83,6 +83,23 @@ net_units = units_ordered − units_delivered − units_replanted + units_return
 ```
 
 A row with `net_units = 0` is fully reconciled. The **Completed** column shows whether the row has been checked off on the Year-End Adjustments tab.
+
+### Packaging Tracking
+Appears below the Reconciliation Summary. Tracks pallets and seedpak containers separately from seed product adjustments. One row per packaging item type.
+
+Columns: Packaging Item, Units Delivered, Units Returned, Net Outstanding.
+
+**Net Outstanding formula:**
+```
+net_outstanding = units_delivered − units_returned
+```
+
+Positive net outstanding means the customer still holds packaging items that have not been returned. Zero means fully reconciled. Empty state ("No pallet or seedpak activity found.") is shown when there is no packaging activity for the customer/season.
+
+### Packaging Movement Detail
+Appears below Packaging Tracking when packaging activity exists. Shows individual delivery and return transactions for packaging items — the audit trail behind the summary totals.
+
+Columns: Date, Type (Delivery/Return), ID, Packaging Item, Units, Notes.
 
 ---
 
@@ -110,8 +127,11 @@ If a section has no data for the selected customer/season, it shows a message:
 - "No replants found."
 - "No returns found."
 - "No reconciliation rows found."
+- "No pallet or seedpak activity found." (Packaging Tracking section)
 
 Rows still appear in the Reconciliation Summary if activity exists in any single category (e.g., a delivery-only row with no corresponding order will appear with `units_ordered = 0` and `early_pay_bucket = UNKNOWN`).
+
+**Note on packaging-only customers:** If a customer has only pallet/seedpak activity and no seed orders, the Orders, Deliveries, Replants, Returns, and Reconciliation Summary sections will all show their empty states. The Packaging Tracking and Packaging Movement Detail sections will show the activity.
 
 ---
 
@@ -125,6 +145,8 @@ Clicking **Print Report** triggers the browser print dialog. During printing:
 - Table rows have extra vertical spacing for manual annotation.
 - Net Units values are underlined instead of colored (for black-and-white printing).
 - Completed status prints as "Yes" / "No" badges.
+- Packaging Tracking appears at the bottom of the printed report.
+- The "Packaging Movement Detail" section also prints if packaging activity exists.
 
 ---
 
@@ -137,6 +159,8 @@ Clicking **Print Report** triggers the browser print dialog. During printing:
 | Replants | `v_customer_adjustment_report_replants` |
 | Returns | `v_customer_adjustment_report_returns` |
 | Reconciliation Summary + KPIs | `v_customer_adjustment_report_summary` |
+| Packaging Tracking | `v_customer_adjustment_report_packaging` |
+| Packaging Movement Detail | `v_customer_adjustment_report_packaging_detail` |
 
 See [`/docs/03_Data/customer_adjustment_report_views.md`](../03_Data/customer_adjustment_report_views.md) for full view documentation.
 
@@ -148,3 +172,6 @@ See [`/docs/03_Data/customer_adjustment_report_views.md`](../03_Data/customer_ad
 - The report is scoped to the authenticated user — no cross-user data is visible.
 - Seed size is required for corn products and preserved in all sections.
 - The `UNKNOWN` early pay bucket appears on rows where a delivery, replant, or return has no linked order item (cannot be attributed to an early-pay tier).
+- **Packaging identification:** `products.crop = 'packaging'` is the canonical field. A delivery with `package_type = 'tote'` is seed inside a Seedpak container — it still appears in the seed sections.
+- Packaging deliveries and returns are excluded from the Orders, Deliveries, and Returns detail sections — they appear only in the Packaging Tracking and Packaging Movement Detail sections.
+- Replants cannot be packaging items (packaging is not replanted). The Replants view does not filter packaging, but none will appear in practice.

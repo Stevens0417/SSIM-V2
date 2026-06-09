@@ -282,3 +282,32 @@ A `net_units = 0` line means the order line is fully reconciled. Positive values
 - Returns appear as a positive contribution (seed comes back to dealer inventory).
 
 **Backed by views:** `v_customer_adjustment_report_orders`, `v_customer_adjustment_report_deliveries`, `v_customer_adjustment_report_replants`, `v_customer_adjustment_report_returns`, `v_customer_adjustment_report_summary`. See `customer_adjustment_report_views.md`.
+
+**Packaging exclusion:** Packaging items (`products.crop = 'packaging'`) do not appear in the reconciliation summary. They are tracked separately — see Packaging Item below.
+
+---
+
+## Packaging Item (Customer Report)
+
+A **packaging item** in the context of the Customer Adjustment Report is a logistics or container product (pallet, Seedpak container) that is delivered to and returned from customers but is NOT a seed sales unit.
+
+**Identification:** `products.crop = 'packaging'`
+
+**Exclusion from seed reconciliation:** Packaging items do not appear in `v_customer_adjustment_report_summary` or `v_year_end_adjustments`. They are excluded via `WHERE coalesce(p.crop, '') <> 'packaging'` on those views.
+
+**Separate tracking:** Packaging movements are tracked in:
+- `v_customer_adjustment_report_packaging` — aggregate: units delivered, returned, net outstanding per (customer, packaging item, season)
+- `v_customer_adjustment_report_packaging_detail` — individual delivery and return rows
+
+**Net outstanding formula:**
+```
+net_outstanding = units_delivered - units_returned
+```
+
+Positive = customer still holds packaging items (pallets or Seedpak containers not yet returned). Zero = fully reconciled.
+
+**Replants excluded:** Packaging items are never replanted. Replants are a seed-only concept (field failure).
+
+**Packaging vs. package_type distinction:**
+- `products.crop = 'packaging'` → the product itself is a packaging item → tracked in packaging views
+- `deliveries.package_type = 'tote'` → seed was delivered inside a Seedpak container → still a seed row, appears in seed reconciliation

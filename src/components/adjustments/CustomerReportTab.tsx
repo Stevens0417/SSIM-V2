@@ -497,6 +497,79 @@ export default function CustomerReportTab({ seasons }: Props) {
               </div>
             )}
           </div>
+
+          {/* Section 8: Packaging Tracking */}
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>Packaging Tracking</div>
+            <div className={styles.sectionDesc}>
+              Pallets and seedpaks are tracked separately from seed product adjustments.
+            </div>
+            {report.packaging.length === 0 ? (
+              <div className={styles.noRows}>No pallet or seedpak activity found.</div>
+            ) : (
+              <div className={styles.wrapper}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Packaging Item</th>
+                      <th className={styles.right}>Units Delivered</th>
+                      <th className={styles.right}>Units Returned</th>
+                      <th className={styles.right}>Net Outstanding</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.packaging.map((r) => (
+                      <tr key={r.packaging_item}>
+                        <td>{r.packaging_item}</td>
+                        <td className={styles.mono}>{r.units_delivered}</td>
+                        <td className={styles.mono}>{r.units_returned}</td>
+                        <td
+                          className={`${styles.mono} ${r.net_outstanding !== 0 ? styles.netHighlight : ""}`}
+                        >
+                          {r.net_outstanding}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Section 9: Packaging Movement Detail */}
+          {report.packagingDetail.length > 0 && (
+            <div className={styles.section}>
+              <div className={styles.sectionTitle}>Packaging Movement Detail</div>
+              <div className={styles.wrapper}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>ID</th>
+                      <th>Packaging Item</th>
+                      <th className={styles.right}>Units</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.packagingDetail.map((r) => (
+                      <tr key={r.movement_id}>
+                        <td>{fmtDate(r.movement_date)}</td>
+                        <td className={styles.capitalize}>
+                          {r.movement_type}
+                        </td>
+                        <td title={r.movement_id}>{shortId(r.movement_id)}</td>
+                        <td>{r.packaging_item}</td>
+                        <td className={styles.mono}>{r.units}</td>
+                        <td>{r.notes ?? ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

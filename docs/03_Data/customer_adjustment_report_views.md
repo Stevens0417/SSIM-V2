@@ -1,8 +1,10 @@
 # Customer Adjustment Report Views
 
-These five read-only views power the printable Customer Adjustment Report under the Adjustments page. They expose the underlying detail behind the Year-End Adjustments tab so users can review invoice adjustments and validate reconciliation totals per customer and season.
+Seven read-only views power the Customer Adjustment Report under the Adjustments page. Five views expose seed product detail and the reconciliation summary. Two packaging views track pallets and seedpak containers separately from seed net units.
 
-Migration: `0035_customer_adjustment_report_views.sql`
+Migrations:
+- `0035_customer_adjustment_report_views.sql` — detail views (orders, deliveries, replants, returns); summary view without packaging exclusion
+- `0036_customer_adjustment_report_packaging.sql` — creates the 5 views correctly (summary with packaging exclusion); replaces packaging views from a prior local migration
 
 For feature-level documentation (how to use the report, print behavior, user workflow), see [`/docs/features/customer_adjustment_report.md`](../features/customer_adjustment_report.md).
 
@@ -12,7 +14,7 @@ For feature-level documentation (how to use the report, print behavior, user wor
 
 ### v_customer_adjustment_report_orders
 
-**Purpose:** One row per order line item for a customer and season.
+**Purpose:** One row per order line item for a customer and season. Packaging products (`products.crop = 'packaging'`) are excluded.
 
 **Grain:** `(order_id, order_item_id)` — one row per product + treatment + seed_size + package_type per order.
 
@@ -41,7 +43,7 @@ For feature-level documentation (how to use the report, print behavior, user wor
 
 ### v_customer_adjustment_report_deliveries
 
-**Purpose:** One row per delivery line item for a customer and season.
+**Purpose:** One row per delivery line item for a customer and season. Packaging products are excluded — packaging deliveries appear only in `v_customer_adjustment_report_packaging_detail`.
 
 **Grain:** `(delivery_id)` — one row per product + treatment + seed_size + package_type per delivery.
 
@@ -90,7 +92,7 @@ For feature-level documentation (how to use the report, print behavior, user wor
 
 ### v_customer_adjustment_report_returns
 
-**Purpose:** One row per return line item for a customer and season.
+**Purpose:** One row per return line item for a customer and season. Packaging products are excluded — packaging returns appear only in `v_customer_adjustment_report_packaging_detail`.
 
 **Grain:** `(return_id)` — one row per product + treatment + seed_size + package_type per return event.
 
@@ -114,9 +116,11 @@ For feature-level documentation (how to use the report, print behavior, user wor
 
 ### v_customer_adjustment_report_summary
 
-**Purpose:** Reconciliation summary for a customer and season. One row per unique combination of product, treatment, seed size, package type, and early pay bucket. Rows appear whenever any activity exists in any category — delivery-only, return-only, or replant-only rows are all included.
+**Purpose:** Reconciliation summary for a customer and season. Seed products only — packaging items (`products.crop = 'packaging'`) are excluded and tracked in `v_customer_adjustment_report_packaging` instead. One row per unique combination of product, treatment, seed size, package type, and early pay bucket. Rows appear whenever any activity exists in any category — delivery-only, return-only, or replant-only rows are all included.
 
 **Grain:** `(user_id, season_year, customer_id, product_id, treatment_id, seed_size, package_type, early_pay_bucket)`
+
+**Packaging exclusion:** `WHERE coalesce(p.crop, '') <> 'packaging'` on the outer SELECT (after joining to `products`). Added in migration 0036.
 
 **Key columns:**
 
@@ -125,7 +129,7 @@ For feature-level documentation (how to use the report, print behavior, user wor
 | `user_id` | Scoped to `auth.uid()` |
 | `season_year` | Season |
 | `customer_id` / `customer_name` / `farm_name` | Customer identity |
-| `product_id` / `product_name` | Product |
+| `product_id` / `product_name` | Seed products only |
 | `treatment_id` / `treatment_name` | Treatment |
 | `seed_size` | Corn seed size — null for soybeans |
 | `package_type` | `bag` or `tote` |
@@ -136,6 +140,57 @@ For feature-level documentation (how to use the report, print behavior, user wor
 | `units_returned` | Sum of returned units |
 | `net_units` | See formula below |
 | `completed` | Pulled from `invoice_adjustment_checks.is_completed` |
+
+---
+
+### v_customer_adjustment_report_packaging
+
+**Purpose:** Aggregated packaging movements (pallets, seedpak containers) per customer per season. Tracks how many were delivered, returned, and how many are still outstanding. Packaging items are identified by `products.crop = 'packaging'`.
+
+**Migration:** `0036_customer_adjustment_report_packaging.sql`
+
+**Grain:** `(user_id, season_year, customer_id, product_id)` — one row per packaging item type per customer per season.
+
+**Key columns:**
+
+| Column | Description |
+|---|---|
+| `user_id` | Scoped to `auth.uid()` |
+| `season_year` | Season |
+| `customer_id` / `customer_name` / `farm_name` | Customer identity |
+| `product_id` | UUID of the packaging product |
+| `packaging_item` | `products.product_name` — e.g., `'Pallet'`, `'Seedpak'` |
+| `units_delivered` | Total packaging units delivered this season |
+| `units_returned` | Total packaging units returned |
+| `net_outstanding` | `units_delivered - units_returned` |
+
+**net_outstanding:** Positive = customer still holds packaging items. Zero or negative = all returned or overcredited.
+
+**New packaging types:** Adding a new product with `crop = 'packaging'` automatically appears here without view changes.
+
+---
+
+### v_customer_adjustment_report_packaging_detail
+
+**Purpose:** Individual delivery and return rows for packaging items. Provides the audit trail behind the packaging summary totals.
+
+**Migration:** `0036_customer_adjustment_report_packaging.sql`
+
+**Grain:** One row per packaging delivery or return transaction.
+
+**Key columns:**
+
+| Column | Description |
+|---|---|
+| `user_id` | Scoped to `auth.uid()` |
+| `season_year` | Season |
+| `customer_id` / `customer_name` / `farm_name` | Customer identity |
+| `movement_type` | `'delivery'` or `'return'` |
+| `movement_date` | `delivery_date` or `return_date` |
+| `movement_id` | UUID of the source delivery or return row |
+| `packaging_item` | `products.product_name` |
+| `units` | `units_delivered` or `units_returned` (positive integer) |
+| `notes` | From the delivery or return record |
 
 ---
 
@@ -167,4 +222,19 @@ A `net_units = 0` row means the order line is fully reconciled.
 | `farm_name` | No | Yes |
 | `completed` source | `invoice_adjustment_checks` | Same |
 
-Both views use the same net_units formula and early_pay_bucket logic. The summary view is additive — it does not replace or alter `v_year_end_adjustments`.
+Both views use the same net_units formula and early_pay_bucket logic. The summary view is additive — it does not replace or alter `v_year_end_adjustments`. Both views exclude packaging products.
+
+---
+
+## Packaging Identification
+
+Packaging items are identified by `products.crop = 'packaging'`. This is the canonical field used throughout the codebase.
+
+**Packaging vs. package_type distinction:**
+
+| Field | Meaning | Appears in |
+|---|---|---|
+| `products.crop = 'packaging'` | The product IS a packaging item (Pallet, Seedpak container) | `v_customer_adjustment_report_packaging` |
+| `deliveries.package_type = 'tote'` | Seed was delivered IN a Seedpak container | `v_customer_adjustment_report_summary` (seed row) |
+
+A corn delivery with `package_type = 'tote'` is still a seed row — it is NOT a packaging item.
