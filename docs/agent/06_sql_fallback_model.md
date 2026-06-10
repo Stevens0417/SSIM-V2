@@ -42,7 +42,7 @@ The agent always follows this hierarchy:
 
 | View | Key columns | Purpose |
 |---|---|---|
-| `v_agent_inventory` | product_name, treatment_name, seed_size, package_type, units_on_hand, units_staged, available_units | On-hand + staged + available inventory |
+| `v_agent_inventory` | product_name, treatment_name, seed_size, package_type, units_received, units_delivered, units_replanted, units_returned, units_on_hand, units_staged, available_units | On-hand + staged + available inventory. `units_on_hand = received − delivered − replanted + returned` |
 | `v_agent_staged_deliveries` | customer_name, farm_name, product_name, treatment_name, seed_size, package_type, units_staged, staged_date, season_year | In-progress staged deliveries |
 | `v_agent_customer_orders` | customer_name, product_name, treatment_name, units_ordered, retail_price_per_unit, line_total_after_all_discounts, profit_per_unit, line_total_profit, season_year | Order line items with pricing and profit |
 | `v_agent_order_fulfillment` | customer_name, product_name, treatment_name, ordered_units, delivered_units, net_units, is_complete, season_year | Delivery fulfillment status per order line |

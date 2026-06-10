@@ -28,7 +28,9 @@ interface InventoryRow {
   treatment_name: string | null;
   seed_size: string | null;
   package_type: string | null;
-  // physical_units_on_hand = received − delivered + returned (warehouse stock)
+  // replanted_units = seed handed to customers to re-plant failed fields (physically left the warehouse)
+  replanted_units: number;
+  // physical_units_on_hand = received − delivered − replanted + returned (warehouse stock)
   physical_units_on_hand: number;
   // staged_units = reserved in in_progress staged deliveries (set aside, not yet delivered)
   staged_units: number;
@@ -38,6 +40,8 @@ interface InventoryRow {
 
 interface ToolOutput {
   rows: InventoryRow[];
+  // Replanted total (seed handed to customers to re-plant failed fields — already subtracted from physical)
+  total_replanted_units: number;
   // Physical stock totals (warehouse counts — NOT the answer to "how many do I have?")
   total_physical_units_on_hand: number;
   has_negative_physical_inventory: boolean;
@@ -65,9 +69,11 @@ export function makeGetOnHandInventoryTool(
       "IMPORTANT — multi-row aggregation: a product filter can return MULTIPLE rows (different seed sizes, package types, or staged-only combinations). " +
       "The pre-computed `total_*` fields aggregate ALL matching rows including rows where physical_units_on_hand = 0 but staged_units > 0. " +
       "Always use `total_available_units` as the headline answer — never an individual row's `available_units`. " +
-      "Each row includes: `physical_units_on_hand` (warehouse stock = received − delivered + returned), " +
+      "Each row includes: `replanted_units` (seed handed to customers to re-plant failed fields — already subtracted from physical, NOT staged), " +
+      "`physical_units_on_hand` (warehouse stock = received − delivered − replanted + returned), " +
       "`staged_units` (reserved in active staged deliveries, set aside for customers but not yet delivered), and " +
       "`available_units` (physical_units_on_hand − staged_units — what can still be committed). " +
+      "When explaining a calculation or breakdown, include replants: received − delivered − replanted + returned − staged = available. " +
       "Rows where physical_units_on_hand = 0 AND staged_units > 0 are included and MUST contribute to the totals — they represent product set aside for delivery that was never formally received into inventory at that seed size. " +
       "Negative `available_units` means more has been staged or delivered than is physically on hand — surface this as a warning. " +
       "Call this tool for any question about inventory levels, stock quantities, Bag or Seedpak quantities, seed sizes, or staged/reserved units.",
@@ -104,7 +110,7 @@ export function makeGetOnHandInventoryTool(
       let query = userClient
         .from("v_on_hand_inventory")
         .select(
-          "product_name, treatment_name, seed_size, package_type, units_on_hand, units_staged, available_units"
+          "product_name, treatment_name, seed_size, package_type, units_replanted, units_on_hand, units_staged, available_units"
         )
         .order("product_name")
         .order("treatment_name")
@@ -150,6 +156,7 @@ export function makeGetOnHandInventoryTool(
           seed_size: row.seed_size as string | null,
           package_type: toDisplayPackageType(row.package_type as string | null),
           // Map DB column names → output field names that are unambiguous for the LLM
+          replanted_units: row.units_replanted as number,
           physical_units_on_hand: row.units_on_hand as number,
           staged_units: row.units_staged as number,
           available_units: row.available_units as number,
@@ -165,9 +172,11 @@ export function makeGetOnHandInventoryTool(
       );
       const total_staged_units = rows.reduce((sum, r) => sum + r.staged_units, 0);
       const total_available_units = rows.reduce((sum, r) => sum + r.available_units, 0);
+      const total_replanted_units = rows.reduce((sum, r) => sum + r.replanted_units, 0);
 
       const output: ToolOutput = {
         rows,
+        total_replanted_units,
         total_physical_units_on_hand,
         has_negative_physical_inventory: negative_physical_rows.length > 0,
         total_staged_units,

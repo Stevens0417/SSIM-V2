@@ -6,22 +6,23 @@ Views that compute on-hand seed inventory from received shipments, deliveries, a
 
 ## Inventory Formula
 
-All inventory views use three computed inventory quantities:
+All inventory views use these computed inventory quantities:
 
 ```
-physical_on_hand  = units_received - units_delivered + units_returned
+physical_on_hand  = units_received - units_delivered - units_replanted + units_returned
 staged_units      = sum of units_staged in in_progress staged deliveries
 available_units   = physical_on_hand - staged_units
 ```
 
 - **units_received** = sum of `bayer_shipment_items.units_received` (can be negative for Bayer-side corrections)
 - **units_delivered** = sum of `deliveries.units_delivered`
+- **units_replanted** = sum of `replants.units_replanted` (added migration 0037)
 - **units_returned** = sum of `returns.units_returned`
 - **staged_units** = sum of `staged_delivery_items.units_staged` for staged deliveries with `status = 'in_progress'`
 
-`units_on_hand` in the view is the **physical** quantity (received − delivered + returned). `available_units` is the operationally meaningful quantity — how much can still be sold or committed.
+`units_on_hand` in the view is the **physical** quantity (received − delivered − replanted + returned). `available_units` is the operationally meaningful quantity — how much can still be sold or committed.
 
-**Replants do not affect inventory.** Replanted units are consumed by the customer and do not come back into stock.
+**Replants subtract from physical inventory (as of migration 0037).** Replanted seed physically leaves the warehouse — it is handed to the customer to re-plant a failed field. It reduces `units_on_hand` exactly like a delivery, and it does not come back into stock like a return. This is the **physical-stock** axis; it is distinct from the **sales-settlement** axis used by `v_year_end_adjustments` and the customer adjustment report, which also net replants but for invoicing/credit purposes. Replants must not be double-counted between the two axes — the reconciliation views do not read inventory.
 
 **Staged deliveries do not reduce physical inventory.** They reduce `available_units` only, reflecting product set aside but not yet formally delivered.
 
@@ -43,7 +44,7 @@ As of migration 0022, `package_type` is a first-class dimension in all inventory
 
 **Purpose:** Detail-level on-hand inventory. One row per distinct (product, treatment, seed_size, package_type) combination across all of the user's shipments, deliveries, and returns.
 
-**Source tables:** `bayer_shipment_items`, `deliveries`, `returns`, `products`, `treatments` — all filtered by `user_id = auth.uid()`.
+**Source tables:** `bayer_shipment_items`, `deliveries`, `replants`, `returns`, `products`, `treatments` — all filtered by `user_id = auth.uid()`.
 
 **Grain:** One row per (product_id, treatment_id, seed_size, package_type).
 
@@ -62,13 +63,14 @@ As of migration 0022, `package_type` is a first-class dimension in all inventory
 | `seed_size` | NULL for non-corn |
 | `units_received` | From Bayer shipments |
 | `units_delivered` | Delivered to customers |
+| `units_replanted` | Replanted by customers — subtracts from stock (added migration 0037) |
 | `units_returned` | Returned from customers |
-| `units_on_hand` | Physical: `received - delivered + returned` |
+| `units_on_hand` | Physical: `received - delivered - replanted + returned` |
 | `package_type` | `'bag'` or `'tote'` (tote = Seedpak) |
 | `units_staged` | Reserved in in_progress staged deliveries (added migration 0027) |
 | `available_units` | `units_on_hand - units_staged` (added migration 0027) |
 
-**Received seed_size (as of migration 0029):** The `received` CTE uses `i.seed_size` from `bayer_shipment_items`. If a Bayer shipment item was saved with `seed_size = 'AF2'`, its received units appear on the AF2 row, correctly matching deliveries and staged deliveries at the same seed_size. If the shipment item has `seed_size = NULL` (e.g. soybean), received units appear on the NULL seed_size row. All four CTEs (received, delivered, returned, staged) and all `IS NOT DISTINCT FROM` joins handle both cases correctly.
+**Received seed_size (as of migration 0029):** The `received` CTE uses `i.seed_size` from `bayer_shipment_items`. If a Bayer shipment item was saved with `seed_size = 'AF2'`, its received units appear on the AF2 row, correctly matching deliveries and staged deliveries at the same seed_size. If the shipment item has `seed_size = NULL` (e.g. soybean), received units appear on the NULL seed_size row. All five CTEs (received, delivered, replanted, returned, staged) and all `IS NOT DISTINCT FROM` joins handle both cases correctly.
 
 **Migration 0029 bug fix:** Prior to migration 0029, the received CTE used `null::text as seed_size`, discarding the actual seed_size from `bayer_shipment_items`. This caused received units to be grouped under NULL seed_size even when the shipment item had a non-null seed_size (e.g. AF2), breaking inventory accuracy for corn seed sizes.
 
@@ -143,7 +145,7 @@ As of migration 0022, `package_type` is a first-class dimension in all inventory
 | `treatment_id` / `treatment_name` | |
 | `seed_size` | NULL last in sort |
 | `package_type` | NULL last in sort |
-| `units_on_hand` | Physical: `received - delivered + returned` |
+| `units_on_hand` | Physical: `received - delivered - replanted + returned` |
 | `units_staged` | Reserved in in_progress staged deliveries (added migration 0027) |
 | `available_units` | `units_on_hand - units_staged` (added migration 0027) |
 

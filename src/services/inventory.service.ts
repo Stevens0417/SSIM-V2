@@ -11,6 +11,7 @@ export interface InventoryDetailRow {
   package_type: string;
   units_received: number;
   units_delivered: number;
+  units_replanted: number;
   units_returned: number;
   units_on_hand: number;
   units_staged: number;

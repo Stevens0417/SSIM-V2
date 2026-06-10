@@ -116,11 +116,12 @@ Returns are entered on the Returns page.
 ## Replant
 
 A **replant** is a record of seed that was replanted by a customer due to field failure (poor germination, weather damage, etc.). A replant:
-- Does **not** increase on-hand inventory — replanted seeds are consumed, not returned
+- **Reduces physical on-hand inventory** — the seed physically leaves the warehouse when handed to the customer (subtracted from `units_on_hand` as of migration 0037). It does not come back into stock like a return.
 - Reduces `net_units` on the linked order line alongside delivered units
 - Is semantically distinct from a return: a replant means "we gave them more seed" not "they gave seed back"
 
-Formula impact: `net_units = ordered - delivered - replanted + returned`
+Formula impact (sales settlement): `net_units = ordered - delivered - replanted + returned`
+Formula impact (physical stock): `units_on_hand = received - delivered - replanted + returned`
 
 Replants are entered on the Replants page.
 
@@ -132,7 +133,7 @@ A **Bayer shipment** is a record of seed received from the Bayer supplier. It co
 - A header (shipment date, season year, shipment number)
 - One or more item lines (product + treatment + seed_size + package_type + units_received)
 
-Bayer shipments are the **source** of on-hand inventory. Units received in shipments minus units delivered to customers plus units returned equals units on hand.
+Bayer shipments are the **source** of on-hand inventory. Units received in shipments, minus units delivered to customers, minus units replanted, plus units returned, equals units on hand.
 
 Negative `units_received` values are valid — they represent corrections or returns to Bayer.
 
@@ -142,11 +143,11 @@ Negative `units_received` values are valid — they represent corrections or ret
 
 **On-hand inventory** (also called **physical on hand**) is the computed quantity of seed physically in stock at any point in time.
 
-Formula: `units_on_hand = units_received - units_delivered + units_returned`
+Formula: `units_on_hand = units_received - units_delivered - units_replanted + units_returned`
 
 This is always computed in real time from the underlying tables — it is not a stored value. The `units_on_hand` column in `v_on_hand_inventory` and `v_inventory_print_sheet` uses this formula.
 
-Replanted units do not affect on-hand inventory. Staged deliveries do not affect physical on-hand inventory (see Available Units below).
+Replanted units reduce on-hand inventory — the seed physically leaves stock when handed to the customer to re-plant a failed field (added migration 0037). Staged deliveries do not affect physical on-hand inventory (see Available Units below).
 
 **In the UI:** The On-Hand Inventory detail view shows Physical On Hand, Staged, and Available columns. KPI cards report Total Physical On Hand, Total Staged, Total Available, and Negative Available count. The wide view pivots Available Units (not physical) — it answers "how much can still be committed?" The print sheet shows all three columns with Total Available in the header.
 

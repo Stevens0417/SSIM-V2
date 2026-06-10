@@ -52,13 +52,13 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 **Allowed filters:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `available_units`
 
-**Columns safe for agent:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_received`, `units_delivered`, `units_returned`, `units_on_hand`, `units_staged`, `available_units`
+**Columns safe for agent:** `product_name`, `treatment_name`, `seed_size`, `package_type`, `units_received`, `units_delivered`, `units_replanted`, `units_returned`, `units_on_hand`, `units_staged`, `available_units`
 
 **Columns to exclude:** `product_id`, `treatment_id` (internal UUIDs)
 
 **Notes:**
 - Use `package_type = 'bag'` for Bags and `package_type = 'tote'` for Seedpaks in filter values. Display as "Bag" / "Seedpak" in responses.
-- `units_on_hand` is **physical** inventory (received − delivered + returned) — the warehouse count. The tool exposes this as `physical_units_on_hand`.
+- `units_on_hand` is **physical** inventory (received − delivered − replanted + returned, as of migration 0037) — the warehouse count. Replanted seed physically leaves stock and is subtracted. The tool exposes this as `physical_units_on_hand` and exposes `units_replanted` as `replanted_units`.
 - `units_staged` is the quantity reserved in in_progress staged deliveries. The tool exposes this as `staged_units`.
 - `available_units = units_on_hand − units_staged` — this is the primary operational quantity. The `get_on_hand_inventory` tool always leads responses with `total_available_units`.
 - This view has separate rows for Bag and Seedpak — if you want a combined total, sum across package_type.
@@ -320,4 +320,4 @@ All views in this document are user-scoped — they automatically filter by `aut
 
 9. **Customer Adjustment Report views** (`v_customer_adjustment_report_orders`, `v_customer_adjustment_report_deliveries`, `v_customer_adjustment_report_replants`, `v_customer_adjustment_report_returns`, `v_customer_adjustment_report_summary`) are safe for agent read queries when the user asks about customer adjustment details. They are user-scoped. The summary view exposes `net_units`, `completed`, `seed_size`, and `package_type`. See `customer_adjustment_report_views.md`.
 
-8. **SQL fallback approved views** (for `run_approved_readonly_query` tool): `v_agent_customer_orders`, `v_agent_order_fulfillment`, `v_agent_inventory`, `v_agent_customer_deliveries`, `v_agent_customer_returns`, `v_agent_customer_replants`, `v_agent_bayer_shipments`, `v_agent_staged_deliveries`, `v_agent_pricing`. `v_agent_inventory` includes `units_on_hand` (physical), `units_staged`, and `available_units` (added migration 0027). Note: in SQL queries use the DB column names (`units_on_hand`, `units_staged`); the `get_on_hand_inventory` tool renames these to `physical_units_on_hand` and `staged_units` in its output to avoid LLM confusion. `v_agent_staged_deliveries` lists all in_progress staged deliveries. `v_agent_pricing` is GLOBAL (no user_id filter) — returns the same pricing rows for every authenticated user. Adding a new view to the SQL fallback requires updating both the `TOOL_DESCRIPTION` in `run-approved-readonly-query.ts` and the `APPROVED_VIEWS` set in `validate-approved-query.ts`.
+8. **SQL fallback approved views** (for `run_approved_readonly_query` tool): `v_agent_customer_orders`, `v_agent_order_fulfillment`, `v_agent_inventory`, `v_agent_customer_deliveries`, `v_agent_customer_returns`, `v_agent_customer_replants`, `v_agent_bayer_shipments`, `v_agent_staged_deliveries`, `v_agent_pricing`. `v_agent_inventory` includes `units_on_hand` (physical = received − delivered − replanted + returned), `units_replanted` (added migration 0037), `units_staged`, and `available_units` (added migration 0027). Note: in SQL queries use the DB column names (`units_on_hand`, `units_staged`); the `get_on_hand_inventory` tool renames these to `physical_units_on_hand` and `staged_units` in its output to avoid LLM confusion. `v_agent_staged_deliveries` lists all in_progress staged deliveries. `v_agent_pricing` is GLOBAL (no user_id filter) — returns the same pricing rows for every authenticated user. Adding a new view to the SQL fallback requires updating both the `TOOL_DESCRIPTION` in `run-approved-readonly-query.ts` and the `APPROVED_VIEWS` set in `validate-approved-query.ts`.

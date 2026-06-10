@@ -6,15 +6,18 @@ Documents the `get_on_hand_inventory` tool and how the agent surfaces inventory 
 
 ## Inventory Concepts
 
-Inventory has three distinct quantities, all returned by the tool:
+Inventory quantities returned by the tool:
 
 | Field | Definition | Use case |
 |---|---|---|
-| `physical_units_on_hand` | `received − delivered + returned` — warehouse stock | Physical stock questions only |
+| `replanted_units` | Seed handed to customers to re-plant failed fields — already subtracted from physical | Explaining how physical was derived |
+| `physical_units_on_hand` | `received − delivered − replanted + returned` — warehouse stock | Physical stock questions only |
 | `staged_units` | Sum of in_progress staged delivery items | Staged/reserved questions |
 | `available_units` | `physical_units_on_hand − staged_units` | **Primary answer to "how many do I have?"** |
 
 **Available units** is the answer to "how many do I have?" / "how many can I sell?" / "how many are left?". Never report `physical_units_on_hand` for these questions.
+
+**Replanted vs staged — do not confuse them.** Replanted seed has *physically left the warehouse* (handed to the customer to re-plant a failed field), so it reduces `physical_units_on_hand`. Staged seed is *still in the warehouse* but reserved for a customer, so it reduces `available_units` only. Both lower availability, but for different reasons.
 
 ---
 
@@ -37,9 +40,11 @@ Inventory has three distinct quantities, all returned by the tool:
 | Field | Description |
 |---|---|
 | `rows` | Per-combination detail rows (product/treatment/size/pkg) |
-| `rows[].physical_units_on_hand` | Warehouse stock (received − delivered + returned) |
+| `rows[].replanted_units` | Seed handed to customers to re-plant failed fields (already subtracted from physical) |
+| `rows[].physical_units_on_hand` | Warehouse stock (received − delivered − replanted + returned) |
 | `rows[].staged_units` | Reserved in in_progress staged deliveries |
 | `rows[].available_units` | What can still be committed (physical − staged) |
+| `total_replanted_units` | Sum of replanted units |
 | `total_physical_units_on_hand` | Sum of physical warehouse stock |
 | `total_staged_units` | Sum of staged/reserved units |
 | `total_available_units` | Sum of available units — **primary answer to "how many do I have?"** |
@@ -52,6 +57,7 @@ Inventory has three distinct quantities, all returned by the tool:
 
 | DB view column (`v_on_hand_inventory`) | Tool output field |
 |---|---|
+| `units_replanted` | `replanted_units` |
 | `units_on_hand` | `physical_units_on_hand` |
 | `units_staged` | `staged_units` |
 | `available_units` | `available_units` |
@@ -68,6 +74,18 @@ Lead with `total_available_units`. If staged, explain the breakdown:
 
 If not staged:
 > "You have 100 available units of DKC 103-93. No units are currently staged."
+
+### Full calculation (include replants)
+> "How many units of 100-01 Fungicide AF2 do I have available?"
+
+When showing the math, include every component so the user can audit it:
+> "DKC 100-01 / FUNGICIDE / AF2 / Bag has 950 available units: 2,100 received − 1,125 delivered − 100 replanted + 100 returned − 125 staged."
+
+### Why is available lower than physical?
+> "Why is my available inventory lower than physical on hand?"
+
+Available is physical minus **staged** — product set aside for a customer but not yet delivered. Explain staged units; do NOT attribute the gap to replants (replants already reduced *physical*, not available):
+> "Your available is lower because 125 units are staged for delivery — they're still in the warehouse but reserved, so they're subtracted from available. (Replanted units, by contrast, already left the warehouse and were subtracted from physical on hand.)"
 
 ### Physical-only question
 > "How much physical inventory do I have for 103-93?"
@@ -103,7 +121,7 @@ For questions about specific staged deliveries ("what staged deliveries do I hav
 - User asks which products are unavailable because they are fully staged (cross-view join with inventory)
 - User asks cross-domain aggregate questions involving staged deliveries
 
-The `v_agent_inventory` view exposes the DB columns directly: `units_on_hand`, `units_staged`, `available_units`.
+The `v_agent_inventory` view exposes the DB columns directly: `units_received`, `units_delivered`, `units_replanted`, `units_returned`, `units_on_hand`, `units_staged`, `available_units`. `units_on_hand = received − delivered − replanted + returned`.
 
 Example queries:
 ```sql
@@ -113,6 +131,13 @@ SELECT product_name, treatment_name, seed_size, package_type,
 FROM v_agent_inventory
 WHERE units_staged > 0 AND available_units <= 0
 LIMIT 50;
+
+-- Products with the most replanted units
+SELECT product_name, treatment_name, seed_size, package_type, units_replanted
+FROM v_agent_inventory
+WHERE units_replanted > 0
+ORDER BY units_replanted DESC
+LIMIT 20;
 
 -- All staged items for a customer
 SELECT customer_name, product_name, treatment_name, seed_size,

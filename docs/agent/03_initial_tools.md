@@ -31,15 +31,18 @@ The agent must never say "I cannot retrieve this" without first attempting a que
 
 **Key output fields:**
 - `total_available_units` — primary answer to "how many do I have?" (physical minus staged)
-- `total_physical_units_on_hand` — warehouse count only
+- `total_physical_units_on_hand` — warehouse count only (`received − delivered − replanted + returned`)
+- `total_replanted_units` — seed handed to customers to re-plant failed fields (already subtracted from physical)
 - `total_staged_units` — reserved in active staged deliveries
-- `rows[]` — one row per (product/treatment/seed_size/package_type); each row always carries `seed_size` (null for soybeans) and `package_type`
+- `rows[]` — one row per (product/treatment/seed_size/package_type); each row carries `seed_size` (null for soybeans), `package_type`, and `replanted_units`
 
 **Row-level display rules (seed_size is required):**
 - Every inventory response must include a per-row breakdown after the total headline.
-- Each row must show: treatment / seed_size (use "—" when null) / package_type / physical / staged / available.
+- Each row must show: treatment / seed_size (use "—" when null) / package_type / physical / staged / available. Include replanted units when explaining how physical was derived.
 - Rows with different seed sizes must be listed separately — never combined.
 - This is operationally required: users need seed_size to create deliveries and make fulfillment decisions for corn products.
+
+**Physical formula:** `physical_units_on_hand = received − delivered − replanted + returned` (replants subtract — the seed left the warehouse). `available_units = physical − staged`. Replanted is distinct from staged: replanted already left the warehouse; staged is still on hand but reserved.
 
 **Aggregation rules by query type:**
 1. Product-only question → headline total + breakdown by treatment / seed_size / package_type for every row

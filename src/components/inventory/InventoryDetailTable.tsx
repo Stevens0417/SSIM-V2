@@ -107,6 +107,7 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
                 <th className={styles.center}>Pkg</th>
                 <th className={styles.right}>Received</th>
                 <th className={styles.right}>Delivered</th>
+                <th className={styles.right}>Replanted</th>
                 <th className={styles.right}>Returned</th>
                 <th className={styles.right}>Physical On Hand</th>
                 <th className={styles.right}>Staged</th>
@@ -122,6 +123,7 @@ export default function InventoryDetailTable({ rows, loading, error, onFilteredC
                   <td className={styles.center}>{fmtPackageType(r.package_type)}</td>
                   <td className={styles.mono}>{r.units_received}</td>
                   <td className={styles.mono}>{r.units_delivered}</td>
+                  <td className={styles.mono}>{r.units_replanted}</td>
                   <td className={styles.mono}>{r.units_returned}</td>
                   <td className={styles.mono}>{r.units_on_hand}</td>
                   <td className={styles.mono}>{r.units_staged}</td>

@@ -40,8 +40,8 @@ const SQL_MODEL_SYSTEM_PROMPT = `You are a SQL query generator for Stevens Seeds
 ## Approved views
 
 v_agent_inventory — on-hand, staged, and available seed inventory (user-scoped)
-  Columns: product_name TEXT, treatment_name TEXT, seed_size TEXT (NULL for soybean/packaging), package_type TEXT ('bag'=Bag, 'tote'=Seedpak), units_on_hand INT, units_staged INT, available_units INT
-  Notes: units_on_hand = received−delivered+returned; units_staged = reserved in active staged deliveries; available_units = units_on_hand − units_staged
+  Columns: product_name TEXT, treatment_name TEXT, seed_size TEXT (NULL for soybean/packaging), package_type TEXT ('bag'=Bag, 'tote'=Seedpak), units_received INT, units_delivered INT, units_replanted INT, units_returned INT, units_on_hand INT, units_staged INT, available_units INT
+  Notes: units_on_hand = received − delivered − replanted + returned; units_replanted = seed handed to customers to re-plant failed fields (already subtracted from units_on_hand); units_staged = reserved in active staged deliveries; available_units = units_on_hand − units_staged. For "most replanted units" questions, aggregate units_replanted from this view.
 
 v_agent_staged_deliveries — in-progress staged deliveries only (user-scoped)
   Columns: staged_delivery_id UUID, customer_name TEXT, farm_name TEXT, season_year INT, staged_date DATE, notes TEXT, product_name TEXT, treatment_name TEXT, seed_size TEXT, package_type TEXT, units_staged INT, created_at TIMESTAMPTZ
@@ -107,6 +107,14 @@ Question: Which products have negative available inventory?
   "reason": "Filter v_agent_inventory where available_units is negative.",
   "expected_result": "Product rows where more has been staged or delivered than physically received.",
   "method_summary": "I queried the approved inventory view for rows where available units are negative."
+}
+
+Question: Which products have the most replanted units?
+{
+  "sql": "SELECT product_name, treatment_name, seed_size, package_type, units_replanted FROM v_agent_inventory WHERE units_replanted > 0 ORDER BY units_replanted DESC LIMIT 20",
+  "reason": "Rank v_agent_inventory rows by units_replanted descending; units_replanted is the seed handed to customers to re-plant failed fields.",
+  "expected_result": "Product rows with their replanted unit counts, highest first.",
+  "method_summary": "I queried the approved inventory view and ranked products by replanted units."
 }
 
 Question: What is our total profit this season?

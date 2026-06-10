@@ -105,7 +105,7 @@ export default function OnHandInventoryPage() {
         <div className={styles.headerText}>
           <div className={styles.headerTitle}>On-Hand Inventory</div>
           <div className={styles.headerSub}>
-            Physical On Hand &minus; Staged = Available
+            Received &minus; Delivered &minus; Replanted + Returned &minus; Staged = Available
           </div>
         </div>
       </div>
