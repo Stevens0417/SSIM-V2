@@ -8,9 +8,10 @@ import {
 import { fetchSeasons } from "@/services/pricing.service";
 import AdjustmentsTable from "@/components/adjustments/AdjustmentsTable";
 import CustomerReportTab from "@/components/adjustments/CustomerReportTab";
+import CustomerSummaryTab from "@/components/adjustments/CustomerSummaryTab";
 import styles from "./adjustments.module.css";
 
-type ActiveTab = "yearEnd" | "customerReport";
+type ActiveTab = "yearEnd" | "customerReport" | "customerSummary";
 
 export default function AdjustmentsPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("yearEnd");
@@ -67,7 +68,9 @@ export default function AdjustmentsPage() {
   const headerSubtitle =
     activeTab === "yearEnd"
       ? "Orders vs Deliveries vs Returns reconciliation"
-      : "Per-customer detailed adjustment report";
+      : activeTab === "customerReport"
+        ? "Per-customer detailed adjustment report"
+        : "Per-customer physical product movement summary";
 
   return (
     <div>
@@ -92,6 +95,12 @@ export default function AdjustmentsPage() {
           onClick={() => setActiveTab("customerReport")}
         >
           Customer Report
+        </button>
+        <button
+          className={`${styles.tabBtn} ${activeTab === "customerSummary" ? styles.tabBtnActive : ""}`}
+          onClick={() => setActiveTab("customerSummary")}
+        >
+          Customer Summary
         </button>
       </div>
 
@@ -126,6 +135,11 @@ export default function AdjustmentsPage() {
       {/* ---- Customer Report Tab ---- */}
       {activeTab === "customerReport" && (
         <CustomerReportTab seasons={seasons} />
+      )}
+
+      {/* ---- Customer Summary Tab ---- */}
+      {activeTab === "customerSummary" && (
+        <CustomerSummaryTab seasons={seasons} />
       )}
     </div>
   );

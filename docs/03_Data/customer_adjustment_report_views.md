@@ -8,6 +8,8 @@ Migrations:
 
 For feature-level documentation (how to use the report, print behavior, user workflow), see [`/docs/features/customer_adjustment_report.md`](../features/customer_adjustment_report.md).
 
+These same views also power the simplified **Customer Summary** report — see [Reuse by the Customer Summary report](#reuse-by-the-customer-summary-report) below and [`/docs/features/customer_summary_report.md`](../features/customer_summary_report.md).
+
 ---
 
 ## Views
@@ -223,6 +225,31 @@ A `net_units = 0` row means the order line is fully reconciled.
 | `completed` source | `invoice_adjustment_checks` | Same |
 
 Both views use the same net_units formula and early_pay_bucket logic. The summary view is additive — it does not replace or alter `v_year_end_adjustments`. Both views exclude packaging products.
+
+---
+
+## Reuse by the Customer Summary report
+
+The simplified **Customer Summary** report (Adjustments → Customer Summary) reuses a subset of these views directly. **No new view or migration was created** for it — the existing views already provide all the data it needs:
+
+| Customer Summary section | View reused |
+|---|---|
+| Deliveries | `v_customer_adjustment_report_deliveries` |
+| Returns | `v_customer_adjustment_report_returns` |
+| Replants | `v_customer_adjustment_report_replants` |
+| Packaging Summary | `v_customer_adjustment_report_packaging` |
+
+The **Summary Totals** and the **Movement Summary by Product** (grouped by product + treatment + seed_size + package_type) are aggregated **client-side** from the detail rows in `src/services/customerSummary.service.ts` (`computeSummaryTotals`, `buildMovementSummary`). Because the seed detail views already exclude packaging, the movement summary is seed-only by construction and packaging never mixes in.
+
+The Customer Summary uses a different headline metric than the reconciliation summary:
+
+```
+net_physical_units = units_delivered + units_replanted − units_returned
+```
+
+This measures what the customer physically kept, versus the reconciliation `net_units` (below) which measures what is still unsettled. The two are intentionally different and the Customer Summary does **not** consume `v_customer_adjustment_report_summary` (it carries orders/early-pay grain that the simplified summary deliberately omits).
+
+> **Note:** The recommended `v_customer_movement_summary` and `v_customer_packaging_summary` views from the original feature brief were **not** created. Client-side aggregation over the existing detail/packaging views fully satisfies the requirement (small per-customer/season row counts) and avoids adding redundant database objects.
 
 ---
 
