@@ -92,3 +92,18 @@ table td {
     display: none !important;
   }
 }
+
+/* ---- Customer Summary print mode ---- */
+/* Applied via body class so only the summary content prints */
+@media print {
+  body.printing-customer-summary .no-print {
+    display: none !important;
+  }
+
+  /* Hide the adjustments page header band, tab nav, and season bar */
+  body.printing-customer-summary [data-adjustments-header],
+  body.printing-customer-summary [data-adjustments-tabnav],
+  body.printing-customer-summary [data-adjustments-seasonbar] {
+    display: none !important;
+  }
+}
