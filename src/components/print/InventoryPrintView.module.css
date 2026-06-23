@@ -126,6 +126,17 @@
   -webkit-print-color-adjust: exact;
 }
 
+/* Crop section subtotals */
+.cropTotal td {
+  background: #f0f0f0 !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-top: 1.5px solid #000 !important;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
 /* ---- Footer / watermark ---- */
 .footer {
   margin-top: 6mm;
