@@ -75,13 +75,14 @@ export default function Sidebar() {
       {/* ---- Mobile Top Bar ---- */}
       <div className={styles.mobileTopBar}>
         <Image
-          src="/assets/logos/logo-horizontal.png"
+          src="/assets/logos/logo-horizontal.svg"
           alt="Stevens Seeds Inventory Management"
-          width={180}
-          height={40}
+          width={710}
+          height={148}
           className={styles.mobileTopLogoImg}
           style={{ objectFit: "contain", height: "36px", width: "auto" }}
           priority
+          unoptimized
         />
         <button
           className={styles.hamburger}
@@ -150,13 +151,14 @@ export default function Sidebar() {
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
           <Image
-            src="/assets/logos/logo-main.png"
+            src="/assets/logos/logo-main.svg"
             alt="Stevens Seeds Inventory Management"
-            width={180}
-            height={80}
+            width={696}
+            height={151}
             className={styles.logoImg}
             style={{ objectFit: "contain", width: "100%", height: "auto", maxHeight: "80px" }}
             priority
+            unoptimized
           />
         </div>
         <nav className={styles.nav}>
