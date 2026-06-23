@@ -75,12 +75,12 @@ export default function Sidebar() {
       {/* ---- Mobile Top Bar ---- */}
       <div className={styles.mobileTopBar}>
         <Image
-          src="/assets/logos/logo-horizontal.svg"
+          src="/assets/logos/logo-main.svg"
           alt="Stevens Seeds Inventory Management"
-          width={710}
-          height={148}
+          width={767}
+          height={216}
           className={styles.mobileTopLogoImg}
-          style={{ objectFit: "contain", height: "36px", width: "auto" }}
+          style={{ objectFit: "contain", height: "38px", width: "auto" }}
           priority
           unoptimized
         />
@@ -153,10 +153,10 @@ export default function Sidebar() {
           <Image
             src="/assets/logos/logo-main.svg"
             alt="Stevens Seeds Inventory Management"
-            width={696}
-            height={151}
+            width={767}
+            height={216}
             className={styles.logoImg}
-            style={{ objectFit: "contain", width: "100%", height: "auto", maxHeight: "80px" }}
+            style={{ objectFit: "contain", width: "100%", height: "auto", maxHeight: "88px" }}
             priority
             unoptimized
           />
