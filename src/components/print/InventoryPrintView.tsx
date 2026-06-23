@@ -14,6 +14,15 @@ export default function InventoryPrintView({ rows, printDate }: Props) {
   const cornRows = rows.filter((r) => r.crop?.toLowerCase() === "corn");
   const beanRows = rows.filter((r) => r.crop?.toLowerCase() !== "corn");
 
+  const sumUnits = (subset: InventoryPrintRow[]) => ({
+    onHand: subset.reduce((s, r) => s + r.units_on_hand, 0),
+    staged: subset.reduce((s, r) => s + r.units_staged, 0),
+    available: subset.reduce((s, r) => s + r.available_units, 0),
+  });
+
+  const cornTotals = sumUnits(cornRows);
+  const beanTotals = sumUnits(beanRows);
+
   const renderRows = (subset: InventoryPrintRow[]) =>
     subset.map((row, i) => (
       <tr key={`${row.product_id}-${row.treatment_id}-${row.seed_size ?? ""}-${row.package_type ?? ""}-${i}`}>
@@ -26,6 +35,18 @@ export default function InventoryPrintView({ rows, printDate }: Props) {
         <td className={styles.right}>{row.available_units.toLocaleString()}</td>
       </tr>
     ));
+
+  const renderTotalRow = (
+    label: string,
+    totals: { onHand: number; staged: number; available: number },
+  ) => (
+    <tr className={styles.cropTotal}>
+      <td colSpan={4}>{label}</td>
+      <td className={styles.right}>{totals.onHand.toLocaleString()}</td>
+      <td className={styles.right}>{totals.staged.toLocaleString()}</td>
+      <td className={styles.right}>{totals.available.toLocaleString()}</td>
+    </tr>
+  );
 
   return (
     <div className={styles.page}>
@@ -67,12 +88,14 @@ export default function InventoryPrintView({ rows, printDate }: Props) {
             </tr>
           )}
           {renderRows(cornRows)}
+          {cornRows.length > 0 && renderTotalRow("Corn Total", cornTotals)}
           {beanRows.length > 0 && (
             <tr className={styles.cropDivider}>
               <td colSpan={7}>Soybean</td>
             </tr>
           )}
           {renderRows(beanRows)}
+          {beanRows.length > 0 && renderTotalRow("Soybean Total", beanTotals)}
         </tbody>
       </table>
 
