@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 767 216" width="767" height="216" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
   <defs>
     <linearGradient id="leafA" x1="0" y1="0" x2="0.8" y2="1">
       <stop offset="0" stop-color="#8ace49"/>
@@ -14,31 +14,21 @@
     </linearGradient>
   </defs>
 
-  <!-- Dark navy rounded-rectangle badge background -->
-  <rect x="4" y="4" width="759" height="208" rx="28" ry="28" fill="#17223b"/>
+  <!-- Full-bleed navy background (safe for maskable / Apple touch icons) -->
+  <rect x="0" y="0" width="512" height="512" fill="#17223b"/>
 
-  <g transform="translate(34,8)">
-    <!-- Hexagon mark -->
+  <!-- Hexagon mark, centered within the maskable safe zone -->
+  <g transform="translate(90.4,76) scale(1.8)">
     <path d="M53 34 L131 34 L170 100 L131 166 L53 166 L14 100 Z" stroke="#ffffff" stroke-width="7" stroke-linejoin="round" fill="none"/>
-    <!-- Bar chart -->
     <g fill="#6cb04a">
       <rect x="95" y="146" width="8" height="16" rx="2"/>
       <rect x="107" y="138" width="8" height="24" rx="2"/>
       <rect x="119" y="128" width="8" height="34" rx="2"/>
     </g>
-    <!-- Seedling -->
     <path d="M92 156 C92 132 90 114 92 96 C94 114 96 132 96 156 Z" fill="url(#stemG)"/>
     <path d="M92 98 C74 66 56 52 40 56 C40 82 60 100 92 98 Z" fill="url(#leafB)"/>
     <path d="M92 96 C110 62 130 48 146 52 C146 80 124 98 92 96 Z" fill="url(#leafA)"/>
     <path d="M46 64 C62 70 80 82 91 97" stroke="#ffffff" stroke-opacity="0.4" stroke-width="2" fill="none" stroke-linecap="round"/>
     <path d="M140 60 C120 66 102 80 92 96" stroke="#ffffff" stroke-opacity="0.4" stroke-width="2" fill="none" stroke-linecap="round"/>
-    <!-- Wordmark -->
-    <g font-family="Arial, Helvetica, sans-serif">
-      <text x="206" y="92" font-size="56" font-weight="800" fill="#ffffff" letter-spacing="1.5">STEVENS SEEDS</text>
-      <line x1="208" y1="119" x2="230" y2="119" stroke="#6cb84a" stroke-width="3"/>
-      <text x="238" y="127" font-size="22" font-weight="700" fill="#6cb84a" letter-spacing="3">INVENTORY MANAGEMENT</text>
-      <line x1="597" y1="119" x2="619" y2="119" stroke="#6cb84a" stroke-width="3"/>
-      <text x="208" y="159" font-size="20" font-weight="600" fill="#9aa7b8" letter-spacing="6.5">TRACK. MANAGE. GROW.</text>
-    </g>
   </g>
 </svg>
