@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browserClient";
 import styles from "./AuthModal.module.css";
 
@@ -53,8 +54,17 @@ export default function AuthModal() {
   return (
     <div className={styles.overlay}>
       <div className={styles.card}>
-        <h1 className={styles.title}>Stevens Seeds</h1>
-        <p className={styles.subtitle}>Inventory Management</p>
+        <h1 className={styles.logo}>
+          <Image
+            src="/assets/logos/logo-main.svg"
+            alt="Stevens Seeds Inventory Management"
+            width={767}
+            height={216}
+            priority
+            unoptimized
+            style={{ width: "100%", maxWidth: "300px", height: "auto" }}
+          />
+        </h1>
 
         <div className={styles.toggle}>
           <button
