@@ -134,19 +134,40 @@ The Adjustments page hosts several tabs over the same season data:
 
 The Corn/Bean Summary views are **additive**. They do not modify or depend on the Year-End Adjustments or Customer Adjustment Report views, and existing Adjustments behavior is unchanged.
 
+The frontend tabs that consume these views are documented in [`/docs/features/adjustments_crop_summaries.md`](../features/adjustments_crop_summaries.md).
+
 ---
 
 ## Validation
 
-Logical validation was run against a temporary harness (stub tables, fixed `user_id` in place of `auth.uid()`) covering every required scenario:
+Validation was run against a temporary harness (stub tables, fixed `user_id` in place of `auth.uid()`) replicating the shipped view DDL, covering every required scenario:
 
 | Test | Result |
 |---|---|
 | Corn movement appears under `crop_group = 'corn'` | ✅ |
 | Bean movement appears under `crop_group = 'beans'` | ✅ |
-| Pallet / Seedpak (`crop = 'packaging'`) rows excluded | ✅ |
+| Mixed-crop customer: corn product → Corn tab only, bean product → Bean tab only | ✅ |
+| Crop normalization: `corn`/`Corn` → `corn`; `soybean`/`soybeans` → `beans` | ✅ |
+| Pallet / Seedpak (`crop = 'packaging'`) rows excluded from both tabs | ✅ |
 | Replant-only row appears (delivered 0, returned 0, replanted > 0) | ✅ |
 | Return-only row appears (returned > 0) | ✅ |
 | `net_units = delivered + replanted − returned` | ✅ |
+| Totals (`Σ delivered`, `Σ returned`, `Σ replanted`, net, distinct customers/varieties) match visible rows | ✅ |
 | `seed_size` / `package_type` grain preserved (separate bag vs. tote rows) | ✅ |
-| Rows scoped to the requesting `user_id` only | ✅ |
+| Season filter isolates rows by `season_year` (2024 data excluded from 2025) | ✅ |
+| Rows scoped to the requesting `user_id` only (other users excluded) | ✅ |
+
+**Full QA worked example** (single user, season 2025):
+
+| Tab | Customer | Product | Delivered | Returned | Replanted | Net |
+|---|---|---|---|---|---|---|
+| Corn | Corn Carl | DKC 45 | 100 | 10 | 5 | 95 |
+| Corn | Mixed Mary | DKC 50 | 20 | 0 | 0 | 20 |
+| Bean | Bean Beth | SOY 22 | 40 | 8 | 2 | 34 |
+| Bean | Mixed Mary | SOY 30 | 15 | 5 | 0 | 10 |
+
+Corn totals: delivered 120, returned 10, replanted 5, **net 115**, 2 customers, 2 varieties.
+Bean totals: delivered 55, returned 13, replanted 2, **net 44**, 2 customers, 2 varieties.
+Packaging deliveries/returns for "Pack Pete" produced **zero** rows on either tab.
+
+Static checks: `tsc --noEmit` clean, `next lint` clean, `vitest` 44/44 passing, `next build` succeeds.
