@@ -288,6 +288,37 @@ A `net_units = 0` line means the order line is fully reconciled. Positive values
 
 ---
 
+## Crop Group
+
+**Crop group** is a normalized crop bucket used by the Corn Summary and Bean Summary tabs so the frontend can filter reliably on a stable value regardless of how the raw `products.crop` string is recorded.
+
+| `crop_group` | Source `products.crop` values |
+|---|---|
+| `'corn'` | `corn` |
+| `'beans'` | `soybean`, `soybeans`, `bean`, `beans` |
+
+Packaging products (`crop = 'packaging'`) are excluded from crop-group reporting entirely. The raw `crop` value is preserved alongside `crop_group` in `v_crop_customer_movement_summary`.
+
+---
+
+## Crop Customer Movement Summary (Corn / Bean Summary)
+
+The **Corn Summary** and **Bean Summary** tabs on the Adjustments page show a season-level, **movement-only** summary of every customer and variety: total units delivered, returned, and replanted, plus a movement net. Orders and pricing are intentionally excluded — this is physical movement only.
+
+**Movement net formula** (what the customer physically kept):
+
+```
+net_units = units_delivered + units_replanted − units_returned
+```
+
+This is the **opposite sign convention** from the Year-End Adjustment / Customer Adjustment Report net (`ordered − delivered − replanted + returned`), which measures outstanding units to settle. The two answer different questions and are not interchangeable.
+
+**Grain:** `(user_id, season_year, crop, customer_id, product_id, treatment_id, seed_size, package_type)` — `seed_size` and `package_type` are preserved so bag and Seedpak movements stay distinct.
+
+**Backed by views:** `v_crop_customer_movement_summary` (detail) and `v_crop_customer_movement_totals` (top-of-page totals). Packaging items (`products.crop = 'packaging'`) are excluded. See `crop_customer_movement_summary_views.md`.
+
+---
+
 ## Packaging Item (Customer Report)
 
 A **packaging item** in the context of the Customer Adjustment Report is a logistics or container product (pallet, Seedpak container) that is delivered to and returned from customers but is NOT a seed sales unit.
