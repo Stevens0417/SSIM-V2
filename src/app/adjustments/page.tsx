@@ -9,9 +9,15 @@ import { fetchSeasons } from "@/services/pricing.service";
 import AdjustmentsTable from "@/components/adjustments/AdjustmentsTable";
 import CustomerReportTab from "@/components/adjustments/CustomerReportTab";
 import CustomerSummaryTab from "@/components/adjustments/CustomerSummaryTab";
+import CropSummaryTab from "@/components/adjustments/CropSummaryTab";
 import styles from "./adjustments.module.css";
 
-type ActiveTab = "yearEnd" | "customerReport" | "customerSummary";
+type ActiveTab =
+  | "yearEnd"
+  | "customerReport"
+  | "customerSummary"
+  | "cornSummary"
+  | "beanSummary";
 
 export default function AdjustmentsPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("yearEnd");
@@ -70,7 +76,11 @@ export default function AdjustmentsPage() {
       ? "Orders vs Deliveries vs Returns reconciliation"
       : activeTab === "customerReport"
         ? "Per-customer detailed adjustment report"
-        : "Per-customer physical product movement summary";
+        : activeTab === "customerSummary"
+          ? "Per-customer physical product movement summary"
+          : activeTab === "cornSummary"
+            ? "Corn customer movement summary"
+            : "Bean customer movement summary";
 
   return (
     <div>
@@ -101,6 +111,18 @@ export default function AdjustmentsPage() {
           onClick={() => setActiveTab("customerSummary")}
         >
           Customer Summary
+        </button>
+        <button
+          className={`${styles.tabBtn} ${activeTab === "cornSummary" ? styles.tabBtnActive : ""}`}
+          onClick={() => setActiveTab("cornSummary")}
+        >
+          Corn Summary
+        </button>
+        <button
+          className={`${styles.tabBtn} ${activeTab === "beanSummary" ? styles.tabBtnActive : ""}`}
+          onClick={() => setActiveTab("beanSummary")}
+        >
+          Bean Summary
         </button>
       </div>
 
@@ -140,6 +162,16 @@ export default function AdjustmentsPage() {
       {/* ---- Customer Summary Tab ---- */}
       {activeTab === "customerSummary" && (
         <CustomerSummaryTab seasons={seasons} />
+      )}
+
+      {/* ---- Corn Summary Tab ---- */}
+      {activeTab === "cornSummary" && (
+        <CropSummaryTab seasons={seasons} cropGroup="corn" />
+      )}
+
+      {/* ---- Bean Summary Tab ---- */}
+      {activeTab === "beanSummary" && (
+        <CropSummaryTab seasons={seasons} cropGroup="beans" />
       )}
     </div>
   );
