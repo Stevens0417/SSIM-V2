@@ -10,6 +10,8 @@ For feature-level documentation (how to use the report, print behavior, user wor
 
 These same views also power the simplified **Customer Summary** report — see [Reuse by the Customer Summary report](#reuse-by-the-customer-summary-report) below and [`/docs/features/customer_summary_report.md`](../features/customer_summary_report.md).
 
+> **Related:** the **Corn Summary** and **Bean Summary** tabs on the Adjustments page are powered by a separate, movement-only view family — see [`crop_customer_movement_summary_views.md`](./crop_customer_movement_summary_views.md). Those views use a different (movement) net formula and group by crop; they do not consume the reconciliation views below.
+
 ---
 
 ## Views
