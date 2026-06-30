@@ -59,7 +59,7 @@ Totals always reflect the **currently visible rows** (i.e. after any search filt
 
 > Product/variety, treatment, and seed size are **no longer shown** — the summary aggregates across them.
 
-**Default sort:** Customer → Package Type (ascending).
+**Default sort:** Customer → Farm Name → Package Type (all ascending).
 
 **Empty state:** "No corn movement found for this season." / "No bean movement found for this season."
 

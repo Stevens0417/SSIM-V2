@@ -78,17 +78,21 @@ describe("computeCropMovementTotals", () => {
 });
 
 describe("sortCropMovementRows", () => {
-  it("sorts by customer, then package type", () => {
+  it("sorts by customer, then farm name, then package type", () => {
     const rows = [
-      row({ customer_name: "Bravo", package_type: "bag" }),
-      row({ customer_name: "Alpha", package_type: "tote" }),
-      row({ customer_name: "Alpha", package_type: "bag" }),
+      row({ customer_name: "Bravo", farm_name: "South", package_type: "bag" }),
+      row({ customer_name: "Alpha", farm_name: "North", package_type: "tote" }),
+      row({ customer_name: "Alpha", farm_name: "North", package_type: "bag" }),
+      row({ customer_name: "Alpha", farm_name: "East", package_type: "tote" }),
     ];
     const sorted = sortCropMovementRows(rows);
-    expect(sorted.map((r) => [r.customer_name, r.package_type])).toEqual([
-      ["Alpha", "bag"],
-      ["Alpha", "tote"],
-      ["Bravo", "bag"],
+    expect(
+      sorted.map((r) => [r.customer_name, r.farm_name, r.package_type])
+    ).toEqual([
+      ["Alpha", "East", "tote"],
+      ["Alpha", "North", "bag"],
+      ["Alpha", "North", "tote"],
+      ["Bravo", "South", "bag"],
     ]);
   });
 

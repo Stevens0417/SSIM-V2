@@ -84,7 +84,7 @@ export function computeCropMovementTotals(
 }
 
 /**
- * Default sort: customer asc, then package type asc.
+ * Default sort: customer asc, then farm name asc, then package type asc.
  *
  * Pure function — exported for unit testing.
  */
@@ -94,6 +94,8 @@ export function sortCropMovementRows(
   return [...rows].sort((a, b) => {
     const c = a.customer_name.localeCompare(b.customer_name);
     if (c !== 0) return c;
+    const f = (a.farm_name ?? "").localeCompare(b.farm_name ?? "");
+    if (f !== 0) return f;
     return a.package_type.localeCompare(b.package_type);
   });
 }
