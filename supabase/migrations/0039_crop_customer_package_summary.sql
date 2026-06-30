@@ -107,7 +107,12 @@ with delivered as (
       else lower(coalesce(p.crop, ''))
     end                                       as crop_group,
     d.customer_id,
-    d.package_type,
+    -- NULL package_type (legacy rows; the column is nullable on the
+    -- base movement tables) is normalized to 'bag' — the same
+    -- convention used by v_on_hand_inventory and the fmtPackageType
+    -- display helper. This also keeps package_type non-null so the
+    -- key UNION and the equality joins below never compare NULLs.
+    coalesce(d.package_type, 'bag')           as package_type,
     sum(d.units_delivered)::integer           as units_delivered
   from deliveries d
   join products p on p.id = d.product_id
@@ -124,7 +129,7 @@ with delivered as (
       when 'beans'    then 'beans'
       else lower(coalesce(p.crop, ''))
     end,
-    d.customer_id, d.package_type
+    d.customer_id, coalesce(d.package_type, 'bag')
 ),
 returned as (
   select
@@ -139,7 +144,7 @@ returned as (
       else lower(coalesce(p.crop, ''))
     end                                       as crop_group,
     r.customer_id,
-    r.package_type,
+    coalesce(r.package_type, 'bag')           as package_type,
     sum(r.units_returned)::integer            as units_returned
   from returns r
   join products p on p.id = r.product_id
@@ -155,7 +160,7 @@ returned as (
       when 'beans'    then 'beans'
       else lower(coalesce(p.crop, ''))
     end,
-    r.customer_id, r.package_type
+    r.customer_id, coalesce(r.package_type, 'bag')
 ),
 replanted as (
   select
@@ -170,7 +175,7 @@ replanted as (
       else lower(coalesce(p.crop, ''))
     end                                       as crop_group,
     rp.customer_id,
-    rp.package_type,
+    coalesce(rp.package_type, 'bag')          as package_type,
     sum(rp.units_replanted)::integer          as units_replanted
   from replants rp
   join products p on p.id = rp.product_id
@@ -186,7 +191,7 @@ replanted as (
       when 'beans'    then 'beans'
       else lower(coalesce(p.crop, ''))
     end,
-    rp.customer_id, rp.package_type
+    rp.customer_id, coalesce(rp.package_type, 'bag')
 ),
 -- Union all keys so a row appears when activity exists in only one
 -- category (delivery-only, return-only, or replant-only).
@@ -289,6 +294,9 @@ group by user_id, season_year, crop_group;
 --    the summary must trace back to a non-packaging product. This
 --    must return ZERO rows:
 --
+--    (package_type is coalesced to 'bag' to match the view, since the
+--    base movement tables allow NULL package_type.)
+--
 --    select s.*
 --    from public.v_crop_customer_movement_summary s
 --    where not exists (
@@ -297,7 +305,7 @@ group by user_id, season_year, crop_group;
 --      join public.products p on p.id = d.product_id
 --      where d.customer_id = s.customer_id
 --        and d.season_year = s.season_year
---        and d.package_type = s.package_type
+--        and coalesce(d.package_type, 'bag') = s.package_type
 --        and coalesce(p.crop, '') <> 'packaging'
 --      union
 --      select 1
@@ -305,7 +313,7 @@ group by user_id, season_year, crop_group;
 --      join public.products p on p.id = r.product_id
 --      where r.customer_id = s.customer_id
 --        and r.season_year = s.season_year
---        and r.package_type = s.package_type
+--        and coalesce(r.package_type, 'bag') = s.package_type
 --        and coalesce(p.crop, '') <> 'packaging'
 --      union
 --      select 1
@@ -313,7 +321,7 @@ group by user_id, season_year, crop_group;
 --      join public.products p on p.id = rp.product_id
 --      where rp.customer_id = s.customer_id
 --        and rp.season_year = s.season_year
---        and rp.package_type = s.package_type
+--        and coalesce(rp.package_type, 'bag') = s.package_type
 --        and coalesce(p.crop, '') <> 'packaging'
 --    );
 --

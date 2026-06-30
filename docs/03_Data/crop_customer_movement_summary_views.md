@@ -138,7 +138,22 @@ where coalesce(p.crop, '') <> 'packaging'
 
 This is the same identifier used by `v_customer_adjustment_report_summary` and `v_year_end_adjustments`. **Pallet and Seedpak products carry `crop = 'packaging'`** and therefore never appear as crop rows in these movement summaries. They are tracked separately in `v_customer_adjustment_report_packaging`.
 
-> **Packaging vs. `package_type`:** a corn delivery with `package_type = 'tote'` is still a seed row and appears here — only products whose `crop = 'packaging'` are excluded.
+> **Packaging vs. `package_type`:** a corn delivery with `package_type = 'tote'` is still a seed row and appears here — only products whose `crop = 'packaging'` are excluded. A seed product shipped in a tote shows as `package_type = 'tote'` (displayed as "Seedpak"); the **packaging product literally named "Seedpak"** carries `crop = 'packaging'` and is excluded entirely — it never produces a `tote` crop row.
+
+---
+
+## package_type Normalization (NULL → 'bag')
+
+`package_type` is **nullable** on the base `deliveries`, `returns`, and `replants` tables (it was added in migration `0022` with no `NOT NULL` constraint, default, or backfill), so legacy rows can carry `package_type = NULL`. Each movement CTE normalizes it:
+
+```sql
+coalesce(<table>.package_type, 'bag') as package_type
+```
+
+This is required for two reasons:
+
+1. **Correctness of the joins.** The view `UNION`s the keys from the three movement CTEs and then `LEFT JOIN`s each total back on `package_type = k.package_type`. SQL equality treats `NULL = NULL` as *unknown* (not true), so a `NULL`-package row would fail to join and surface as a phantom all-zero row with its real units dropped. Coalescing to a concrete `'bag'` value keeps every key non-null so the equality joins always match.
+2. **Consistency with the rest of the app.** `v_on_hand_inventory` already keys on `coalesce(package_type, 'bag')` (migration `0022`), and the `fmtPackageType` display helper renders `NULL`/empty as **"Bag"**. Normalizing here means a legacy `NULL`-package delivery and an explicit `'bag'` delivery for the same customer merge into a single Bag row, matching what the UI shows everywhere else.
 
 ---
 
@@ -178,6 +193,23 @@ farm_name, package_type, units_delivered, units_returned,
 units_replanted, net_units
 ```
 
-Static checks after the change: `tsc --noEmit` clean, `next lint` clean, `vitest` 44/44 passing.
+### Final QA results
 
-> The migration is intended to be **run manually in Supabase**; it was not executed against any database during authoring.
+The view DDL was exercised against a local PostgreSQL harness (stub tables, a fixed `user_id` in place of `auth.uid()`) loaded with fixtures covering every required scenario. **No live Supabase connection was used** — the schema was reconstructed from the repo's migration files. Results:
+
+| Scenario | Expectation | Result |
+|---|---|---|
+| Customer with multiple corn varieties, all Bag | one aggregated Bag row; no product/treatment/seed split | ✅ 2 varieties (100 + 40) → one Bag row of 140 |
+| Customer with Bag and Seedpak (tote) seed deliveries | one row per package type | ✅ separate `bag` and `tote` rows |
+| Packaging product "Seedpak" (`crop = 'packaging'`) | excluded; no phantom `tote` row | ✅ no row produced |
+| Packaging product "Pallet" (`crop = 'packaging'`) | excluded | ✅ Carl's Bag stays 140, not 147 |
+| Bean Summary | grouped by customer/package; no corn rows | ✅ only soybean rows |
+| Net units formula | `net = delivered + replanted − returned` for every row | ✅ 0 rows violate it |
+| Totals rollup (`v_crop_customer_movement_totals`) | sums + distinct customer / package counts | ✅ corn 225/14/5 → net 216; beans 70/8/2 → net 64 |
+| Forbidden columns | no `product_*`, `treatment_*`, `seed_size`, `crop` | ✅ 0 present; column set matches spec exactly |
+| Legacy `NULL` package_type row | normalized to Bag and merged | ✅ delivery 50 + return 4 → one Bag row, net 46 |
+| Season / user isolation | other seasons and users excluded | ✅ 2024 and other-user rows excluded |
+
+Static checks after the change: `tsc --noEmit` clean, `next lint` clean, `vitest` 44/44 passing, `next build` succeeds.
+
+> The migration is intended to be **run manually in Supabase**; it was not executed against any live database during authoring or QA. The harness above was a throwaway local PostgreSQL instance built only from the repo's migration/schema files.

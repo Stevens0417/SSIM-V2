@@ -105,4 +105,8 @@ The current view grain is defined by migration `0039_crop_customer_package_summa
 
 ## QA Status
 
-Full QA was performed at both the database and application layers — see the [Validation section of the views doc](../03_Data/crop_customer_movement_summary_views.md#validation) for the worked example and the complete scenario checklist (crop filtering, mixed-crop customers, packaging exclusion, totals, season filter, user scoping). Static checks pass: TypeScript clean, lint clean, 44/44 unit tests, production build succeeds.
+Full QA was performed at both the database and application layers — see the [Validation section of the views doc](../03_Data/crop_customer_movement_summary_views.md#final-qa-results) for the complete scenario checklist (multi-variety aggregation, Bag/Seedpak split, packaging exclusion, bean filtering, totals, the net-units formula, season/user isolation, and the legacy `NULL` package_type case). The view DDL was exercised against a throwaway local PostgreSQL harness rebuilt from the repo's migration files — **no live Supabase connection was used**.
+
+**Bug fixed during final QA:** `package_type` is nullable on the base movement tables, and the view's key `UNION` + equality `LEFT JOIN`s would have dropped the units of any legacy `NULL`-package row (since `NULL = NULL` is not true in SQL). Each CTE now normalizes `package_type` with `coalesce(package_type, 'bag')`, matching `v_on_hand_inventory` and the `fmtPackageType` display helper. See the [package_type Normalization section](../03_Data/crop_customer_movement_summary_views.md#package_type-normalization-null--bag) of the views doc.
+
+Static checks pass: TypeScript clean, lint clean, 44/44 unit tests, production build succeeds.
