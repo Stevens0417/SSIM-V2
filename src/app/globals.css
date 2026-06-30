@@ -107,3 +107,18 @@ table td {
     display: none !important;
   }
 }
+
+/* ---- Corn / Bean Summary print mode ---- */
+/* Applied via body class so only the active crop summary prints */
+@media print {
+  body.printing-crop-summary .no-print {
+    display: none !important;
+  }
+
+  /* Hide the adjustments page header band, tab nav, and season bar */
+  body.printing-crop-summary [data-adjustments-header],
+  body.printing-crop-summary [data-adjustments-tabnav],
+  body.printing-crop-summary [data-adjustments-seasonbar] {
+    display: none !important;
+  }
+}
