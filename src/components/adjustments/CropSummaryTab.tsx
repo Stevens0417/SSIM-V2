@@ -20,6 +20,11 @@ const EMPTY_MESSAGE: Record<CropGroup, string> = {
   beans: "No bean movement found for this season.",
 };
 
+const REPORT_TITLE: Record<CropGroup, string> = {
+  corn: "Corn Summary",
+  beans: "Bean Summary",
+};
+
 export default function CropSummaryTab({ seasons, cropGroup }: Props) {
   const [selectedSeason, setSelectedSeason] = useState<number | null>(
     seasons.length > 0 ? seasons[0] : null
@@ -28,6 +33,7 @@ export default function CropSummaryTab({ seasons, cropGroup }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
 
   // Keep selectedSeason in sync when seasons prop arrives
   useEffect(() => {
@@ -43,17 +49,25 @@ export default function CropSummaryTab({ seasons, cropGroup }: Props) {
       try {
         const data = await fetchCropMovementSummary(season, cropGroup);
         setRows(data);
+        setGeneratedAt(new Date());
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load summary"
         );
         setRows([]);
+        setGeneratedAt(null);
       } finally {
         setLoading(false);
       }
     },
     [cropGroup]
   );
+
+  function handlePrint() {
+    document.body.classList.add("printing-crop-summary");
+    window.print();
+    document.body.classList.remove("printing-crop-summary");
+  }
 
   useEffect(() => {
     if (selectedSeason !== null) {
@@ -104,6 +118,35 @@ export default function CropSummaryTab({ seasons, cropGroup }: Props) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+
+        {!loading && !error && filteredRows.length > 0 && (
+          <button className={styles.printBtn} onClick={handlePrint}>
+            Print {REPORT_TITLE[cropGroup]}
+          </button>
+        )}
+      </div>
+
+      {/* ---- Print-only report header (Title / Season / Generated) ---- */}
+      <div className={`${styles.reportHeader} print-only`}>
+        <div className={styles.reportTitle}>{REPORT_TITLE[cropGroup]}</div>
+        <div className={styles.reportMeta}>
+          <div className={styles.metaItem}>
+            <span className={styles.metaLabel}>Season</span>
+            <span className={styles.metaValue}>{selectedSeason ?? "—"}</span>
+          </div>
+          {search.trim() && (
+            <div className={styles.metaItem}>
+              <span className={styles.metaLabel}>Filter</span>
+              <span className={styles.metaValue}>{search.trim()}</span>
+            </div>
+          )}
+          <div className={styles.metaItem}>
+            <span className={styles.metaLabel}>Generated</span>
+            <span className={styles.metaValue}>
+              {(generatedAt ?? new Date()).toLocaleDateString("en-CA")}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* ---- Error ---- */}

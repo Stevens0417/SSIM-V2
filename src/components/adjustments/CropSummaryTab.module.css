@@ -42,6 +42,64 @@
   border-color: var(--color-accent-500);
 }
 
+.printBtn {
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--color-primary-800);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.printBtn:hover {
+  opacity: 0.9;
+}
+
+/* ---- Report Header (print-only) ---- */
+.reportHeader {
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  background: var(--color-gray-50);
+}
+
+.reportTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary-800);
+  margin-bottom: 8px;
+}
+
+.reportMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.metaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metaLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.metaValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary-800);
+}
+
 /* ---- Status ---- */
 .error {
   padding: 12px 16px;
@@ -178,5 +236,111 @@
   .searchInput {
     min-height: 44px;
     font-size: 16px;
+  }
+}
+
+/* ---- Print ---- */
+@media print {
+  /* Hide the on-screen filter/search controls (incl. print button). */
+  .controlsBar {
+    display: none !important;
+  }
+
+  /* Report header box */
+  .reportHeader {
+    border: 1.5px solid #000 !important;
+    background: #fff !important;
+    border-radius: 0;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    break-inside: avoid;
+  }
+
+  .reportTitle {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #000;
+    margin-bottom: 6px;
+  }
+
+  .metaLabel {
+    font-size: 7pt;
+    color: #000;
+  }
+
+  .metaValue {
+    font-size: 10pt;
+    color: #000;
+  }
+
+  /* Summary totals */
+  .kpiRow {
+    break-inside: avoid;
+    margin-bottom: 16px;
+    gap: 8px;
+  }
+
+  .kpi {
+    border: 1px solid #000 !important;
+    background: #fff !important;
+    border-radius: 0;
+    padding: 8px 12px;
+  }
+
+  .kpiLabel {
+    font-size: 7pt;
+    color: #000;
+  }
+
+  .kpiValue,
+  .kpiValueNet {
+    font-size: 16pt;
+    color: #000;
+  }
+
+  /* Tables — clean black & white, repeat headers, keep rows intact */
+  .wrapper {
+    overflow: visible;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  .table thead {
+    display: table-header-group; /* repeat headers on each page */
+  }
+
+  .table thead th {
+    background: #fff !important;
+    text-align: left !important;
+    font-size: 8pt;
+    font-weight: 700;
+    color: #000;
+    padding: 5px 6px;
+    border: 1px solid #000 !important;
+    border-bottom: 1.5px solid #000 !important;
+    white-space: nowrap;
+  }
+
+  .table tbody td {
+    padding: 6px;
+    border: 1px solid #000 !important;
+    color: #000;
+  }
+
+  .table tbody tr {
+    break-inside: avoid;
+  }
+
+  .table tbody tr:hover {
+    background: transparent !important;
+  }
+
+  .right,
+  .mono {
+    text-align: right !important;
   }
 }
