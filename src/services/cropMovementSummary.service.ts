@@ -8,6 +8,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browserClient";
 // season-level summary view:
 //   v_crop_customer_movement_summary
 //
+// Grain: customer + farm name + package type. Product/variety,
+// treatment, and seed size are aggregated away by the view.
+//
 // The view already:
 //   - excludes packaging products (products.crop = 'packaging')
 //   - normalizes crop into crop_group ('corn' | 'beans')
@@ -23,16 +26,10 @@ export type CropGroup = "corn" | "beans";
 export interface CropMovementRow {
   user_id: string;
   season_year: number;
-  crop: string | null;
   crop_group: string;
   customer_id: string;
   customer_name: string;
   farm_name: string | null;
-  product_id: string;
-  product_name: string;
-  treatment_id: string;
-  treatment_name: string;
-  seed_size: string | null;
   package_type: string;
   units_delivered: number;
   units_returned: number;
@@ -47,12 +44,12 @@ export interface CropMovementTotals {
   // netUnits = delivered + replanted - returned
   netUnits: number;
   customerCount: number;
-  varietyCount: number;
+  packageCount: number;
 }
 
 /**
  * Sum delivered / returned / replanted units and count distinct
- * customers and varieties (products) across the given rows.
+ * customers and package types across the given rows.
  *
  * Computed from whatever rows are passed in (after search filtering)
  * so the KPI cards always match the visible table.
@@ -66,14 +63,14 @@ export function computeCropMovementTotals(
   let totalReturned = 0;
   let totalReplanted = 0;
   const customers = new Set<string>();
-  const varieties = new Set<string>();
+  const packages = new Set<string>();
 
   for (const r of rows) {
     totalDelivered += r.units_delivered ?? 0;
     totalReturned += r.units_returned ?? 0;
     totalReplanted += r.units_replanted ?? 0;
     customers.add(r.customer_id);
-    varieties.add(r.product_id);
+    packages.add(r.package_type);
   }
 
   return {
@@ -82,12 +79,12 @@ export function computeCropMovementTotals(
     totalReplanted,
     netUnits: totalDelivered + totalReplanted - totalReturned,
     customerCount: customers.size,
-    varietyCount: varieties.size,
+    packageCount: packages.size,
   };
 }
 
 /**
- * Default sort: customer asc, product asc, treatment asc, seed_size asc.
+ * Default sort: customer asc, then package type asc.
  *
  * Pure function — exported for unit testing.
  */
@@ -97,11 +94,7 @@ export function sortCropMovementRows(
   return [...rows].sort((a, b) => {
     const c = a.customer_name.localeCompare(b.customer_name);
     if (c !== 0) return c;
-    const p = a.product_name.localeCompare(b.product_name);
-    if (p !== 0) return p;
-    const t = a.treatment_name.localeCompare(b.treatment_name);
-    if (t !== 0) return t;
-    return (a.seed_size ?? "").localeCompare(b.seed_size ?? "");
+    return a.package_type.localeCompare(b.package_type);
   });
 }
 
